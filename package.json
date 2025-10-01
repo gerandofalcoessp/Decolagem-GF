@@ -1,0 +1,55 @@
+{
+  "name": "decolagem-system",
+  "version": "1.0.0",
+  "description": "Sistema de gestão CRM Social + ERP Simplificado para programas As Maras, Microcrédito e Decolagem",
+  "main": "index.js",
+  "scripts": {
+    "install:all": "npm run install:backend && npm run install:frontend && npm run install:mobile",
+    "install:backend": "cd backend && npm install",
+    "install:frontend": "cd frontend && npm install", 
+    "install:mobile": "cd mobile && npm install",
+    "dev:backend": "cd backend && npm run start:dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:mobile": "cd mobile && npm run start",
+    "build:backend": "cd backend && npm run build",
+    "build:frontend": "cd frontend && npm run build",
+    "build:mobile": "cd mobile && npm run build",
+    "start:backend": "cd backend && npm run start:prod",
+    "start:frontend": "cd frontend && npm run preview",
+    "test:backend": "cd backend && npm run test",
+    "test:frontend": "cd frontend && npm run test",
+    "lint": "npm run lint:backend && npm run lint:frontend",
+    "lint:backend": "cd backend && npm run lint",
+    "lint:frontend": "cd frontend && npm run lint",
+    "db:migrate": "cd backend && npm run migration:run",
+    "db:seed": "cd backend && npm run seed",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down"
+  },
+  "keywords": [
+    "crm",
+    "erp",
+    "gestao",
+    "social",
+    "maras",
+    "microcredito",
+    "decolagem",
+    "inclusao-produtiva"
+  ],
+  "author": "Decolagem Team",
+  "license": "PROPRIETARY",
+  "workspaces": [
+    "backend",
+    "frontend", 
+    "mobile"
+  ],
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "concurrently": "^8.2.2",
+    "cross-env": "^7.0.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}
