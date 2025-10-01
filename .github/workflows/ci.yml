@@ -1,0 +1,90 @@
+name: CI/CD Pipeline
+
+# Quando executar
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+# Variáveis de ambiente globais
+env:
+  NODE_VERSION: '18'
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+
+jobs:
+  # Job para testes do backend
+  backend-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+      
+      - name: Instalar dependências do backend
+        working-directory: ./backend
+        run: npm ci
+      
+      - name: Executar testes do backend
+        working-directory: ./backend
+        run: npm test
+      
+      - name: Verificar build do backend
+        working-directory: ./backend
+        run: npm run build
+
+  # Job para testes do frontend
+  frontend-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      
+      - name: Instalar dependências do frontend
+        working-directory: ./frontend
+        run: npm ci
+      
+      - name: Executar testes do frontend
+        working-directory: ./frontend
+        run: npm test
+      
+      - name: Build do frontend
+        working-directory: ./frontend
+        run: npm run build
+      
+      - name: Upload artifacts do build
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/dist/
+
+  # Job de deploy (só executa se os testes passarem)
+  deploy:
+    needs: [backend-tests, frontend-tests]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+      
+      - name: Deploy para produção
+        run: |
+          echo "Aqui você configuraria o deploy real"
+          echo "Por exemplo: Vercel, Netlify, AWS, etc."

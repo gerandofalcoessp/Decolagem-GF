@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  # Banco de dados PostgreSQL local (para desenvolvimento)
+  postgres:
+    image: postgres:15
+    container_name: maras-postgres
+    environment:
+      POSTGRES_DB: maras_dev
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/database/migrations:/docker-entrypoint-initdb.d
+    networks:
+      - maras-network
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: maras-backend
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://postgres:postgres123@postgres:5432/maras_dev
+      JWT_SECRET: dev-secret-key
+      PORT: 3001
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    depends_on:
+      - postgres
+    networks:
+      - maras-network
+    command: npm run dev
+
+  # Frontend React
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: maras-frontend
+    environment:
+      VITE_API_URL: http://localhost:3001
+      VITE_SUPABASE_URL: ${SUPABASE_URL}
+      VITE_SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - maras-network
+    command: npm run dev
+
+  # Redis para cache (opcional)
+  redis:
+    image: redis:7-alpine
+    container_name: maras-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - maras-network
+
+volumes:
+  postgres_data:
+
+networks:
+  maras-network:
+    driver: bridge
