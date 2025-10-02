@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { 
   MapPin, 
   Users, 
@@ -8,11 +7,13 @@ import {
   Calendar,
   Plus,
   Activity,
-  Building2
+  Building2,
+  Flag
 } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useNavigate } from 'react-router-dom';
+import { useUserStats } from '@/hooks/useUserStats';
 
 interface Regional {
   id: string;
@@ -163,8 +164,13 @@ const regionaisData: Regional[] = [
 ];
 
 export default function RegionaisPage() {
-  const [selectedRegional, setSelectedRegional] = useState<string | null>(null);
   const navigate = useNavigate();
+  const { data: userStats, loading: statsLoading, error: statsError } = useUserStats();
+
+  const handleRegionalClick = (regionalId: string) => {
+    const mappedId = mapRegionalId(regionalId);
+    navigate(`/regionais/${mappedId}`);
+  };
 
   const mapRegionalId = (id: string): string => {
     switch (id) {
@@ -178,27 +184,43 @@ export default function RegionaisPage() {
     }
   };
 
-  const totalLideres = regionaisData.filter(r => r.leader).length;
-  const totalCoordenadores = regionaisData.filter(r => r.coordinator).length;
-  const totalConsultores = regionaisData.reduce((acc, r) => acc + r.consultants.length, 0);
-  const totalMembros = regionaisData.reduce((acc, r) => acc + r.totalMembers, 0);
+  // Usar dados reais se disponíveis, senão usar dados mockados como fallback
+  const totalLideres = userStats?.lideresRegionais ?? regionaisData.filter(r => r.leader).length;
+  const totalCoordenadores = userStats?.coordenadores ?? regionaisData.filter(r => r.coordinator).length;
+  const totalConsultores = userStats?.consultores ?? regionaisData.reduce((acc, r) => acc + r.consultants.length, 0);
+  const totalMembros = userStats?.totalMembros ?? regionaisData.reduce((acc, r) => acc + r.totalMembers, 0);
+  const totalNacional = userStats?.totalNacional ?? 0; // Usuários com função "Nacional"
 
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="text-center">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Regionais</h1>
+        <h1 className="text-lg font-bold text-gray-900 mb-2">Regionais</h1>
         <p className="text-gray-600">Gestão das 8 Regionais e Equipes</p>
       </div>
 
       {/* Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+        <Card className="p-4 border-l-4 border-l-red-500">
+          <div className="flex items-center">
+            <Flag className="h-8 w-8 text-red-500 mr-3" />
+            <div>
+              <p className="text-sm text-gray-600">Nacional</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {statsLoading ? '...' : statsError ? '0' : totalNacional}
+              </p>
+            </div>
+          </div>
+        </Card>
+
         <Card className="p-4 border-l-4 border-l-yellow-500">
           <div className="flex items-center">
             <Crown className="h-8 w-8 text-yellow-500 mr-3" />
             <div>
-              <p className="text-2xl font-bold text-gray-900">{totalLideres}</p>
               <p className="text-sm text-gray-600">Líderes Regionais</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {statsLoading ? '...' : statsError ? '0' : totalLideres}
+              </p>
             </div>
           </div>
         </Card>
@@ -207,8 +229,10 @@ export default function RegionaisPage() {
           <div className="flex items-center">
             <Shield className="h-8 w-8 text-blue-500 mr-3" />
             <div>
-              <p className="text-2xl font-bold text-gray-900">{totalCoordenadores}</p>
               <p className="text-sm text-gray-600">Coordenadores</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {statsLoading ? '...' : statsError ? '0' : totalCoordenadores}
+              </p>
             </div>
           </div>
         </Card>
@@ -217,8 +241,10 @@ export default function RegionaisPage() {
           <div className="flex items-center">
             <UserCheck className="h-8 w-8 text-green-500 mr-3" />
             <div>
-              <p className="text-2xl font-bold text-gray-900">{totalConsultores}</p>
               <p className="text-sm text-gray-600">Consultores</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {statsLoading ? '...' : statsError ? '0' : totalConsultores}
+              </p>
             </div>
           </div>
         </Card>
@@ -227,8 +253,10 @@ export default function RegionaisPage() {
           <div className="flex items-center">
             <Users className="h-8 w-8 text-purple-500 mr-3" />
             <div>
-              <p className="text-2xl font-bold text-gray-900">{totalMembros}</p>
               <p className="text-sm text-gray-600">Total de Membros</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {statsLoading ? '...' : statsError ? '0' : totalMembros}
+              </p>
             </div>
           </div>
         </Card>
@@ -268,7 +296,6 @@ export default function RegionaisPage() {
               <div className="flex items-center">
                 <Crown className="h-4 w-4 text-yellow-600 mr-2" />
                 <div>
-                  <p className="text-sm font-medium text-gray-900">{regional.leader.name}</p>
                   <p className="text-xs text-gray-600">{regional.leader.role}</p>
                 </div>
               </div>
@@ -278,7 +305,6 @@ export default function RegionaisPage() {
                 <div className="flex items-center">
                   <Shield className="h-4 w-4 text-blue-600 mr-2" />
                   <div>
-                    <p className="text-sm font-medium text-gray-900">{regional.coordinator.name}</p>
                     <p className="text-xs text-gray-600">{regional.coordinator.role}</p>
                   </div>
                 </div>
@@ -289,7 +315,6 @@ export default function RegionaisPage() {
                 <div key={index} className="flex items-center">
                   <UserCheck className="h-4 w-4 text-green-600 mr-2" />
                   <div>
-                    <p className="text-sm font-medium text-gray-900">{consultant.name}</p>
                     <p className="text-xs text-gray-600">{consultant.role}</p>
                   </div>
                 </div>
