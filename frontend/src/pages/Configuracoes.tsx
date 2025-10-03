@@ -5,24 +5,23 @@ import {
   Shield, 
   Target, 
   FileText, 
-  Database,
-  User,
-  Plus,
-  Search,
-  Filter,
-  Edit,
-  Trash2,
   Eye,
   EyeOff,
-  Download,
-  Upload,
-  Info,
   X
 } from 'lucide-react';
-import { Card } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import ErrorBoundary from '@/components/ErrorBoundary';
-import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import { Button } from '../components/ui/Button';
+import ErrorBoundary from '../components/ErrorBoundary';
+import MetaFormFields from '../components/modals/meta/MetaFormFields';
+import MonthSelector from '../components/modals/meta/MonthSelector';
+import YearInput from '../components/modals/meta/YearInput';
+import RegionaisSelector from '../components/modals/meta/RegionaisSelector';
+import ActionButtons from '../components/modals/meta/ActionButtons';
+import { useMembers, useUsers, useUsersWithMembers, useGoals } from '../hooks/useApi';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
+import { MemberService } from '../services/memberService';
+import { GoalService } from '../services/goalService';
+import { AuthService } from '../services/authService';
+import { useToastContext } from '../contexts/ToastContext';
 
 interface TabItem {
   id: string;
@@ -31,77 +30,19 @@ interface TabItem {
 }
 
 const tabs: TabItem[] = [
-  { id: 'membros', name: 'Membros', icon: Users },
   { id: 'senhas', name: 'Senhas', icon: Shield },
   { id: 'metas', name: 'Metas', icon: Target },
   { id: 'arquivos', name: 'Arquivos', icon: FileText },
-  { id: 'sistema', name: 'Sistema', icon: Database },
 ];
 
-// Mock data para membros
-const mockMembros = [
-  {
-    id: 1,
-    nome: 'Deise',
-    funcao: 'Coordenador',
-    regional: 'R. Centro-Oeste',
-    status: 'ativo'
-  },
-  {
-    id: 2,
-    nome: 'Flávio',
-    funcao: 'Líder Regional',
-    regional: 'R. Centro-Oeste',
-    status: 'ativo'
-  },
-  {
-    id: 3,
-    nome: 'Alcione',
-    funcao: 'Coordenador',
-    regional: 'R. MG/ES',
-    status: 'ativo'
-  },
-  {
-    id: 4,
-    nome: 'Sérgio',
-    funcao: 'Líder Regional',
-    regional: 'R. MG/ES',
-    status: 'ativo'
-  },
-  {
-    id: 5,
-    nome: 'Ana Maria',
-    funcao: 'Consultor',
-    regional: 'R. Nordeste 1',
-    status: 'ativo'
-  },
-  {
-    id: 6,
-    nome: 'Carlos Eduardo',
-    funcao: 'Diretor',
-    regional: 'Nacional',
-    status: 'ativo'
-  },
-  {
-    id: 7,
-    nome: 'Mariana Silva',
-    funcao: 'Gerente',
-    regional: 'Comercial',
-    status: 'ativo'
-  },
-  {
-    id: 8,
-    nome: 'João Santos',
-    funcao: 'Nacional',
-    regional: 'Nacional',
-    status: 'ativo'
-  }
-];
+
 
 // Opções de funções
 const funcoes = [
   'Comercial',
   'Nacional', 
+  'Líder Nacional',
+  'Diretor Operações',
   'Líder Regional',
   'Coordenador',
   'Consultor',
@@ -125,66 +66,16 @@ const regionais = [
   'R. São Paulo'
 ];
 
-// Mock data para usuários/senhas
-const mockUsuarios = [
-  {
-    id: 1,
-    usuario: 'Amanda Boliarini',
-    email: 'amanda.boliarini@gerandofalcoes.com',
-    tipo: 'Nacional',
-    permissao: 'Super Admin',
-    regional: '-',
-    status: 'Ativo',
-    criadoEm: '19/09/2025',
-    senha: 'Admin@2025'
-  },
-  {
-    id: 2,
-    usuario: 'Lemaestro',
-    email: 'diretor.operacoes',
-    tipo: 'Nacional',
-    permissao: 'Super Admin',
-    regional: '-',
-    status: 'Ativo',
-    criadoEm: '11/08/2025',
-    senha: 'Diretor123'
-  },
-  {
-    id: 3,
-    usuario: 'Nacional SP',
-    email: 'nacionalsp',
-    tipo: 'Nacional',
-    permissao: 'Super Admin',
-    regional: '-',
-    status: 'Ativo',
-    criadoEm: '25/06/2025',
-    senha: 'NacionalSP@2025'
-  },
-  {
-    id: 4,
-    usuario: 'Léo Martins',
-    email: 'lidernacional',
-    tipo: 'Nacional',
-    permissao: 'Super Admin',
-    regional: '-',
-    status: 'Ativo',
-    criadoEm: '25/06/2025',
-    senha: 'LeoMartins456'
-  }
-];
 
-const MembrosTabLazy = lazy(() => import('./configuracoes/MembrosTab'));
+
+
 const SenhasTabLazy = lazy(() => import('./configuracoes/SenhasTab'));
 const ArquivosTabLazy = lazy(() => import('./configuracoes/ArquivosTab'));
-const SistemaTabLazy = lazy(() => import('./configuracoes/SistemaTab'));
 const MetasTabLazy = lazy(() => import('./configuracoes/MetasTab'));
 
 // Prefetch dos módulos das abas para melhorar a performance de navegação
 const prefetchTab = (id: string) => {
   switch (id) {
-    case 'membros':
-      import('./configuracoes/MembrosTab');
-      break;
     case 'senhas':
       import('./configuracoes/SenhasTab');
       break;
@@ -194,16 +85,14 @@ const prefetchTab = (id: string) => {
     case 'arquivos':
       import('./configuracoes/ArquivosTab');
       break;
-    case 'sistema':
-      import('./configuracoes/SistemaTab');
-      break;
     default:
       break;
   }
 };
 
 export default function Configuracoes() {
-  const [activeTab, setActiveTab] = useState('membros');
+  const [activeTab, setActiveTab] = useState('senhas');
+  const toast = useToastContext();
 
   // Prefetch inicial de abas mais acessadas
   useEffect(() => {
@@ -213,7 +102,7 @@ export default function Configuracoes() {
 
   // Prefetch baseado na aba ativa: pré-carrega a aba vizinha mais provável
   useEffect(() => {
-    const order = ['membros', 'senhas', 'metas', 'arquivos', 'sistema'];
+    const order = ['senhas', 'metas', 'arquivos'];
     const idx = order.indexOf(activeTab);
     if (idx !== -1) {
       const neighbor = order[idx + 1] ?? order[idx - 1];
@@ -226,11 +115,64 @@ export default function Configuracoes() {
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [showAddFuncaoModal, setShowAddFuncaoModal] = useState(false);
   const [editingMember, setEditingMember] = useState<any>(null);
-  const [newFuncao, setNewFuncao] = useState('');
-  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [editingMemberData, setEditingMemberData] = useState({
+    nome: '',
+    email: '',
+    funcao: '',
+    regional: ''
+  });
+  // Função para inicializar dados de edição quando um membro é selecionado
+  useEffect(() => {
+    if (editingMember) {
+      setEditingMemberData({
+        nome: editingMember.name || '',
+        email: editingMember.email || '',
+        funcao: editingMember.funcao || '',
+        regional: editingMember.area || editingMember.regional || ''
+      });
+    }
+  }, [editingMember]);
+   const [newFuncao, setNewFuncao] = useState('');
+   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [memberToDelete, setMemberToDelete] = useState<any>(null);
-  const [membros, setMembros] = useState(mockMembros);
-  const [usuarios, setUsuarios] = useState(mockUsuarios);
+  // Usando dados reais da API
+  const { data: members, refetch: refetchMembers } = useMembers();
+  const { data: usersWithMembers, loading: usersLoading, error: usersError, refetch: refetchUsers } = useUsersWithMembers();
+  
+  // Extrair usuários dos dados combinados e mapear para o formato esperado pela aba Gestão de Senhas
+  const usuarios = useMemo(() => {
+    if (!usersWithMembers || usersWithMembers.length === 0) return [];
+    
+    return usersWithMembers.map((user: any, index: number) => {
+      const isBanned = user.banned_until && new Date(user.banned_until) > new Date();
+      
+      // Debug: log dos dados do usuário para investigar
+      console.log('Dados do usuário combinado:', {
+        email: user.email,
+        funcao: user.funcao,
+        tipo: user.tipo,
+        role: user.role,
+        regional: user.regional,
+        nome: user.nome,
+        area: user.area
+      });
+      
+      return {
+        id: user.id || `user-${index + 1}`,
+        usuario: user.nome || user.email?.split('@')[0] || 'Usuário',
+        email: user.email || '',
+        tipo: user.tipo || (user.role === 'super_admin' ? 'Nacional' : 'Regional'), // Usar campo tipo ou inferir do role
+        permissao: user.role || 'membro', // Usar role diretamente
+        regional: user.regional || 'Nacional',
+        funcao: user.funcao || 'Não definido', // Priorizar funcao da tabela members
+        area: user.area || user.regional || 'Não definido', // Priorizar area da tabela members
+        status: isBanned ? 'Bloqueado' : (user.status === 'ativo' ? 'Ativo' : 'Inativo'),
+        criadoEm: user.created_at ? new Date(user.created_at).toLocaleDateString('pt-BR') : 'N/A',
+        senha: '••••••••', // Senha oculta por segurança
+        banned_until: user.banned_until
+      };
+    });
+  }, [usersWithMembers]);
   
   // Estados para aba Senhas
   const [showAddUserModal, setShowAddUserModal] = useState(false);
@@ -242,12 +184,32 @@ export default function Configuracoes() {
   const [searchUsuarios, setSearchUsuarios] = useState('');
   const [filterTipo, setFilterTipo] = useState('Todos');
   const [filterStatus, setFilterStatus] = useState('Todos');
+  const [filterFuncao, setFilterFuncao] = useState('Todas');
+  const [filterArea, setFilterArea] = useState('Todas');
   const [newPassword, setNewPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
+  // Estados para formulários
+  const [newMember, setNewMember] = useState({
+    nome: '',
+    email: '',
+    funcao: '',
+    regional: ''
+  });
+  const [newUser, setNewUser] = useState({
+    nome: '',
+    email: '',
+    senha: '',
+    tipo: '',
+    permissao: '',
+    regional: '',
+    funcao: ''
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   // Estados para aba Metas
   const [showNewMetaModal, setShowNewMetaModal] = useState(false);
-  const [metas, setMetas] = useState<any[]>([]);
+  const { data: metas, loading: metasLoading, error: metasError, refetch: refetchGoals } = useGoals();
   const [newMeta, setNewMeta] = useState({
     nome: '',
     nomePersonalizado: '',
@@ -290,28 +252,112 @@ export default function Configuracoes() {
     { value: '12', label: 'Dezembro' }
   ];
 
+  // Funções para gerenciar usuários
+  const handleBlockUser = async (userId: string) => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/auth/users/${userId}/block`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ duration: '24h' })
+      });
+
+      if (response.ok) {
+        await refetchUsers();
+        alert('Usuário bloqueado com sucesso!');
+      } else {
+        const error = await response.json();
+        alert(`Erro ao bloquear usuário: ${error.error}`);
+      }
+    } catch (error) {
+      console.error('Erro ao bloquear usuário:', error);
+      alert('Erro ao bloquear usuário');
+    }
+  };
+
+  const handleUnblockUser = async (userId: string) => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/auth/users/${userId}/unblock`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (response.ok) {
+        await refetchUsers();
+        alert('Usuário desbloqueado com sucesso!');
+      } else {
+        const error = await response.json();
+        alert(`Erro ao desbloquear usuário: ${error.error}`);
+      }
+    } catch (error) {
+      console.error('Erro ao desbloquear usuário:', error);
+      alert('Erro ao desbloquear usuário');
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    if (!confirm('Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/auth/users/${userId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (response.ok) {
+        await refetchUsers();
+        alert('Usuário excluído com sucesso!');
+      } else {
+        const error = await response.json();
+        alert(`Erro ao excluir usuário: ${error.error}`);
+      }
+    } catch (error) {
+      console.error('Erro ao excluir usuário:', error);
+      alert('Erro ao excluir usuário');
+    }
+  };
+
   // Filtrar membros baseado nos filtros ativos
   const filteredMembros = useMemo(() => {
-    return membros.filter(membro => {
-      const matchesSearch = membro.nome.toLowerCase().includes(searchTerm.toLowerCase());
+    if (!members || members.length === 0) return [];
+    
+    return members.filter((membro: any) => {
+      const matchesSearch = (membro.name || '').toLowerCase().includes(searchTerm.toLowerCase());
       const matchesFuncao = selectedFuncao === 'Todas as funções' || membro.funcao === selectedFuncao;
-      const matchesRegional = selectedRegional === 'Todas as áreas' || membro.regional === selectedRegional;
+      const matchesRegional = selectedRegional === 'Todas as áreas' || membro.area === selectedRegional;
       
       return matchesSearch && matchesFuncao && matchesRegional;
     });
-  }, [membros, searchTerm, selectedFuncao, selectedRegional]);
+  }, [members, searchTerm, selectedFuncao, selectedRegional]);
 
   // Filtrar usuários baseado nos filtros ativos
   const filteredUsuarios = useMemo(() => {
     return usuarios.filter(usuario => {
-      const matchesSearch = usuario.usuario.toLowerCase().includes(searchUsuarios.toLowerCase()) ||
-                           usuario.email.toLowerCase().includes(searchUsuarios.toLowerCase());
-      const matchesTipo = filterTipo === 'Todos' || usuario.tipo === filterTipo;
-      const matchesStatus = filterStatus === 'Todos' || usuario.status === filterStatus;
+      const matchesSearch = (usuario.nome?.toLowerCase() || '').includes(searchUsuarios.toLowerCase()) ||
+                           (usuario.email?.toLowerCase() || '').includes(searchUsuarios.toLowerCase());
+      const matchesTipo = filterTipo === 'Todos' || usuario.role === filterTipo;
+      const matchesStatus = filterStatus === 'Todos' || 
+                           (filterStatus === 'Ativo' && usuario.status === 'Ativo') ||
+                           (filterStatus === 'Inativo' && usuario.status === 'Inativo');
+      const matchesFuncao = filterFuncao === 'Todas' || usuario.funcao === filterFuncao;
+      const matchesArea = filterArea === 'Todas' || usuario.area === filterArea || usuario.regional === filterArea;
       
-      return matchesSearch && matchesTipo && matchesStatus;
+      return matchesSearch && matchesTipo && matchesStatus && matchesFuncao && matchesArea;
     });
-  }, [usuarios, searchUsuarios, filterTipo, filterStatus]);
+  }, [usuarios, searchUsuarios, filterTipo, filterStatus, filterFuncao, filterArea]);
 
   // Função para excluir membro
   const handleDeleteMember = (membro: any) => {
@@ -319,62 +365,320 @@ export default function Configuracoes() {
     setShowDeleteConfirmModal(true);
   };
 
-  const confirmDeleteMember = () => {
+  // Função para atualizar membro
+  const handleUpdateMember = async () => {
+    try {
+      if (!editingMember?.id) return;
+      
+      const memberData = {
+        name: editingMemberData.nome,
+        email: editingMemberData.email,
+        funcao: editingMemberData.funcao,
+        area: editingMemberData.regional
+      };
+
+      await MemberService.updateMember(editingMember.id, memberData);
+      
+      // Atualizar a lista de membros
+      await refetchMembers();
+      
+      // Fechar modal
+      setEditingMember(null);
+      setEditingMemberData({
+        nome: '',
+        email: '',
+        funcao: '',
+        regional: ''
+      });
+      
+      alert('Membro atualizado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao atualizar membro:', error);
+      alert('Erro ao atualizar membro. Tente novamente.');
+    }
+  };
+
+  // Handlers para criação de membros, usuários e metas
+  const handleCreateMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!newMember.nome.trim() || !newMember.email?.trim()) {
+      toast.warning('Campos obrigatórios', 'Por favor, preencha todos os campos obrigatórios (nome e email).');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const memberData = {
+        name: newMember.nome.trim(),
+        email: newMember.email.trim(),
+        regional_id: null, // Por enquanto, definindo como null até implementarmos a seleção de regional
+        funcao: newMember.funcao || null,
+        area: newMember.regional || null
+      };
+
+      await MemberService.createMember(memberData);
+      
+      // Fechar modal e resetar formulário
+      setShowAddMemberModal(false);
+      setNewMember({ nome: '', email: '', funcao: '', regional: '' });
+      
+      toast.success('Membro criado', 'Membro criado com sucesso!');
+      
+      // Recarregar dados (se necessário, dependendo da implementação do useMembers)
+      window.location.reload(); // Temporário - idealmente deveria atualizar o estado local
+      
+    } catch (error: any) {
+      console.error('Erro ao criar membro:', error);
+      toast.error('Erro ao criar membro', 'Ocorreu um erro ao criar o membro. Tente novamente.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleEditUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!selectedUser) return;
+
+    const formData = new FormData(e.target as HTMLFormElement);
+    const userData = {
+      nome: formData.get('nome') as string,
+      email: formData.get('email') as string,
+      tipo: formData.get('tipo') as string,
+      role: formData.get('role') as string,
+      funcao: formData.get('funcao') as string,
+      regional: formData.get('regional') as string,
+    };
+
+    console.log('🔄 Dados sendo enviados para atualização:', userData);
+
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/auth/users/${selectedUser.id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(userData)
+      });
+
+      console.log('📡 Resposta da API:', response.status, response.statusText);
+
+      if (response.ok) {
+        const responseData = await response.json();
+        console.log('✅ Dados retornados pela API:', responseData);
+        
+        console.log('🔄 Chamando refetchUsers...');
+        await refetchUsers();
+        console.log('✅ refetchUsers concluído');
+        
+        setShowEditUserModal(false);
+        setSelectedUser(null);
+        alert('Usuário atualizado com sucesso!');
+      } else {
+        const error = await response.json();
+        console.error('❌ Erro da API:', error);
+        alert(`Erro ao atualizar usuário: ${error.error}`);
+      }
+    } catch (error) {
+      console.error('❌ Erro ao atualizar usuário:', error);
+      alert('Erro ao atualizar usuário');
+    }
+  };
+
+  const handleGeneratePassword = async (userId: number) => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/auth/users/${userId}/generate-password`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        alert(`Nova senha gerada com sucesso!\n\nSenha temporária: ${data.password}\n\nAnote esta senha e repasse ao usuário. Por segurança, esta senha não será exibida novamente.`);
+        await refetchUsers();
+      } else {
+        const error = await response.json();
+        alert(`Erro ao gerar nova senha: ${error.error}`);
+      }
+    } catch (error) {
+      console.error('Erro ao gerar nova senha:', error);
+      alert('Erro ao gerar nova senha');
+    }
+  };
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!newUser.nome.trim() || !newUser.email.trim() || !newUser.senha.trim() || 
+        !newUser.tipo || !newUser.permissao || !newUser.regional || !newUser.funcao) {
+      toast.warning('Campos obrigatórios', 'Por favor, preencha todos os campos obrigatórios.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const userData = {
+        nome: newUser.nome,
+        email: newUser.email,
+        password: newUser.senha,
+        role: newUser.permissao, // Corrigido: usar permissao (Super Admin, Admin, Usuário)
+        tipo: newUser.tipo, // Adicionar tipo (Nacional/Regional)
+        regional: newUser.regional,
+        funcao: newUser.funcao
+      };
+
+      await AuthService.register(userData);
+      
+      // Atualizar ambas as listas após criação bem-sucedida
+      await Promise.all([
+        refetchUsers(),
+        refetchMembers()
+      ]);
+      
+      // Fechar modal e resetar formulário
+      setShowAddUserModal(false);
+      setNewUser({ nome: '', email: '', senha: '', tipo: '', permissao: '', regional: '', funcao: '' });
+      
+      toast.success('Usuário criado', 'Usuário criado com sucesso!');
+      
+    } catch (error) {
+      console.error('Erro ao criar usuário:', error);
+      toast.error('Erro ao criar usuário', 'Erro ao criar usuário. Tente novamente.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCreateGoal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!newMeta.nome.trim() || !newMeta.quantidade.trim() || 
+        newMeta.mes.length === 0 || newMeta.regionais.length === 0) {
+      toast.warning('Campos obrigatórios', 'Por favor, preencha todos os campos obrigatórios.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const title = newMeta.nome.trim() === 'Outra' ? newMeta.nomePersonalizado.trim() : newMeta.nome.trim();
+      const targetValue = parseFloat(newMeta.quantidade);
+      
+      // Criar descrição com detalhes da meta
+      const mesesTexto = newMeta.mes.join(', ');
+      const regionaisTexto = newMeta.regionais.join(', ');
+      const unit = newMeta.nome === 'Retenção' ? '%' : ((newMeta.nome === 'Atendidos Indiretamente' || newMeta.nome === 'Atendidos Diretamente' || newMeta.nome === 'Pessoas Atendidas') ? ' pessoas' : ' unidades');
+      const description = `Meta: ${targetValue}${unit} | Meses: ${mesesTexto} | Regionais: ${regionaisTexto}`;
+      
+      // Calcular deadline baseado no último mês selecionado
+      let ultimoMes: number;
+      
+      if (newMeta.mes.length === 0 || newMeta.mes.includes('todo-ano')) {
+        // Se não há meses selecionados ou "todo-ano" está selecionado, usar dezembro
+        ultimoMes = 12;
+      } else {
+        // Filtrar apenas valores numéricos válidos e pegar o maior
+        const mesesNumericos = newMeta.mes
+          .map(m => parseInt(m))
+          .filter(m => !isNaN(m) && m >= 1 && m <= 12);
+        
+        ultimoMes = mesesNumericos.length > 0 ? Math.max(...mesesNumericos) : 12;
+      }
+      
+      const deadline = `${newMeta.ano}-${ultimoMes.toString().padStart(2, '0')}-31`;
+
+      const goalData = {
+        nome: title,
+        descricao: description,
+        valor_meta: targetValue,
+        valor_atual: 0,
+        due_date: deadline,
+        status: 'pending' as const
+      };
+
+      console.log('Enviando dados da meta:', goalData);
+      const createdGoal = await GoalService.createGoal(goalData);
+      console.log('Meta criada com sucesso:', createdGoal);
+      
+      // Sincronizar cache global de metas
+      await refetchGoals();
+      
+      // Fechar modal e resetar formulário
+      setShowNewMetaModal(false);
+      setNewMeta({
+        nome: '',
+        nomePersonalizado: '',
+        quantidade: '',
+        mes: [],
+        ano: new Date().getFullYear().toString(),
+        regionais: []
+      });
+      
+      toast.success('Meta criada', 'Meta criada com sucesso!');
+      
+    } catch (error) {
+      console.error('Erro ao criar meta:', error);
+      toast.error('Erro ao criar meta', error instanceof Error ? error.message : 'Erro ao criar meta. Tente novamente.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const confirmDeleteMember = async () => {
     if (memberToDelete) {
-      setMembros(membros.filter(m => m.id !== memberToDelete.id));
-      setShowDeleteConfirmModal(false);
-      setMemberToDelete(null);
+      try {
+        await MemberService.deleteMember(memberToDelete.id);
+        
+        console.log('Membro excluído com sucesso:', memberToDelete);
+        toast.success('Membro excluído', 'Membro excluído com sucesso!');
+        
+        // Recarregar dados
+        window.location.reload(); // Temporário - idealmente deveria atualizar o estado local
+      } catch (error) {
+        console.error('Erro ao excluir membro:', error);
+        toast.error('Erro ao excluir membro', 'Erro ao excluir membro. Tente novamente.');
+      } finally {
+        setShowDeleteConfirmModal(false);
+        setMemberToDelete(null);
+      }
     }
   };
 
   // Função para resetar senha do usuário
-  const handleResetPassword = () => {
+  const handleResetPassword = async () => {
     if (selectedUser && newPassword.trim()) {
-      // Aqui você implementaria a lógica real de definir nova senha
-      // Por enquanto, vamos simular o processo
-      console.log(`Definindo nova senha para o usuário: ${selectedUser.usuario}`);
-      
-      // Atualizar a senha do usuário na lista
-      setUsuarios(usuarios.map(user => 
-        user.id === selectedUser.id 
-          ? { ...user, senha: newPassword }
-          : user
-      ));
-      
-      // Fechar o modal e limpar estados
-      setShowResetPasswordModal(false);
-      setSelectedUser(null);
-      setNewPassword('');
-      setShowPassword(false);
-      
-      // Mostrar mensagem de sucesso
-      alert(`Nova senha definida com sucesso para ${selectedUser.usuario}.`);
+      try {
+        // Implementar a lógica real de definir nova senha via API
+        console.log(`Definindo nova senha para o usuário: ${selectedUser.usuario}`);
+        
+        // Chamar a API para atualizar a senha
+        await AuthService.updateUserPassword(selectedUser.id, newPassword);
+        
+        // Atualizar os dados dos usuários
+        await refetchUsers();
+        
+        // Fechar o modal e limpar estados
+        setShowResetPasswordModal(false);
+        setSelectedUser(null);
+        setNewPassword('');
+        setShowPassword(false);
+        
+        // Mostrar mensagem de sucesso
+        toast.success('Senha redefinida', `Nova senha definida com sucesso para ${selectedUser.usuario}.`);
+      } catch (error) {
+        console.error('Erro ao definir nova senha:', error);
+        toast.error('Erro', 'Erro ao definir nova senha');
+      }
     } else {
-      alert('Por favor, digite uma nova senha.');
+      toast.warning('Senha obrigatória', 'Por favor, digite uma nova senha.');
     }
   };
-
-  const renderMembrosTab = () => (
-    <ErrorBoundary fallback={<div className="p-6 text-red-600">Falha ao carregar aba Membros.</div>}>
-      <Suspense fallback={<div className="p-6 flex items-center gap-3 text-gray-500"><LoadingSpinner size="lg" color="gray" /><span>Carregando Membros...</span></div>}>
-        <MembrosTabLazy
-          searchTerm={searchTerm}
-          setSearchTerm={setSearchTerm}
-          selectedFuncao={selectedFuncao}
-          setSelectedFuncao={setSelectedFuncao}
-          selectedRegional={selectedRegional}
-          setSelectedRegional={setSelectedRegional}
-          funcoes={funcoes}
-          regionais={regionais}
-          filteredMembros={filteredMembros}
-          setShowAddMemberModal={setShowAddMemberModal}
-          setShowAddFuncaoModal={setShowAddFuncaoModal}
-          setEditingMember={setEditingMember}
-          handleDeleteMember={handleDeleteMember}
-        />
-      </Suspense>
-    </ErrorBoundary>
-  );
 
   const renderSenhasTab = () => (
     <ErrorBoundary fallback={<div className="p-6 text-red-600">Falha ao carregar aba Senhas.</div>}>
@@ -386,6 +690,10 @@ export default function Configuracoes() {
           setFilterTipo={setFilterTipo}
           filterStatus={filterStatus}
           setFilterStatus={setFilterStatus}
+          filterFuncao={filterFuncao}
+          setFilterFuncao={setFilterFuncao}
+          filterArea={filterArea}
+          setFilterArea={setFilterArea}
           filteredUsuarios={filteredUsuarios}
           setShowAddUserModal={setShowAddUserModal}
           setSelectedUser={setSelectedUser}
@@ -393,6 +701,10 @@ export default function Configuracoes() {
           setShowEditUserModal={setShowEditUserModal}
           setShowResetPasswordModal={setShowResetPasswordModal}
           setShowDeleteUserModal={setShowDeleteUserModal}
+          onBlockUser={handleBlockUser}
+          onUnblockUser={handleUnblockUser}
+          onDeleteUser={handleDeleteUser}
+          onGeneratePassword={handleGeneratePassword}
         />
       </Suspense>
     </ErrorBoundary>
@@ -404,13 +716,15 @@ export default function Configuracoes() {
         <Suspense fallback={<div className="p-6 flex items-center gap-3 text-gray-500"><LoadingSpinner size="lg" color="gray" /><span>Carregando Metas...</span></div>}>
           <MetasTabLazy
             metas={metas}
-            setMetas={setMetas}
             setShowNewMetaModal={setShowNewMetaModal}
             setEditingMeta={setEditingMeta}
             setNewMeta={setNewMeta}
             setShowEditMetaModal={setShowEditMetaModal}
             mesesDisponiveis={mesesDisponiveis}
             regionaisDisponiveis={regionaisDisponiveis}
+            metasLoading={metasLoading}
+            metasError={metasError}
+            refetchGoals={refetchGoals}
           />
         </Suspense>
       </ErrorBoundary>
@@ -425,28 +739,16 @@ export default function Configuracoes() {
     </ErrorBoundary>
   );
 
-  const renderSistemaTab = () => (
-    <ErrorBoundary fallback={<div className="p-6 text-red-600">Falha ao carregar aba Sistema.</div>}>
-      <Suspense fallback={<div className="p-6 flex items-center gap-3 text-gray-500"><LoadingSpinner size="lg" color="gray" /><span>Carregando Sistema...</span></div>}>
-        <SistemaTabLazy />
-      </Suspense>
-    </ErrorBoundary>
-  );
-
   const renderTabContent = () => {
     switch (activeTab) {
-      case 'membros':
-        return renderMembrosTab();
       case 'senhas':
         return renderSenhasTab();
       case 'metas':
         return renderMetasTab();
       case 'arquivos':
         return renderArquivosTab();
-      case 'sistema':
-        return renderSistemaTab();
       default:
-        return renderMembrosTab();
+        return renderSenhasTab();
     }
   };
 
@@ -457,9 +759,9 @@ export default function Configuracoes() {
         <div className="mb-8">
           <div className="flex items-center space-x-3 mb-2">
             <Settings className="w-8 h-8 text-blue-600" />
-            <h1 className="text-3xl font-bold text-gray-900">Configurações</h1>
+            <h1 className="text-lg font-bold text-gray-900">Configurações</h1>
           </div>
-          <p className="text-gray-600">Painel administrativo do sistema</p>
+          <p className="text-gray-600">Painel administrativo</p>
         </div>
 
         {/* Tabs */}
@@ -502,7 +804,7 @@ export default function Configuracoes() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Adicionar Novo Membro</h3>
+              <h3 className="text-sm font-semibold">Adicionar Novo Membro</h3>
               <button 
                 onClick={() => setShowAddMemberModal(false)}
                 className="text-gray-400 hover:text-gray-600"
@@ -511,25 +813,39 @@ export default function Configuracoes() {
               </button>
             </div>
             
-            <form className="space-y-4">
+            <form className="space-y-4" onSubmit={handleCreateMember}>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
                 <input
                   type="text"
+                  value={newMember.nome}
+                  onChange={(e) => setNewMember(prev => ({ ...prev, nome: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Digite o nome completo"
+                  spellCheck="false"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={newMember.email}
+                  onChange={(e) => setNewMember(prev => ({ ...prev, email: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Digite o email"
+                  spellCheck="false"
+                  required
                 />
               </div>
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Função</label>
-                <select 
+                <select
+                  value={newMember.funcao}
+                  onChange={(e) => setNewMember(prev => ({ ...prev, funcao: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  onChange={(e) => {
-                    if (e.target.value === 'Outro') {
-                      setShowAddFuncaoModal(true);
-                    }
-                  }}
                 >
                   <option value="">Selecione uma função</option>
                   {funcoes.map(funcao => (
@@ -540,9 +856,13 @@ export default function Configuracoes() {
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Área</label>
-                <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                <select
+                  value={newMember.regional}
+                  onChange={(e) => setNewMember(prev => ({ ...prev, regional: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
                   <option value="">Selecione uma área</option>
-                  {regionais.slice(1).map(regional => (
+                  {regionais.filter(r => r !== 'Todas as áreas').map(regional => (
                     <option key={regional} value={regional}>{regional}</option>
                   ))}
                 </select>
@@ -552,12 +872,20 @@ export default function Configuracoes() {
                 <Button 
                   type="button"
                   variant="outline" 
-                  onClick={() => setShowAddMemberModal(false)}
+                  onClick={() => {
+                    setShowAddMemberModal(false);
+                    setNewMember({ nome: '', email: '', funcao: '', regional: '' });
+                  }}
+                  disabled={isSubmitting}
                 >
                   Cancelar
                 </Button>
-                <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-                  Adicionar Membro
+                <Button 
+                  type="submit" 
+                  className="bg-blue-600 hover:bg-blue-700"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? 'Adicionando...' : 'Adicionar Membro'}
                 </Button>
               </div>
             </form>
@@ -570,7 +898,7 @@ export default function Configuracoes() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Criar Nova Função</h3>
+              <h3 className="text-sm font-semibold">Criar Nova Função</h3>
               <button 
                 onClick={() => setShowAddFuncaoModal(false)}
                 className="text-gray-400 hover:text-gray-600"
@@ -579,7 +907,7 @@ export default function Configuracoes() {
               </button>
             </div>
             
-            <form className="space-y-4">
+            <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleUpdateMember(); }}>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nome da Função</label>
                 <input
@@ -627,7 +955,7 @@ export default function Configuracoes() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Editar Membro</h3>
+              <h3 className="text-sm font-semibold">Editar Membro</h3>
               <button 
                 onClick={() => setEditingMember(null)}
                 className="text-gray-400 hover:text-gray-600"
@@ -636,12 +964,23 @@ export default function Configuracoes() {
               </button>
             </div>
             
-            <form className="space-y-4">
+            <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleUpdateMember(); }}>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
                 <input
                   type="text"
-                  defaultValue={editingMember.nome}
+                  value={editingMemberData.nome}
+                  onChange={(e) => setEditingMemberData(prev => ({ ...prev, nome: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={editingMemberData.email}
+                  onChange={(e) => setEditingMemberData(prev => ({ ...prev, email: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
@@ -649,14 +988,16 @@ export default function Configuracoes() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Função</label>
                 <select 
-                  defaultValue={editingMember.funcao}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  value={editingMemberData.funcao}
                   onChange={(e) => {
+                    setEditingMemberData(prev => ({ ...prev, funcao: e.target.value }));
                     if (e.target.value === 'Outro') {
                       setShowAddFuncaoModal(true);
                     }
                   }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
+                  <option value="">Selecione uma função</option>
                   {funcoes.map(funcao => (
                     <option key={funcao} value={funcao}>{funcao}</option>
                   ))}
@@ -666,10 +1007,12 @@ export default function Configuracoes() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Área</label>
                 <select 
-                  defaultValue={editingMember.regional}
+                  value={editingMemberData.regional}
+                  onChange={(e) => setEditingMemberData(prev => ({ ...prev, regional: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
-                  {regionais.slice(1).map(regional => (
+                  <option value="">Selecione uma área</option>
+                  {regionais.filter(r => r !== 'Todas as áreas').map(regional => (
                     <option key={regional} value={regional}>{regional}</option>
                   ))}
                 </select>
@@ -697,7 +1040,7 @@ export default function Configuracoes() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-red-600">Confirmar Exclusão</h3>
+              <h3 className="text-sm font-semibold text-red-600">Confirmar Exclusão</h3>
               <button 
                 onClick={() => {
                   setShowDeleteConfirmModal(false);
@@ -745,7 +1088,7 @@ export default function Configuracoes() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Criar Novo Usuário</h3>
+              <h3 className="text-sm font-semibold">Criar Novo Usuário</h3>
               <button 
                 onClick={() => setShowAddUserModal(false)}
                 className="text-gray-400 hover:text-gray-600"
@@ -754,13 +1097,17 @@ export default function Configuracoes() {
               </button>
             </div>
             
-            <form className="space-y-4">
+            <form className="space-y-4" onSubmit={handleCreateUser}>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Usuário</label>
                 <input
                   type="text"
+                  value={newUser.nome}
+                  onChange={(e) => setNewUser(prev => ({ ...prev, nome: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Digite o nome do usuário"
+                  spellCheck="false"
+                  required
                 />
               </div>
               
@@ -768,25 +1115,83 @@ export default function Configuracoes() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
                 <input
                   type="email"
+                  value={newUser.email}
+                  onChange={(e) => setNewUser(prev => ({ ...prev, email: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Digite o email"
+                  spellCheck="false"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Senha</label>
+                <input
+                  type="password"
+                  value={newUser.senha}
+                  onChange={(e) => setNewUser(prev => ({ ...prev, senha: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Digite a senha"
+                  required
                 />
               </div>
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
-                <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                  <option>Nacional</option>
-                  <option>Regional</option>
+                <select 
+                  value={newUser.tipo}
+                  onChange={(e) => setNewUser(prev => ({ ...prev, tipo: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                >
+                  <option value="">Selecione o tipo</option>
+                  <option value="Nacional">Nacional</option>
+                  <option value="Regional">Regional</option>
                 </select>
               </div>
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Permissão</label>
-                <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                  <option>Super Admin</option>
-                  <option>Admin</option>
-                  <option>Usuário</option>
+                <select 
+                  value={newUser.permissao}
+                  onChange={(e) => setNewUser(prev => ({ ...prev, permissao: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                >
+                  <option value="">Selecione a permissão</option>
+                  <option value="super_admin">Super Admin</option>
+                  <option value="admin">Admin</option>
+                  <option value="user">Usuário</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Função</label>
+                <select 
+                  value={newUser.funcao}
+                  onChange={(e) => setNewUser(prev => ({ ...prev, funcao: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                >
+                  <option value="">Selecione a função</option>
+                  {funcoes.map(funcao => (
+                    <option key={funcao} value={funcao}>{funcao}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Área</label>
+                <select 
+                  value={newUser.regional}
+                  onChange={(e) => setNewUser(prev => ({ ...prev, regional: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                >
+                  <option value="">Selecione a área</option>
+                  {regionais.slice(1).map(regional => (
+                    <option key={regional} value={regional}>{regional}</option>
+                  ))}
                 </select>
               </div>
               
@@ -794,12 +1199,20 @@ export default function Configuracoes() {
                 <Button 
                   type="button"
                   variant="outline" 
-                  onClick={() => setShowAddUserModal(false)}
+                  onClick={() => {
+                    setShowAddUserModal(false);
+                    setNewUser({ nome: '', email: '', senha: '', tipo: '', permissao: '', regional: '', funcao: '' });
+                  }}
+                  disabled={isSubmitting}
                 >
                   Cancelar
                 </Button>
-                <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-                  Criar Usuário
+                <Button 
+                  type="submit" 
+                  className="bg-blue-600 hover:bg-blue-700"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? 'Criando...' : 'Criar Usuário'}
                 </Button>
               </div>
             </form>
@@ -812,7 +1225,7 @@ export default function Configuracoes() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Detalhes do Usuário</h3>
+              <h3 className="text-sm font-semibold">Detalhes do Usuário</h3>
               <button 
                 onClick={() => {
                   setShowViewUserModal(false);
@@ -898,7 +1311,7 @@ export default function Configuracoes() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Editar Usuário</h3>
+              <h3 className="text-sm font-semibold">Editar Usuário</h3>
               <button 
                 onClick={() => {
                   setShowEditUserModal(false);
@@ -910,13 +1323,16 @@ export default function Configuracoes() {
               </button>
             </div>
             
-            <form className="space-y-4">
+            <form onSubmit={handleEditUser} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Usuário</label>
                 <input
                   type="text"
+                  name="nome"
                   defaultValue={selectedUser.usuario}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  spellCheck="false"
+                  required
                 />
               </div>
               
@@ -924,51 +1340,74 @@ export default function Configuracoes() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
                 <input
                   type="email"
+                  name="email"
                   defaultValue={selectedUser.email}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  spellCheck="false"
+                  required
                 />
               </div>
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
                 <select 
-                  defaultValue={selectedUser.tipo}
+                  name="tipo"
+                  defaultValue={selectedUser.tipo || ''}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
                 >
-                  <option>Nacional</option>
-                  <option>Regional</option>
+                  <option value="">Selecione o tipo</option>
+                  <option value="Nacional">Nacional</option>
+                  <option value="Regional">Regional</option>
                 </select>
               </div>
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Permissão</label>
                 <select 
+                  name="role"
                   defaultValue={selectedUser.permissao}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
                 >
-                  <option>Super Admin</option>
-                  <option>Admin</option>
-                  <option>Usuário</option>
+                  <option value="super_admin">Super Admin</option>
+                  <option value="admin">Admin</option>
+                  <option value="user">Usuário</option>
                 </select>
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Senha</label>
-                <div className="relative">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    defaultValue={selectedUser.senha || '123456'}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-10"
-                    placeholder="Digite a senha"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Função</label>
+                <select 
+                  name="funcao"
+                  defaultValue={selectedUser.funcao || ''}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                >
+                  <option value="">Selecione a função</option>
+                  {funcoes.map((funcao) => (
+                    <option key={funcao} value={funcao}>
+                      {funcao}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Área</label>
+                <select 
+                  name="regional"
+                  defaultValue={selectedUser.regional || selectedUser.area || ''}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                >
+                  <option value="">Selecione a área</option>
+                  {regionais.map((regional) => (
+                    <option key={regional} value={regional}>
+                      {regional}
+                    </option>
+                  ))}
+                </select>
               </div>
               
               <div className="flex justify-end space-x-3 pt-4">
@@ -997,7 +1436,7 @@ export default function Configuracoes() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-orange-600">Definir Nova Senha</h3>
+              <h3 className="text-sm font-semibold text-orange-600">Definir Nova Senha</h3>
               <button 
                 onClick={() => {
                   setShowResetPasswordModal(false);
@@ -1074,7 +1513,7 @@ export default function Configuracoes() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-red-600">Confirmar Exclusão</h3>
+              <h3 className="text-sm font-semibold text-red-600">Confirmar Exclusão</h3>
               <button 
                 onClick={() => {
                   setShowDeleteUserModal(false);
@@ -1107,10 +1546,22 @@ export default function Configuracoes() {
                 Cancelar
               </Button>
               <Button 
-                onClick={() => {
-                  setUsuarios(usuarios.filter(u => u.id !== selectedUser.id));
-                  setShowDeleteUserModal(false);
-                  setSelectedUser(null);
+                onClick={async () => {
+                  try {
+                    // Aqui você implementaria a lógica real de deletar usuário via API
+                    // await AuthService.deleteUser(selectedUser.id);
+                    
+                    // Atualizar os dados dos usuários
+                    await refetchUsers();
+                    
+                    setShowDeleteUserModal(false);
+                    setSelectedUser(null);
+                    
+                    toast.success('Usuário excluído', 'Usuário excluído com sucesso.');
+                  } catch (error) {
+                    console.error('Erro ao excluir usuário:', error);
+                    toast.error('Erro', 'Erro ao excluir usuário');
+                  }
                 }}
                 className="bg-red-600 hover:bg-red-700"
               >
@@ -1123,9 +1574,9 @@ export default function Configuracoes() {
 
       {/* Modal Nova Meta */}
       {showNewMetaModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-lg">
-            <div className="flex justify-between items-center mb-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl p-5 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-3">
               <h3 className="text-lg font-semibold text-gray-900">Nova Meta</h3>
               <button 
                 onClick={() => {
@@ -1139,231 +1590,66 @@ export default function Configuracoes() {
                     regionais: []
                   });
                 }}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-100"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            
-            <div className="space-y-4">
-              {/* Nome da Meta */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nome da Meta
-                </label>
-                <select
-                  value={newMeta.nome}
-                  onChange={(e) => setNewMeta({...newMeta, nome: e.target.value, nomePersonalizado: ''})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">Selecione o nome</option>
-                  <option value="Ong Mara">Ong Mara</option>
-                  <option value="Liga Mara Formadas">Liga Mara Formadas</option>
-                  <option value="Ong Decolagem">Ong Decolagem</option>
-                  <option value="Liga Decolagem">Liga Decolagem</option>
-                  <option value="Formação Liga">Formação Liga</option>
-                  <option value="Famílias atendidas">Famílias atendidas</option>
-                  <option value="Imersão Ongs">Imersão Ongs</option>
-                  <option value="Encontro líder Maras">Encontro líder Maras</option>
-                  <option value="Processo seletivo">Processo seletivo</option>
-                  <option value="Retenção">Retenção</option>
-                  <option value="Inadimplência">Inadimplência</option>
-                  <option value="NPS">NPS</option>
-                  <option value="Outra">Outra</option>
-                </select>
-              </div>
 
-              {/* Campo Meta Personalizada */}
-              {newMeta.nome === 'Outra' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Nome da Meta Personalizada
-                  </label>
-                  <input
-                    type="text"
-                    value={newMeta.nomePersonalizado}
-                    onChange={(e) => setNewMeta({...newMeta, nomePersonalizado: e.target.value})}
-                    placeholder="Digite o nome da meta personalizada"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-              )}
-
-              {/* Quantidade/Porcentagem */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {newMeta.nome === 'Retenção' ? 'Porcentagem (%)' : 'Quantidade'}
-                </label>
-                <input
-                  type="number"
-                  value={newMeta.quantidade}
-                  onChange={(e) => setNewMeta({...newMeta, quantidade: e.target.value})}
-                  placeholder={newMeta.nome === 'Retenção' ? 'Ex: 85' : 'Ex: 300'}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            <div className="space-y-3">
+              <MetaFormFields meta={newMeta} setMeta={setNewMeta} />
+              <div className="grid grid-cols-3 gap-3">
+                <MonthSelector
+                  selectedMonths={newMeta.mes}
+                  setSelectedMonths={(meses) => setNewMeta({ ...newMeta, mes: meses })}
+                  mesesDisponiveis={mesesDisponiveis}
                 />
-                {newMeta.nome === 'Retenção' && (
-                  <p className="text-xs text-gray-500 mt-1">Digite apenas o número (ex: 85 para 85%)</p>
-                )}
-              </div>
-
-              {/* Mês e Ano */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Mês
-                  </label>
-                  <div className="bg-gray-50 border border-gray-300 rounded-lg p-3 max-h-40 overflow-y-auto">
-                    <div className="space-y-2">
-                      {mesesDisponiveis.map(mes => (
-                        <label key={mes.value} className="flex items-center">
-                          <input
-                            type="checkbox"
-                            checked={mes.value === 'todo-ano' ? 
-                              newMeta.mes.includes('todo-ano') : 
-                              newMeta.mes.includes(mes.value)
-                            }
-                            onChange={(e) => {
-                              if (mes.value === 'todo-ano') {
-                                if (e.target.checked) {
-                                  setNewMeta({...newMeta, mes: ['todo-ano']});
-                                } else {
-                                  setNewMeta({...newMeta, mes: []});
-                                }
-                              } else {
-                                if (e.target.checked) {
-                                  const novosMeses = newMeta.mes.filter(m => m !== 'todo-ano');
-                                  setNewMeta({...newMeta, mes: [...novosMeses, mes.value]});
-                                } else {
-                                  setNewMeta({...newMeta, mes: newMeta.mes.filter(m => m !== mes.value)});
-                                }
-                              }
-                            }}
-                            className="mr-2"
-                          />
-                          <span className="text-sm">{mes.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Ano
-                  </label>
-                  <input
-                    type="number"
-                    value={newMeta.ano}
-                    onChange={(e) => setNewMeta({...newMeta, ano: e.target.value})}
-                    placeholder="2025"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
-
-              {/* Aplicar Meta para */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Aplicar Meta para:
-                </label>
-                <div className="bg-gray-50 border border-gray-300 rounded-lg p-3 max-h-40 overflow-y-auto">
-                  <div className="space-y-2">
-                    <label className="flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={newMeta.regionais.length === regionaisDisponiveis.length}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setNewMeta({...newMeta, regionais: [...regionaisDisponiveis]});
-                          } else {
-                            setNewMeta({...newMeta, regionais: []});
-                          }
-                        }}
-                        className="mr-2 text-pink-500 focus:ring-pink-500"
-                      />
-                      <span className="text-sm font-medium">Todas</span>
-                    </label>
-                    {regionaisDisponiveis.map(regional => (
-                      <label key={regional} className="flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={newMeta.regionais.includes(regional)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setNewMeta({...newMeta, regionais: [...newMeta.regionais, regional]});
-                            } else {
-                              setNewMeta({...newMeta, regionais: newMeta.regionais.filter(r => r !== regional)});
-                            }
-                          }}
-                          className="mr-2"
-                        />
-                        <span className="text-sm">{regional}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
+                <YearInput
+                  year={newMeta.ano}
+                  setYear={(ano) => setNewMeta({ ...newMeta, ano })}
+                />
+                <RegionaisSelector
+                  selectedRegionais={newMeta.regionais}
+                  setSelectedRegionais={(regs) => setNewMeta({ ...newMeta, regionais: regs })}
+                  options={regionaisDisponiveis}
+                />
               </div>
             </div>
             
-            <div className="flex justify-end space-x-3 mt-6">
-              <Button 
-                type="button"
-                variant="outline" 
-                onClick={() => {
-                  setShowNewMetaModal(false);
-                  setNewMeta({
-                    nome: '',
-                    nomePersonalizado: '',
-                    quantidade: '',
-                    mes: [],
-                    ano: new Date().getFullYear().toString(),
-                    regionais: []
-                  });
-                }}
-              >
-                Cancelar
-              </Button>
-              <Button 
-                onClick={() => {
-                  const nomeValido = newMeta.nome === 'Outra' ? newMeta.nomePersonalizado.trim() : newMeta.nome;
-                  if (nomeValido && newMeta.quantidade && newMeta.mes.length > 0 && newMeta.ano && newMeta.regionais.length > 0) {
-                    const novaMeta = {
-                      ...newMeta,
-                      nome: nomeValido,
-                      id: Date.now() // ID simples para identificação
-                    };
-                    setMetas([...metas, novaMeta]);
-                    setShowNewMetaModal(false);
-                    setNewMeta({
-                      nome: '',
-                      nomePersonalizado: '',
-                      quantidade: '',
-                      mes: [],
-                      ano: new Date().getFullYear().toString(),
-                      regionais: []
-                    });
-                  }
-                }}
-                className="bg-pink-500 hover:bg-pink-600 text-white"
-                disabled={
-                  !(newMeta.nome === 'Outra' ? newMeta.nomePersonalizado.trim() : newMeta.nome) || 
-                  !newMeta.quantidade || 
-                  newMeta.mes.length === 0 || 
-                  !newMeta.ano || 
-                  newMeta.regionais.length === 0
-                }
-              >
-                Salvar Meta
-              </Button>
-            </div>
+            <ActionButtons
+              onCancel={() => {
+                setShowNewMetaModal(false);
+                setNewMeta({
+                  nome: '',
+                  nomePersonalizado: '',
+                  quantidade: '',
+                  mes: [],
+                  ano: new Date().getFullYear().toString(),
+                  regionais: []
+                });
+              }}
+              onSubmit={handleCreateGoal}
+              cancelLabel="Cancelar"
+              submitLabel={isSubmitting ? 'Criando...' : 'Criar Meta'}
+              submitDisabled={
+                isSubmitting ||
+                !(newMeta.nome === 'Outra' ? newMeta.nomePersonalizado.trim() : newMeta.nome) || 
+                !newMeta.quantidade || 
+                newMeta.mes.length === 0 || 
+                !newMeta.ano || 
+                newMeta.regionais.length === 0
+              }
+              isSubmitting={isSubmitting}
+            />
           </div>
         </div>
       )}
 
       {/* Modal Editar Meta */}
       {showEditMetaModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-lg">
-            <div className="flex justify-between items-center mb-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl p-5 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-3">
               <h3 className="text-lg font-semibold text-gray-900">Editar Meta</h3>
               <button 
                 onClick={() => {
@@ -1378,176 +1664,73 @@ export default function Configuracoes() {
                     regionais: []
                   });
                 }}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-100"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            
-            <div className="space-y-4">
-              {/* Nome da Meta */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nome da Meta
-                </label>
-                <select
-                  value={newMeta.nome}
-                  onChange={(e) => setNewMeta({...newMeta, nome: e.target.value, nomePersonalizado: ''})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">Selecione o nome</option>
-                  <option value="Ong Mara">Ong Mara</option>
-                  <option value="Liga Mara Formadas">Liga Mara Formadas</option>
-                  <option value="Ong Decolagem">Ong Decolagem</option>
-                  <option value="Liga Decolagem">Liga Decolagem</option>
-                  <option value="Formação Liga">Formação Liga</option>
-                  <option value="Famílias atendidas">Famílias atendidas</option>
-                  <option value="Imersão Ongs">Imersão Ongs</option>
-                  <option value="Encontro líder Maras">Encontro líder Maras</option>
-                  <option value="Processo seletivo">Processo seletivo</option>
-                  <option value="Retenção">Retenção</option>
-                  <option value="Inadimplência">Inadimplência</option>
-                  <option value="NPS">NPS</option>
-                  <option value="Outra">Outra</option>
-                </select>
-              </div>
 
-              {/* Campo Meta Personalizada */}
-              {newMeta.nome === 'Outra' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Nome da Meta Personalizada
-                  </label>
-                  <input
-                    type="text"
-                    value={newMeta.nomePersonalizado}
-                    onChange={(e) => setNewMeta({...newMeta, nomePersonalizado: e.target.value})}
-                    placeholder="Digite o nome da meta personalizada"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-              )}
-
-              {/* Quantidade/Porcentagem */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {newMeta.nome === 'Retenção' ? 'Porcentagem (%)' : 'Quantidade'}
-                </label>
-                <input
-                  type="number"
-                  value={newMeta.quantidade}
-                  onChange={(e) => setNewMeta({...newMeta, quantidade: e.target.value})}
-                  placeholder={newMeta.nome === 'Retenção' ? 'Ex: 85' : 'Ex: 300'}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            <div className="space-y-3">
+              <MetaFormFields meta={newMeta} setMeta={setNewMeta} />
+              <div className="grid grid-cols-3 gap-3">
+                <MonthSelector
+                  selectedMonths={newMeta.mes}
+                  setSelectedMonths={(meses) => setNewMeta({ ...newMeta, mes: meses })}
+                  mesesDisponiveis={mesesDisponiveis}
                 />
-                {newMeta.nome === 'Retenção' && (
-                  <p className="text-xs text-gray-500 mt-1">Digite apenas o número (ex: 85 para 85%)</p>
-                )}
+                <YearInput
+                  year={newMeta.ano}
+                  setYear={(ano) => setNewMeta({ ...newMeta, ano })}
+                />
               </div>
-
-              {/* Mês e Ano */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Mês
-                  </label>
-                  <div className="bg-gray-50 border border-gray-300 rounded-lg p-3 max-h-40 overflow-y-auto">
-                    <div className="space-y-2">
-                      {mesesDisponiveis.map(mes => (
-                        <label key={mes.value} className="flex items-center">
-                          <input
-                            type="checkbox"
-                            checked={mes.value === 'todo-ano' ? 
-                              newMeta.mes.includes('todo-ano') : 
-                              newMeta.mes.includes(mes.value)
-                            }
-                            onChange={(e) => {
-                              if (mes.value === 'todo-ano') {
-                                if (e.target.checked) {
-                                  setNewMeta({...newMeta, mes: ['todo-ano']});
-                                } else {
-                                  setNewMeta({...newMeta, mes: []});
-                                }
-                              } else {
-                                if (e.target.checked) {
-                                  const novosMeses = newMeta.mes.filter(m => m !== 'todo-ano');
-                                  setNewMeta({...newMeta, mes: [...novosMeses, mes.value]});
-                                } else {
-                                  setNewMeta({...newMeta, mes: newMeta.mes.filter(m => m !== mes.value)});
-                                }
-                              }
-                            }}
-                            className="mr-2"
-                          />
-                          <span className="text-sm">{mes.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Ano
-                  </label>
-                  <input
-                    type="number"
-                    value={newMeta.ano}
-                    onChange={(e) => setNewMeta({...newMeta, ano: e.target.value})}
-                    placeholder="2025"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
-
-              {/* Aplicar Meta para */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Aplicar Meta para:
-                </label>
-                <div className="bg-gray-50 border border-gray-300 rounded-lg p-3 max-h-40 overflow-y-auto">
-                  <div className="space-y-2">
-                    <label className="flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={newMeta.regionais.length === regionaisDisponiveis.length}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setNewMeta({...newMeta, regionais: [...regionaisDisponiveis]});
-                          } else {
-                            setNewMeta({...newMeta, regionais: []});
-                          }
-                        }}
-                        className="mr-2 text-pink-500 focus:ring-pink-500"
-                      />
-                      <span className="text-sm font-medium">Todas</span>
-                    </label>
-                    {regionaisDisponiveis.map(regional => (
-                      <label key={regional} className="flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={newMeta.regionais.includes(regional)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setNewMeta({...newMeta, regionais: [...newMeta.regionais, regional]});
-                            } else {
-                              setNewMeta({...newMeta, regionais: newMeta.regionais.filter(r => r !== regional)});
-                            }
-                          }}
-                          className="mr-2"
-                        />
-                        <span className="text-sm">{regional}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              </div>
+              <RegionaisSelector
+                selectedRegionais={newMeta.regionais}
+                setSelectedRegionais={(regs) => setNewMeta({ ...newMeta, regionais: regs })}
+                options={regionaisDisponiveis}
+              />
             </div>
             
-            <div className="flex justify-end space-x-3 mt-6">
-              <Button 
-                type="button"
-                variant="outline" 
-                onClick={() => {
+            <ActionButtons
+              onCancel={() => {
+                setShowEditMetaModal(false);
+                setEditingMeta(null);
+                setNewMeta({
+                  nome: '',
+                  nomePersonalizado: '',
+                  quantidade: '',
+                  mes: [],
+                  ano: new Date().getFullYear().toString(),
+                  regionais: []
+                });
+              }}
+              onSubmit={async () => {
+                const nomeValido = newMeta.nome === 'Outra' ? newMeta.nomePersonalizado.trim() : newMeta.nome;
+                if (nomeValido && newMeta.quantidade && newMeta.mes.length > 0 && newMeta.ano && newMeta.regionais.length > 0) {
+                  const targetValue = parseFloat(newMeta.quantidade);
+                  const mesesTexto = newMeta.mes.join(', ');
+                  const regionaisTexto = newMeta.regionais.join(', ');
+                  const unit = newMeta.nome === 'Retenção' ? '%' : ((newMeta.nome === 'Atendidos Indiretamente' || newMeta.nome === 'Atendidos Diretamente' || newMeta.nome === 'Pessoas Atendidas') ? ' pessoas' : ' unidades');
+                  const description = `Meta: ${targetValue}${unit} | Meses: ${mesesTexto} | Regionais: ${regionaisTexto}`;
+
+                  let ultimoMes: number;
+                  if (newMeta.mes.length === 0 || newMeta.mes.includes('todo-ano')) {
+                    ultimoMes = 12;
+                  } else {
+                    const mesesNumericos = newMeta.mes
+                      .map(m => parseInt(m))
+                      .filter(m => !isNaN(m) && m >= 1 && m <= 12);
+                    ultimoMes = mesesNumericos.length > 0 ? Math.max(...mesesNumericos) : 12;
+                  }
+                  const deadline = `${newMeta.ano}-${ultimoMes.toString().padStart(2, '0')}-31`;
+
+                  await GoalService.updateGoal(editingMeta.id, {
+                    nome: nomeValido,
+                    descricao: description,
+                    valor_meta: targetValue,
+                    due_date: deadline,
+                  });
+
+                  await refetchGoals();
                   setShowEditMetaModal(false);
                   setEditingMeta(null);
                   setNewMeta({
@@ -1558,42 +1741,18 @@ export default function Configuracoes() {
                     ano: new Date().getFullYear().toString(),
                     regionais: []
                   });
-                }}
-              >
-                Cancelar
-              </Button>
-              <Button 
-                onClick={() => {
-                  const nomeValido = newMeta.nome === 'Outra' ? newMeta.nomePersonalizado.trim() : newMeta.nome;
-                  if (nomeValido && newMeta.quantidade && newMeta.mes.length > 0 && newMeta.ano && newMeta.regionais.length > 0) {
-                    const metasAtualizadas = metas.map(meta => 
-                      meta.id === editingMeta.id ? {...newMeta, nome: nomeValido, id: editingMeta.id} : meta
-                    );
-                    setMetas(metasAtualizadas);
-                    setShowEditMetaModal(false);
-                    setEditingMeta(null);
-                    setNewMeta({
-                      nome: '',
-                      nomePersonalizado: '',
-                      quantidade: '',
-                      mes: [],
-                      ano: new Date().getFullYear().toString(),
-                      regionais: []
-                    });
-                  }
-                }}
-                className="bg-pink-500 hover:bg-pink-600 text-white"
-                disabled={
-                  !(newMeta.nome === 'Outra' ? newMeta.nomePersonalizado.trim() : newMeta.nome) || 
-                  !newMeta.quantidade || 
-                  newMeta.mes.length === 0 || 
-                  !newMeta.ano || 
-                  newMeta.regionais.length === 0
                 }
-              >
-                Salvar Alterações
-              </Button>
-            </div>
+              }}
+              cancelLabel="Cancelar"
+              submitLabel="Salvar Alterações"
+              submitDisabled={
+                !(newMeta.nome === 'Outra' ? newMeta.nomePersonalizado.trim() : newMeta.nome) || 
+                !newMeta.quantidade || 
+                newMeta.mes.length === 0 || 
+                !newMeta.ano || 
+                newMeta.regionais.length === 0
+              }
+            />
           </div>
         </div>
       )}
