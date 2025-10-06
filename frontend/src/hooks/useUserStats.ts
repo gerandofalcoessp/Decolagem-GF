@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+const API_BASE_URL = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '');
 
 export interface UserStats {
   lideresRegionais: number;
@@ -26,8 +26,8 @@ export function useUserStats() {
         throw new Error('Token de autenticação não encontrado');
       }
 
-      // Buscar apenas dados dos usuários da tabela usuarios
-      const usersResponse = await fetch(`${API_BASE_URL}/auth/users`, {
+      // Buscar apenas dados dos usuários da tabela usuarios via endpoint regional
+      const usersResponse = await fetch(`${API_BASE_URL}/api/regionals/users`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -35,7 +35,9 @@ export function useUserStats() {
       });
 
       if (!usersResponse.ok) {
-        throw new Error(`Erro ao buscar usuários: ${usersResponse.status}`);
+        const body = await usersResponse.json().catch(() => ({}));
+        const msg = body?.error ? `${usersResponse.status} - ${body.error}` : `${usersResponse.status}`;
+        throw new Error(`Erro ao buscar usuários: ${msg}`);
       }
 
       const usersData = await usersResponse.json();
@@ -54,7 +56,7 @@ export function useUserStats() {
 
       // Contar por função nos usuários
       if (Array.isArray(users)) {
-        users.forEach(user => {
+        users.forEach((user: any) => {
           if (user.funcao) {
             switch (user.funcao.toLowerCase()) {
               case 'líder regional':
@@ -65,16 +67,36 @@ export function useUserStats() {
                 stats.coordenadores++;
                 break;
               case 'consultor':
-                stats.consultores++;
+                // Só conta como consultor se não for da área Nacional
+                if (user.regional?.toLowerCase() !== 'nacional' && user.area?.toLowerCase() !== 'nacional') {
+                  stats.consultores++;
+                }
                 break;
               case 'nacional':
+              case 'líder nacional':
+              case 'lider nacional':
+              case 'diretor operações':
+              case 'diretor operacoes':
                 stats.totalNacional++;
                 break;
             }
           }
+          
+          // Contar usuários da área Nacional (independente da função)
+          if (user.regional?.toLowerCase() === 'nacional' || user.area?.toLowerCase() === 'nacional') {
+            // Só conta se ainda não foi contado nas funções específicas nacionais
+            const funcaoLower = user.funcao?.toLowerCase();
+            if (funcaoLower !== 'nacional' && 
+                funcaoLower !== 'líder nacional' && 
+                funcaoLower !== 'lider nacional' && 
+                funcaoLower !== 'diretor operações' && 
+                funcaoLower !== 'diretor operacoes') {
+              stats.totalNacional++;
+            }
+          }
         });
         
-        // Total de membros é o total de usuários
+        // Total de membros é o total de usuários retornados (já filtrados por regional se necessário)
         stats.totalMembros = users.length;
       }
 

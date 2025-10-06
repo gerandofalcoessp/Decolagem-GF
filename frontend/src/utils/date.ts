@@ -14,8 +14,8 @@ export function toDate(dateStr: string, timeStr: string): Date {
 // Caso end seja indefinido/null, assume o próprio start (evento pontual)
 export function rangesOverlap(
   startA: Date,
-  endA?: Date | null,
   startB: Date,
+  endA?: Date | null,
   endB?: Date | null
 ): boolean {
   const aEnd = endA ?? startA;

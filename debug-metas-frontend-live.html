@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Metas Frontend - Live</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+        .logs {
+            height: 300px;
+            overflow-y: auto;
+            background: #000;
+            color: #00ff00;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug Metas Frontend - Live Test</h1>
+    
+    <div class="container">
+        <h3>1. Configuração da API</h3>
+        <button onclick="checkAPIConfig()">Verificar Configuração da API</button>
+        <div id="api-config-result"></div>
+    </div>
+
+    <div class="container">
+        <h3>2. Teste de Login</h3>
+        <button onclick="testLogin()">Fazer Login</button>
+        <div id="login-result"></div>
+    </div>
+
+    <div class="container">
+        <h3>3. Teste da API de Metas</h3>
+        <button onclick="testGoalsAPI()">Buscar Metas</button>
+        <div id="goals-result"></div>
+    </div>
+
+    <div class="container">
+        <h3>4. Verificar Frontend (Porta 3001)</h3>
+        <button onclick="testFrontendConnection()">Testar Conexão com Frontend</button>
+        <div id="frontend-result"></div>
+    </div>
+
+    <div class="container">
+        <h3>5. Logs de Debug</h3>
+        <button onclick="clearLogs()">Limpar Logs</button>
+        <div id="logs" class="logs"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:4000';
+        const FRONTEND_URL = 'http://localhost:3001';
+        let authToken = null;
+
+        function log(message, type = 'info') {
+            const logs = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? '#ff6b6b' : type === 'success' ? '#51cf66' : '#00ff00';
+            logs.innerHTML += `<div style="color: ${color}">[${timestamp}] ${message}</div>`;
+            logs.scrollTop = logs.scrollHeight;
+            console.log(`[${timestamp}] ${message}`);
+        }
+
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+        }
+
+        async function checkAPIConfig() {
+            const result = document.getElementById('api-config-result');
+            log('🔍 Verificando configuração da API...');
+            
+            try {
+                // Testar conectividade básica
+                const response = await fetch(`${API_BASE_URL}/health`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    log('✅ Backend está respondendo na porta 4000', 'success');
+                    result.innerHTML = `<div class="success">
+                        <p>✅ Backend acessível em ${API_BASE_URL}</p>
+                        <p>Status: ${response.status}</p>
+                    </div>`;
+                } else {
+                    throw new Error(`Status: ${response.status}`);
+                }
+            } catch (error) {
+                log(`❌ Erro ao conectar com backend: ${error.message}`, 'error');
+                result.innerHTML = `<div class="error">
+                    <p>❌ Erro ao conectar com backend</p>
+                    <p>URL: ${API_BASE_URL}</p>
+                    <p>Erro: ${error.message}</p>
+                </div>`;
+            }
+        }
+
+        async function testLogin() {
+            const result = document.getElementById('login-result');
+            log('🔑 Testando login...');
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: 'teste@decolagem.com',
+                        password: 'Teste123!'
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    authToken = data.session.access_token;
+                    log('✅ Login realizado com sucesso!', 'success');
+                    log(`Token obtido: ${authToken.substring(0, 50)}...`, 'success');
+                    
+                    result.innerHTML = `<div class="success">
+                        <p>✅ Login realizado com sucesso!</p>
+                        <p>Usuário: ${data.user.nome}</p>
+                        <p>Email: ${data.user.email}</p>
+                        <p>Role: ${data.user.role}</p>
+                        <p>Token: ${authToken.substring(0, 50)}...</p>
+                    </div>`;
+                } else {
+                    throw new Error(data.error || 'Erro no login');
+                }
+            } catch (error) {
+                log(`❌ Erro no login: ${error.message}`, 'error');
+                result.innerHTML = `<div class="error">
+                    <p>❌ Erro no login: ${error.message}</p>
+                </div>`;
+            }
+        }
+
+        async function testGoalsAPI() {
+            const result = document.getElementById('goals-result');
+            
+            if (!authToken) {
+                log('❌ Token não encontrado. Faça login primeiro.', 'error');
+                result.innerHTML = `<div class="error">
+                    <p>❌ Token não encontrado. Faça login primeiro.</p>
+                </div>`;
+                return;
+            }
+
+            log('🎯 Testando API de metas...');
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/goals`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    const goals = data.data || [];
+                    log(`✅ Metas obtidas com sucesso! Total: ${goals.length}`, 'success');
+                    
+                    result.innerHTML = `<div class="success">
+                        <p>✅ API de metas funcionando!</p>
+                        <p>Total de metas: ${goals.length}</p>
+                        <h4>Metas encontradas:</h4>
+                        <pre>${JSON.stringify(goals, null, 2)}</pre>
+                    </div>`;
+                } else {
+                    throw new Error(data.error || 'Erro ao buscar metas');
+                }
+            } catch (error) {
+                log(`❌ Erro na API de metas: ${error.message}`, 'error');
+                result.innerHTML = `<div class="error">
+                    <p>❌ Erro na API de metas: ${error.message}</p>
+                </div>`;
+            }
+        }
+
+        async function testFrontendConnection() {
+            const result = document.getElementById('frontend-result');
+            log('🌐 Testando conexão com frontend...');
+            
+            try {
+                // Testar se o frontend está rodando na porta 3001
+                const response = await fetch(`${FRONTEND_URL}`, {
+                    method: 'GET',
+                    mode: 'no-cors' // Para evitar problemas de CORS
+                });
+
+                log('✅ Frontend está respondendo na porta 3001', 'success');
+                result.innerHTML = `<div class="success">
+                    <p>✅ Frontend acessível em ${FRONTEND_URL}</p>
+                    <p><a href="${FRONTEND_URL}/configuracoes" target="_blank">Abrir página de configurações</a></p>
+                </div>`;
+                
+            } catch (error) {
+                log(`❌ Erro ao conectar com frontend: ${error.message}`, 'error');
+                result.innerHTML = `<div class="error">
+                    <p>❌ Erro ao conectar com frontend</p>
+                    <p>URL: ${FRONTEND_URL}</p>
+                    <p>Erro: ${error.message}</p>
+                    <p>Verifique se o frontend está rodando com 'npm run dev'</p>
+                </div>`;
+            }
+        }
+
+        // Inicializar
+        window.onload = function() {
+            log('🚀 Debug Metas Frontend carregado');
+            log('💡 Execute os testes na ordem: 1 → 2 → 3 → 4');
+        };
+    </script>
+</body>
+</html>

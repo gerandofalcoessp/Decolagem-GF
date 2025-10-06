@@ -1,11 +1,14 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { User, UserRole } from '@/types';
+import type { User, UserRole } from '../types';
+import { AuthService } from '../services/authService';
+import { logger } from '../utils/logger';
 
 interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  error?: string | null;
   
   // Actions
   login: (email: string, password: string) => Promise<void>;
@@ -13,74 +16,38 @@ interface AuthState {
   setUser: (user: User) => void;
   setLoading: (loading: boolean) => void;
   checkAuth: () => Promise<void>;
+  register: (userData: {
+    email: string;
+    password: string;
+    nome: string;
+    role: string;
+    regional: string;
+  }) => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
+  updatePassword: (newPassword: string) => Promise<void>;
+  clearError: () => void;
 }
-
-// Mock de usuários para desenvolvimento (será substituído pelo Supabase)
-const mockUsers: User[] = [
-  {
-    id: '1',
-    nome: 'Admin Sistema',
-    email: 'admin@decolagem.com',
-    role: 'super_admin',
-    regional: 'nacional',
-    ativo: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: '2',
-    nome: 'Equipe São Paulo',
-    email: 'equipe.sp@decolagem.com',
-    role: 'equipe_interna',
-    regional: 'sp',
-    ativo: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: '3',
-    nome: 'Equipe Rio de Janeiro',
-    email: 'equipe.rj@decolagem.com',
-    role: 'equipe_interna',
-    regional: 'rj',
-    ativo: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-];
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       user: null,
       isAuthenticated: false,
       isLoading: false,
+      error: null,
 
       login: async (email: string, password: string) => {
-        set({ isLoading: true });
-        
         try {
-          // Simulação de login (será substituído pelo Supabase)
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          set({ isLoading: true });
           
-          // Mock de validação
-          const user = mockUsers.find(u => u.email === email);
+          const response = await AuthService.login(email, password);
+          const user = AuthService.mapToFrontendUser(response);
           
-          if (!user) {
-            throw new Error('Usuário não encontrado');
-          }
-          
-          // Mock de validação de senha (em produção será feito pelo Supabase)
-          if (password !== '123456') {
-            throw new Error('Senha incorreta');
-          }
-          
-          set({ 
-            user, 
-            isAuthenticated: true, 
-            isLoading: false 
+          set({
+            user,
+            isAuthenticated: true,
+            isLoading: false,
           });
-          
         } catch (error) {
           set({ isLoading: false });
           throw error;
@@ -88,20 +55,15 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: () => {
-        set({ 
-          user: null, 
-          isAuthenticated: false 
+        AuthService.logout();
+        set({
+          user: null,
+          isAuthenticated: false,
         });
-        
-        // Limpar localStorage
-        localStorage.removeItem('auth-storage');
       },
 
       setUser: (user: User) => {
-        set({ 
-          user, 
-          isAuthenticated: true 
-        });
+        set({ user, isAuthenticated: true });
       },
 
       setLoading: (loading: boolean) => {
@@ -109,14 +71,80 @@ export const useAuthStore = create<AuthState>()(
       },
 
       checkAuth: async () => {
-        const { user } = get();
-        
-        if (user) {
-          // Verificar se o token ainda é válido (será implementado com Supabase)
-          set({ isAuthenticated: true });
-        } else {
-          set({ isAuthenticated: false });
+        try {
+          logger.debug('🔐 AuthStore: Iniciando checkAuth');
+          set({ isLoading: true });
+          
+          logger.debug('📡 AuthStore: Chamando AuthService.getCurrentUser');
+          const response = await AuthService.getCurrentUser();
+          
+          if (response) {
+            logger.debug('✅ AuthStore: Usuário encontrado:', response);
+            const user = AuthService.mapToFrontendUser(response);
+            set({
+              user,
+              isAuthenticated: true,
+              isLoading: false,
+            });
+          } else {
+            logger.debug('❌ AuthStore: Nenhum usuário encontrado');
+            set({
+              user: null,
+              isAuthenticated: false,
+              isLoading: false,
+            });
+          }
+        } catch (error) {
+          logger.error('💥 AuthStore: Erro ao verificar autenticação:', error);
+          set({
+            user: null,
+            isAuthenticated: false,
+            isLoading: false,
+          });
         }
+      },
+
+      register: async (userData: {
+        email: string;
+        password: string;
+        nome: string;
+        role: string;
+        regional: string;
+      }) => {
+        try {
+          set({ isLoading: true });
+          await AuthService.register(userData);
+          set({ isLoading: false });
+        } catch (error) {
+          set({ isLoading: false });
+          throw error;
+        }
+      },
+
+      resetPassword: async (email: string) => {
+        try {
+          set({ isLoading: true });
+          await AuthService.resetPassword(email);
+          set({ isLoading: false });
+        } catch (error) {
+          set({ isLoading: false });
+          throw error;
+        }
+      },
+
+      updatePassword: async (newPassword: string) => {
+        try {
+          set({ isLoading: true });
+          await AuthService.updatePassword(newPassword);
+          set({ isLoading: false });
+        } catch (error) {
+          set({ isLoading: false });
+          throw error;
+        }
+      },
+
+      clearError: () => {
+        set({ error: null });
       },
     }),
     {

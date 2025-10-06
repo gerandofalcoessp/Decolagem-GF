@@ -5,25 +5,54 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'react-hot-toast'
 
 import App from './App.tsx'
+import { ToastProvider } from './contexts/ToastContext.tsx'
 import './index.css'
+
+// Silenciar logs em produção para reduzir overhead e ruído no console
+if (import.meta && import.meta.env && import.meta.env.PROD) {
+  const noop = (..._args: unknown[]) => {};
+  console.log = noop;
+  console.debug = noop;
+  console.info = noop;
+  console.warn = noop; // adicional
+}
+
+console.log('🚀 Main: Iniciando aplicação React');
 
 // Configuração do React Query
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 1000 * 60 * 5, // 5 minutos
-      cacheTime: 1000 * 60 * 10, // 10 minutos
+      gcTime: 1000 * 60 * 10, // 10 minutos (anteriormente cacheTime)
       retry: 2,
       refetchOnWindowFocus: false,
     },
   },
 })
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
+console.log('📦 Main: QueryClient configurado');
+
+const rootElement = document.getElementById('root');
+if (!rootElement) {
+  console.error('❌ Main: Elemento root não encontrado!');
+  throw new Error('Elemento root não encontrado');
+}
+
+console.log('✅ Main: Elemento root encontrado, renderizando aplicação');
+
+ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <App />
+      <BrowserRouter
+        future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true,
+        }}
+      >
+        <ToastProvider>
+          <App />
+        </ToastProvider>
         <Toaster
           position="top-right"
           toastOptions={{

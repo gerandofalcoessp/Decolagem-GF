@@ -7,13 +7,17 @@ import {
   Calendar,
   Plus,
   Activity,
-  Building2,
-  Flag
+  Flag,
+  AlertCircle
 } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useNavigate } from 'react-router-dom';
 import { useUserStats } from '@/hooks/useUserStats';
+import { useRegionalData } from '@/hooks/useRegionalData';
+import { useState } from 'react';
+import { RegistrarAtividadeModal } from '@/components/modals/RegistrarAtividadeModal';
+import { NotificationModal } from '@/components/modals/NotificationModal';
 
 interface Regional {
   id: string;
@@ -35,161 +39,407 @@ interface Regional {
   color: string;
 }
 
-const regionaisData: Regional[] = [
-  {
-    id: 'nacional',
-    name: 'Nacional',
-    states: ['Todas as Regiões'],
-    leader: { name: 'Maria Silva', role: 'Líder Nacional' },
-    coordinator: { name: 'João Santos', role: 'Coordenador' },
-    consultants: [
-      { name: 'Ana Costa', role: 'Consultor' },
-      { name: 'Pedro Lima', role: 'Consultor' }
-    ],
-    totalMembers: 8,
-    color: 'bg-blue-50 border-blue-200'
-  },
-  {
-    id: 'comercial',
-    name: 'Comercial',
-    states: ['Área Comercial'],
-    leader: { name: 'Carlos Mendes', role: 'Líder Comercial' },
-    coordinator: { name: 'Lucia Ferreira', role: 'Coordenador' },
-    consultants: [
-      { name: 'Roberto Alves', role: 'Consultor' },
-      { name: 'Fernanda Rocha', role: 'Consultor' }
-    ],
-    totalMembers: 6,
-    color: 'bg-green-50 border-green-200'
-  },
-  {
-    id: 'centro-oeste',
-    name: 'Centro-Oeste',
-    states: ['DF', 'GO', 'MT', 'MS'],
-    leader: { name: 'Flávio', role: 'Líder Regional' },
-    coordinator: { name: 'Deise', role: 'Coordenador' },
-    consultants: [],
-    totalMembers: 2,
-    color: 'bg-purple-50 border-purple-200'
-  },
-  {
-    id: 'mg-es',
-    name: 'MG/ES',
-    states: ['MG', 'ES'],
-    leader: { name: 'Sérgio', role: 'Líder Regional' },
-    coordinator: { name: 'Alcione', role: 'Coordenador' },
-    consultants: [],
-    totalMembers: 2,
-    color: 'bg-emerald-50 border-emerald-200'
-  },
-  {
-    id: 'nordeste-1',
-    name: 'Nordeste 1',
-    states: ['CE', 'PB', 'RN', 'MA', 'PI'],
-    leader: { name: 'Ana Neiry', role: 'Líder Regional' },
-    coordinator: { name: 'Louisiany', role: 'Coordenador' },
-    consultants: [
-      { name: 'Aline', role: 'Consultor' },
-      { name: 'Anailton', role: 'Consultor' },
-      { name: 'Neuza', role: 'Consultor' }
-    ],
-    totalMembers: 5,
-    color: 'bg-violet-50 border-violet-200'
-  },
-  {
-    id: 'nordeste-2',
-    name: 'Nordeste 2',
-    states: ['BA', 'SE', 'PE', 'AL'],
-    leader: { name: 'Eduardo', role: 'Líder Regional' },
-    coordinator: { name: 'Alessandro', role: 'Coordenador' },
-    consultants: [
-      { name: 'Carlos Henrique', role: 'Consultor' },
-      { name: 'Luciana', role: 'Consultor' }
-    ],
-    totalMembers: 4,
-    color: 'bg-orange-50 border-orange-200'
-  },
-  {
-    id: 'norte',
-    name: 'Norte',
-    states: ['AC', 'AP', 'AM', 'PA', 'RO', 'RR', 'TO'],
-    leader: { name: 'Marcos Silva', role: 'Líder Regional' },
-    coordinator: { name: 'Patricia Santos', role: 'Coordenador' },
-    consultants: [
-      { name: 'Rafael Costa', role: 'Consultor' }
-    ],
-    totalMembers: 3,
-    color: 'bg-teal-50 border-teal-200'
-  },
-  {
-    id: 'rio-janeiro',
-    name: 'Rio de Janeiro',
-    states: ['RJ'],
-    leader: { name: 'Beatriz Lima', role: 'Líder Regional' },
-    coordinator: { name: 'Gabriel Oliveira', role: 'Coordenador' },
-    consultants: [
-      { name: 'Camila Souza', role: 'Consultor' },
-      { name: 'Diego Martins', role: 'Consultor' }
-    ],
-    totalMembers: 4,
-    color: 'bg-cyan-50 border-cyan-200'
-  },
-  {
-    id: 'sul',
-    name: 'Sul',
-    states: ['RS', 'PR', 'SC'],
-    leader: { name: 'Amanda Pereira', role: 'Líder Regional' },
-    coordinator: { name: 'Rodrigo Almeida', role: 'Coordenador' },
-    consultants: [
-      { name: 'Juliana Barbosa', role: 'Consultor' },
-      { name: 'Thiago Ribeiro', role: 'Consultor' }
-    ],
-    totalMembers: 4,
-    color: 'bg-indigo-50 border-indigo-200'
-  },
-  {
-    id: 'sao-paulo',
-    name: 'São Paulo',
-    states: ['SP'],
-    leader: { name: 'Ricardo Fernandes', role: 'Líder Regional' },
-    coordinator: { name: 'Vanessa Castro', role: 'Coordenador' },
-    consultants: [
-      { name: 'Leonardo Dias', role: 'Consultor' },
-      { name: 'Priscila Moreira', role: 'Consultor' },
-      { name: 'Bruno Carvalho', role: 'Consultor' }
-    ],
-    totalMembers: 5,
-    color: 'bg-rose-50 border-rose-200'
-  }
-];
+// Mapeamento de cores para as regionais
+const regionalColors: Record<string, string> = {
+  'Nacional': 'bg-blue-50 border-blue-200',
+  'Comercial': 'bg-green-50 border-green-200',
+  'Centro-Oeste': 'bg-purple-50 border-purple-200',
+  'Norte': 'bg-teal-50 border-teal-200',
+  'Nordeste': 'bg-violet-50 border-violet-200',
+  'Sudeste': 'bg-emerald-50 border-emerald-200',
+  'Sul': 'bg-indigo-50 border-indigo-200',
+  'MG/ES': 'bg-lime-50 border-lime-200',
+  'Rio de Janeiro': 'bg-cyan-50 border-cyan-200',
+  'São Paulo': 'bg-rose-50 border-rose-200',
+  'Nordeste 1': 'bg-amber-50 border-amber-200',
+  'Nordeste 2': 'bg-orange-50 border-orange-200',
+  // Variações de nomenclatura que podem aparecer nos dados
+  'R. Centro-Oeste': 'bg-purple-50 border-purple-200',
+  'R. Norte': 'bg-teal-50 border-teal-200',
+  'R. Nordeste': 'bg-violet-50 border-violet-200',
+  'R. Sudeste': 'bg-emerald-50 border-emerald-200',
+  'R. Sul': 'bg-indigo-50 border-indigo-200',
+  'R. MG/ES': 'bg-lime-50 border-lime-200',
+  'R. Rio de Janeiro': 'bg-cyan-50 border-cyan-200',
+  'R. São Paulo': 'bg-rose-50 border-rose-200',
+  'R. Nordeste 1': 'bg-amber-50 border-amber-200',
+  'R. Nordeste 2': 'bg-orange-50 border-orange-200',
+  // Variações em minúsculo
+  'nacional': 'bg-blue-50 border-blue-200',
+  'comercial': 'bg-green-50 border-green-200',
+  'centro-oeste': 'bg-purple-50 border-purple-200',
+  'centro_oeste': 'bg-purple-50 border-purple-200',
+  'norte': 'bg-teal-50 border-teal-200',
+  'nordeste': 'bg-violet-50 border-violet-200',
+  'sudeste': 'bg-emerald-50 border-emerald-200',
+  'sul': 'bg-indigo-50 border-indigo-200',
+  'mg/es': 'bg-lime-50 border-lime-200',
+  'mg_es': 'bg-lime-50 border-lime-200',
+  'rio de janeiro': 'bg-cyan-50 border-cyan-200',
+  'rj': 'bg-cyan-50 border-cyan-200',
+  'são paulo': 'bg-rose-50 border-rose-200',
+  'sp': 'bg-rose-50 border-rose-200',
+  'nordeste 1': 'bg-amber-50 border-amber-200',
+  'nordeste_1': 'bg-amber-50 border-amber-200',
+  'nordeste 2': 'bg-orange-50 border-orange-200',
+  'nordeste_2': 'bg-orange-50 border-orange-200',
+  // Casos especiais
+  'Sem Regional': 'bg-gray-50 border-gray-200',
+  'sem regional': 'bg-gray-50 border-gray-200',
+};
+
+// Cores dos pontos indicadores
+const getRegionalColorDot = (regionalId: string): string => {
+  const colorMap: Record<string, string> = {
+    'Nacional': '#3B82F6',
+    'Comercial': '#10B981',
+    'Centro-Oeste': '#8B5CF6',
+    'Norte': '#14B8A6',
+    'Nordeste': '#7C3AED',
+    'Sudeste': '#059669',
+    'Sul': '#4F46E5',
+    'MG/ES': '#65A30D',
+    'Rio de Janeiro': '#0891B2',
+    'São Paulo': '#E11D48',
+    'Nordeste 1': '#F59E0B',
+    'Nordeste 2': '#EA580C',
+    // Variações de nomenclatura
+    'R. Centro-Oeste': '#8B5CF6',
+    'R. Norte': '#14B8A6',
+    'R. Nordeste': '#7C3AED',
+    'R. Sudeste': '#059669',
+    'R. Sul': '#4F46E5',
+    'R. MG/ES': '#65A30D',
+    'R. Rio de Janeiro': '#0891B2',
+    'R. São Paulo': '#E11D48',
+    'R. Nordeste 1': '#F59E0B',
+    'R. Nordeste 2': '#EA580C',
+    // Variações em minúsculo
+    'nacional': '#3B82F6',
+    'comercial': '#10B981',
+    'centro-oeste': '#8B5CF6',
+    'centro_oeste': '#8B5CF6',
+    'norte': '#14B8A6',
+    'nordeste': '#7C3AED',
+    'sudeste': '#059669',
+    'sul': '#4F46E5',
+    'mg/es': '#65A30D',
+    'mg_es': '#65A30D',
+    'rio de janeiro': '#0891B2',
+    'rj': '#0891B2',
+    'são paulo': '#E11D48',
+    'sp': '#E11D48',
+    'nordeste 1': '#F59E0B',
+    'nordeste_1': '#F59E0B',
+    'nordeste 2': '#EA580C',
+    'nordeste_2': '#EA580C',
+    // Casos especiais
+    'Sem Regional': '#6B7280',
+    'sem regional': '#6B7280',
+  };
+  return colorMap[regionalId] || '#6B7280';
+};
+
+// Estados por região (para exibição) - mapeamento flexível
+const estadosPorRegiao: Record<string, string[]> = {
+  'Nacional': ['Todos os Estados'],
+  'nacional': ['Todos os Estados'],
+  'Comercial': ['Todos os Estados'],
+  'comercial': ['Todos os Estados'],
+  'Centro-Oeste': ['DF', 'GO', 'MT', 'MS'],
+  'centro-oeste': ['DF', 'GO', 'MT', 'MS'],
+  'centro_oeste': ['DF', 'GO', 'MT', 'MS'],
+  'R. Centro-Oeste': ['DF', 'GO', 'MT', 'MS'],
+  'Norte': ['AC', 'AP', 'AM', 'PA', 'RO', 'RR', 'TO'],
+  'norte': ['AC', 'AP', 'AM', 'PA', 'RO', 'RR', 'TO'],
+  'R. Norte': ['AC', 'AP', 'AM', 'PA', 'RO', 'RR', 'TO'],
+  'Nordeste': ['CE', 'PB', 'RN', 'MA', 'PI', 'BA', 'SE', 'PE', 'AL'],
+  'nordeste': ['CE', 'PB', 'RN', 'MA', 'PI', 'BA', 'SE', 'PE', 'AL'],
+  'R. Nordeste': ['CE', 'PB', 'RN', 'MA', 'PI', 'BA', 'SE', 'PE', 'AL'],
+  'Sudeste': ['MG', 'ES', 'RJ', 'SP'],
+  'sudeste': ['MG', 'ES', 'RJ', 'SP'],
+  'R. Sudeste': ['MG', 'ES', 'RJ', 'SP'],
+  'Sul': ['RS', 'PR', 'SC'],
+  'sul': ['RS', 'PR', 'SC'],
+  'R. Sul': ['RS', 'PR', 'SC'],
+  'MG/ES': ['MG', 'ES'],
+  'mg/es': ['MG', 'ES'],
+  'mg_es': ['MG', 'ES'],
+  'R. MG/ES': ['MG', 'ES'],
+  'Rio de Janeiro': ['RJ'],
+  'rio de janeiro': ['RJ'],
+  'rj': ['RJ'],
+  'R. Rio de Janeiro': ['RJ'],
+  'São Paulo': ['SP'],
+  'são paulo': ['SP'],
+  'sp': ['SP'],
+  'R. São Paulo': ['SP'],
+  'Nordeste 1': ['CE', 'PB', 'RN', 'MA', 'PI'],
+  'nordeste 1': ['CE', 'PB', 'RN', 'MA', 'PI'],
+  'nordeste_1': ['CE', 'PB', 'RN', 'MA', 'PI'],
+  'R. Nordeste 1': ['CE', 'PB', 'RN', 'MA', 'PI'],
+  'Nordeste 2': ['BA', 'SE', 'PE', 'AL'],
+  'nordeste 2': ['BA', 'SE', 'PE', 'AL'],
+  'nordeste_2': ['BA', 'SE', 'PE', 'AL'],
+  'R. Nordeste 2': ['BA', 'SE', 'PE', 'AL'],
+  'Sem Regional': [],
+  'sem regional': [],
+};
 
 export default function RegionaisPage() {
   const navigate = useNavigate();
   const { data: userStats, loading: statsLoading, error: statsError } = useUserStats();
+  const { data: regionaisDataRaw, loading: regionaisLoading, error: regionaisError } = useRegionalData();
+  
+  // Estado para controlar o modal de registrar atividade
+  const [showRegistrarModal, setShowRegistrarModal] = useState(false);
+  const [selectedRegionalId, setSelectedRegionalId] = useState<string>('');
+  const [showNotificationModal, setShowNotificationModal] = useState(false);
+  const [notificationData, setNotificationData] = useState<{
+    type: 'success' | 'error';
+    title: string;
+    message: string;
+  }>({ type: 'success', title: '', message: '' });
 
   const handleRegionalClick = (regionalId: string) => {
     const mappedId = mapRegionalId(regionalId);
     navigate(`/regionais/${mappedId}`);
   };
 
-  const mapRegionalId = (id: string): string => {
-    switch (id) {
-      case 'centro-oeste': return 'centro_oeste';
-      case 'mg-es': return 'mg_es';
-      case 'nordeste-1': return 'nordeste_1';
-      case 'nordeste-2': return 'nordeste_2';
-      case 'rio-janeiro': return 'rj';
-      case 'sao-paulo': return 'sp';
-      default: return id; // nacional, comercial, norte, sul já compatíveis
+  const handleRegistrarAtividade = (regionalId: string) => {
+    setSelectedRegionalId(mapRegionalId(regionalId));
+    setShowRegistrarModal(true);
+  };
+
+  const handleSubmitAtividade = async (form: any) => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        console.error('Usuário não autenticado');
+        return;
+      }
+
+      // Preparar FormData para envio com arquivos
+      const formData = new FormData();
+      
+      // Adicionar dados da atividade
+      const atividadeData = {
+        title: form.atividadeLabel === 'OUTRA' && form.atividadeCustomLabel.trim() 
+          ? form.atividadeCustomLabel.trim() 
+          : form.atividadeLabel || form.atividade,
+        description: form.descricao || '',
+        type: form.atividade,
+        activity_date: form.dataAtividade,
+        responsavel_id: form.responsavel || null,
+        regional: selectedRegionalId || form.regional,
+        // Adicionar os campos que estavam faltando
+        programa: form.programa || '',
+        estados: form.estados || [],
+        instituicaoId: form.instituicaoId || '',
+        quantidade: form.quantidade || null,
+        atividadeLabel: form.atividadeLabel || '',
+        atividadeCustomLabel: form.atividadeCustomLabel || ''
+      };
+
+      // Adicionar campos de dados ao FormData
+      Object.keys(atividadeData).forEach(key => {
+        const value = atividadeData[key as keyof typeof atividadeData];
+        if (value !== null && value !== undefined) {
+          // Para arrays, converter para JSON string
+          if (Array.isArray(value)) {
+            formData.append(key, JSON.stringify(value));
+          } else {
+            formData.append(key, String(value));
+          }
+        }
+      });
+
+      // Processar evidências se existirem
+      if (form.evidencias && form.evidencias.length > 0) {
+        console.log('🔍 DEBUG - Processando evidências:', form.evidencias);
+        
+        // Converter base64 para File objects
+        for (const evidencia of form.evidencias) {
+          if (evidencia.url && evidencia.url.startsWith('data:')) {
+            try {
+              // Extrair dados do base64
+              const response = await fetch(evidencia.url);
+              const blob = await response.blob();
+              
+              // Criar File object
+              const file = new File([blob], evidencia.filename, { 
+                type: evidencia.mimeType 
+              });
+              
+              formData.append('evidencias', file);
+              console.log('✅ Arquivo adicionado ao FormData:', evidencia.filename);
+            } catch (error) {
+              console.error('❌ Erro ao processar evidência:', evidencia.filename, error);
+            }
+          }
+        }
+      }
+
+      console.log('🔍 DEBUG - Form data recebido:', form);
+      console.log('🔍 DEBUG - FormData preparado para envio');
+
+      // Chamar a nova API para salvar a atividade regional
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/regional-activities`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          // Não definir Content-Type para multipart/form-data - o browser define automaticamente
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Erro ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('Atividade regional salva com sucesso:', result);
+      
+      // Fechar o modal após salvar
+      setShowRegistrarModal(false);
+      setSelectedRegionalId('');
+      
+      // Mostrar confirmação de sucesso
+      setNotificationData({
+        type: 'success',
+        title: 'Sucesso!',
+        message: 'Atividade registrada com sucesso!'
+      });
+      setShowNotificationModal(true);
+    } catch (error) {
+      console.error('Erro ao registrar atividade regional:', error);
+      // Mostrar mensagem de erro
+      setNotificationData({
+        type: 'error',
+        title: 'Erro ao registrar atividade',
+        message: 'Não foi possível registrar a atividade. Tente novamente.'
+      });
+      setShowNotificationModal(true);
     }
   };
 
+  const mapRegionalId = (id: string): string => {
+    switch (id.toLowerCase()) {
+      case 'centro-oeste': return 'centro_oeste';
+      case 'mg/es': return 'mg_es';
+      case 'nordeste 1': return 'nordeste_1';
+      case 'nordeste 2': return 'nordeste_2';
+      case 'rio de janeiro': return 'rj';
+      case 'são paulo': return 'sp';
+      default: return id.toLowerCase().replace(/\s+/g, '_'); // nacional, comercial, norte, sul
+    }
+  };
+
+  // Função para obter estados de uma regional
+  const getEstadosPorRegional = (nomeRegional: string): string[] => {
+    if (!nomeRegional) return [];
+    
+    // Normalizar o nome da regional
+    const nomeNormalizado = nomeRegional.toLowerCase().trim();
+    
+    // Buscar no mapeamento
+    const estados = estadosPorRegiao[nomeNormalizado] || estadosPorRegiao[nomeRegional];
+    
+    console.log(`📍 DEBUG - Regional: "${nomeRegional}", Estados encontrados:`, estados || 'NENHUM');
+    console.log(`🔑 DEBUG - Chaves exatas no mapeamento que contêm "${nomeRegional}":`, 
+      Object.keys(estadosPorRegiao).filter(key => key.includes(nomeRegional) || key.includes(nomeNormalizado))
+    );
+    
+    return estados || [];
+  };
+
+  // Converter dados do hook para o formato esperado pelo componente
+  console.log('🔍 DEBUG - Dados brutos recebidos do hook:', regionaisDataRaw);
+  console.log('🗺️ DEBUG - Mapeamento de estados disponível:', Object.keys(estadosPorRegiao));
+  
+  const regionaisData: Regional[] = (regionaisDataRaw || []).map(data => {
+    const states = getEstadosPorRegional(data.regional);
+    
+    // Determinar o líder (regional ou nacional para casos específicos)
+    const leaderData = data.liderRegional || 
+      (data.liderNacional && (data.regional === 'Nacional' || data.regional === 'Comercial') ? data.liderNacional : null);
+    
+    // Debug específico para Centro-Oeste
+    if (data.regional === 'Centro-Oeste' || data.regional === 'R. Centro-Oeste') {
+      console.log('🔍 DEBUG CENTRO-OESTE - Dados brutos:', data);
+      console.log('🔍 DEBUG CENTRO-OESTE - Líder encontrado:', leaderData);
+      console.log('🔍 DEBUG CENTRO-OESTE - liderRegional:', data.liderRegional);
+    }
+    
+    return {
+      id: data.regional,
+      name: data.regional,
+      states: states,
+      leader: leaderData ? {
+        name: leaderData.nome,
+        role: leaderData.funcao
+      } : undefined,
+      coordinator: data.coordenadores.length > 0 ? {
+        name: data.coordenadores[0].nome,
+        role: data.coordenadores[0].funcao
+      } : undefined,
+      consultants: data.consultores.map(c => ({
+        name: c.nome,
+        role: c.funcao
+      })),
+      totalMembers: data.totalMembros,
+      color: regionalColors[data.regional] || 'bg-slate-50 border-slate-200'
+    };
+  });
+
+  // Reordenar os dados para colocar R. Centro-Oeste logo após Nacional
+  // Remover o card 'Comercial' desta página (ele deve aparecer apenas no Nacional)
+  const regionaisSemComercial = regionaisData.filter(r => r.name !== 'Comercial' && r.id !== 'Comercial' && r.id !== 'comercial');
+  const reorderedRegionaisData = [...regionaisSemComercial].sort((a, b) => {
+    // Nacional sempre primeiro
+    if (a.name === 'Nacional') return -1;
+    if (b.name === 'Nacional') return 1;
+    
+    // R. Centro-Oeste ou Centro-Oeste logo após Nacional
+    if (a.name === 'R. Centro-Oeste' || a.name === 'Centro-Oeste') return -1;
+    if (b.name === 'R. Centro-Oeste' || b.name === 'Centro-Oeste') return 1;
+    
+    // Manter ordem original para os demais
+    return 0;
+  });
+  
+  console.log('✅ DEBUG - Dados finais processados:', reorderedRegionaisData.map(r => ({ name: r.name, statesCount: r.states.length, states: r.states })));
+
   // Usar dados reais se disponíveis, senão usar dados mockados como fallback
-  const totalLideres = userStats?.lideresRegionais ?? regionaisData.filter(r => r.leader).length;
-  const totalCoordenadores = userStats?.coordenadores ?? regionaisData.filter(r => r.coordinator).length;
-  const totalConsultores = userStats?.consultores ?? regionaisData.reduce((acc, r) => acc + r.consultants.length, 0);
-  const totalMembros = userStats?.totalMembros ?? regionaisData.reduce((acc, r) => acc + r.totalMembers, 0);
+  const totalLideres = userStats?.lideresRegionais ?? 0;
+  const totalCoordenadores = userStats?.coordenadores ?? 0;
+  const totalMembros = userStats?.totalMembros ?? 0;
   const totalNacional = userStats?.totalNacional ?? 0; // Usuários com função "Nacional"
+
+  // Estados de loading e erro
+  const isLoading = statsLoading || regionaisLoading;
+  const hasError = statsError || regionaisError;
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-lg text-gray-600">Carregando dados regionais...</div>
+      </div>
+    );
+  }
+
+  if (hasError) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <div className="text-lg text-red-600 mb-2">Erro ao carregar dados</div>
+          <div className="text-sm text-gray-600">{statsError || regionaisError}</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -199,90 +449,33 @@ export default function RegionaisPage() {
         <p className="text-gray-600">Gestão das 8 Regionais e Equipes</p>
       </div>
 
-      {/* Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
-        <Card className="p-4 border-l-4 border-l-red-500">
-          <div className="flex items-center">
-            <Flag className="h-8 w-8 text-red-500 mr-3" />
-            <div>
-              <p className="text-sm text-gray-600">Nacional</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {statsLoading ? '...' : statsError ? '0' : totalNacional}
-              </p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-4 border-l-4 border-l-yellow-500">
-          <div className="flex items-center">
-            <Crown className="h-8 w-8 text-yellow-500 mr-3" />
-            <div>
-              <p className="text-sm text-gray-600">Líderes Regionais</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {statsLoading ? '...' : statsError ? '0' : totalLideres}
-              </p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-4 border-l-4 border-l-blue-500">
-          <div className="flex items-center">
-            <Shield className="h-8 w-8 text-blue-500 mr-3" />
-            <div>
-              <p className="text-sm text-gray-600">Coordenadores</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {statsLoading ? '...' : statsError ? '0' : totalCoordenadores}
-              </p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-4 border-l-4 border-l-green-500">
-          <div className="flex items-center">
-            <UserCheck className="h-8 w-8 text-green-500 mr-3" />
-            <div>
-              <p className="text-sm text-gray-600">Consultores</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {statsLoading ? '...' : statsError ? '0' : totalConsultores}
-              </p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-4 border-l-4 border-l-purple-500">
-          <div className="flex items-center">
-            <Users className="h-8 w-8 text-purple-500 mr-3" />
-            <div>
-              <p className="text-sm text-gray-600">Total de Membros</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {statsLoading ? '...' : statsError ? '0' : totalMembros}
-              </p>
-            </div>
-          </div>
-        </Card>
-      </div>
+      {/* Estatísticas removidas conforme solicitação: ocultar os 4 cards principais */}
 
       {/* Regional Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {regionaisData.map((regional) => (
-          <Card key={regional.id} className={`p-6 ${regional.color} hover:shadow-lg transition-shadow`}>
-            {/* Header */}
-            <div className="flex items-center mb-4">
-              <MapPin className="h-5 w-5 text-gray-600 mr-2" />
-              <h3 className="text-lg font-semibold text-gray-900">{regional.name}</h3>
+        {reorderedRegionaisData.map((regional) => (
+          <Card key={regional.id} className={`p-6 ${regionalColors[regional.id] || 'bg-slate-50 border-slate-200'} hover:shadow-xl hover:scale-105 hover:border-opacity-80 transition-all duration-300 cursor-pointer`}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center">
+                <div 
+                  className="w-4 h-4 rounded-full mr-3 shadow-sm"
+                  style={{ backgroundColor: getRegionalColorDot(regional.id) }}
+                />
+                <h3 className="text-xl font-semibold text-gray-900">{regional.name}</h3>
+              </div>
+              <div className="text-right">
+                <p className="text-2xl font-bold text-blue-600">{regional.totalMembers}</p>
+                <p className="text-sm text-gray-600">membros</p>
+              </div>
             </div>
 
-            {/* States */}
             <div className="mb-4">
-              <div className="flex items-center mb-2">
-                <Users className="h-4 w-4 text-gray-500 mr-1" />
-                <span className="text-sm text-gray-600">{regional.totalMembers} membros</span>
-              </div>
-              <div className="flex flex-wrap gap-1">
+              <p className="text-sm text-gray-600 mb-2">Estados:</p>
+              <div className="flex flex-wrap gap-2">
                 {regional.states.map((state) => (
                   <span
                     key={state}
-                    className="px-2 py-1 bg-white bg-opacity-60 rounded text-xs font-medium text-gray-700"
+                    className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full"
                   >
                     {state}
                   </span>
@@ -290,35 +483,48 @@ export default function RegionaisPage() {
               </div>
             </div>
 
-            {/* Team Members */}
-            <div className="space-y-2 mb-4">
-              {/* Leader */}
-              <div className="flex items-center">
-                <Crown className="h-4 w-4 text-yellow-600 mr-2" />
-                <div>
-                  <p className="text-xs text-gray-600">{regional.leader.role}</p>
-                </div>
-              </div>
-
-              {/* Coordinator */}
-              {regional.coordinator && (
+            <div className="space-y-3 mb-6">
+              {regional.leader && (
                 <div className="flex items-center">
-                  <Shield className="h-4 w-4 text-blue-600 mr-2" />
-                  <div>
-                    <p className="text-xs text-gray-600">{regional.coordinator.role}</p>
-                  </div>
+                  <Crown className="h-4 w-4 text-yellow-500 mr-2" />
+                  <span className="text-sm">
+                    <span className="font-medium">Líder Regional:</span> {regional.leader.name}
+                  </span>
+                </div>
+              )}
+              
+              {/* Debug específico para Centro-Oeste */}
+              {(regional.name === 'Centro-Oeste' || regional.name === 'R. Centro-Oeste') && (
+                <div style={{ display: 'none' }}>
+                  {console.log('🔍 DEBUG CARD CENTRO-OESTE - regional.leader:', regional.leader)}
+                  {console.log('🔍 DEBUG CARD CENTRO-OESTE - regional completo:', regional)}
                 </div>
               )}
 
-              {/* Consultants */}
-              {regional.consultants.map((consultant, index) => (
-                <div key={index} className="flex items-center">
-                  <UserCheck className="h-4 w-4 text-green-600 mr-2" />
-                  <div>
-                    <p className="text-xs text-gray-600">{consultant.role}</p>
+              {regional.coordinator && (
+                <div className="flex items-center">
+                  <Shield className="h-4 w-4 text-blue-500 mr-2" />
+                  <span className="text-sm">
+                    <span className="font-medium">Coordenador:</span> {regional.coordinator.name}
+                  </span>
+                </div>
+              )}
+
+              {regional.consultants && regional.consultants.length > 0 && (
+                <div className="flex items-start">
+                  <UserCheck className="h-4 w-4 text-green-500 mr-2 mt-0.5" />
+                  <div className="text-sm">
+                    <span className="font-medium">Consultores:</span>
+                    <div className="mt-1">
+                      {regional.consultants.map((consultant, index) => (
+                        <span key={index} className="block text-gray-600">
+                          • {consultant.name}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              ))}
+              )}
             </div>
 
             {/* Action Buttons */}
@@ -326,25 +532,18 @@ export default function RegionaisPage() {
               <Button 
                 className="w-full bg-green-600 hover:bg-green-700 text-white text-sm py-2"
                 size="sm"
-                onClick={() => navigate(`/regionais/calendario?regional=${mapRegionalId(regional.id)}&open=new`)}
+                onClick={() => handleRegistrarAtividade(regional.id)}
               >
                 <Plus className="h-4 w-4 mr-1" />
                 Registrar Atividade
               </Button>
 
-              <Button 
-                className="w-full bg-pink-600 hover:bg-pink-700 text-white text-sm py-2"
-                size="sm"
-                onClick={() => navigate(`/ongs/cadastrar?regional=${regional.id}`)}
-              >
-                <Building2 className="h-4 w-4 mr-1" />
-                Cadastrar ONGs
-              </Button>
+
 
               <Button 
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm py-2"
                 size="sm"
-                onClick={() => navigate(`/regionais/calendario?regional=${mapRegionalId(regional.id)}&view=gestao`)}
+                onClick={() => navigate('/regionais/gestao-atividades')}
               >
                 <Activity className="h-4 w-4 mr-1" />
                 Todas as Atividades
@@ -362,6 +561,26 @@ export default function RegionaisPage() {
           </Card>
         ))}
       </div>
+
+      {/* Modal de Registrar Atividade */}
+      <RegistrarAtividadeModal
+        isOpen={showRegistrarModal}
+        onClose={() => {
+          setShowRegistrarModal(false);
+          setSelectedRegionalId('');
+        }}
+        onSubmit={handleSubmitAtividade}
+        regionalId={selectedRegionalId}
+      />
+
+      {/* Modal de Notificação */}
+      <NotificationModal
+        isOpen={showNotificationModal}
+        onClose={() => setShowNotificationModal(false)}
+        type={notificationData.type}
+        title={notificationData.title}
+        message={notificationData.message}
+      />
     </div>
   );
 }

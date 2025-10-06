@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -14,7 +14,7 @@ import {
 } from 'chart.js';
 import { Line, Doughnut, Bar } from 'react-chartjs-2';
 import { MoreVertical } from 'lucide-react';
-import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import LoadingSpinner from '../ui/LoadingSpinner';
 
 ChartJS.register(
   CategoryScale,
@@ -32,7 +32,7 @@ ChartJS.register(
 interface ChartCardProps {
   title: string;
   subtitle?: string;
-  type: 'line' | 'doughnut' | 'bar';
+  type: 'line' | 'doughnut' | 'bar' | 'pie';
   data: any;
   isLoading?: boolean;
   // Personalização para gráfico de linha
@@ -119,13 +119,20 @@ export default function ChartCard({
   };
 
   const getChartData = () => {
+    if (!data || !Array.isArray(data)) {
+      return {
+        labels: [],
+        datasets: []
+      };
+    }
+
     if (type === 'line') {
       const lc = lineColor || '#EC4899';
       return {
-        labels: data.map((item: any) => item.month),
+        labels: data.map((item: any) => item.name),
         datasets: [
           {
-            label: 'Participantes',
+            label: 'Dados',
             data: data.map((item: any) => item.value),
             borderColor: lc,
             backgroundColor: hexToRgba(lc, lineBgOpacity),
@@ -169,7 +176,11 @@ export default function ChartCard({
         ],
       };
     }
-    return {};
+    
+    return {
+      labels: [],
+      datasets: []
+    };
   };
 
   if (isLoading) {
@@ -229,6 +240,13 @@ export default function ChartCard({
             ref={chartRef}
             data={getChartData()}
             options={barChartOptions}
+          />
+        )}
+        {type === 'pie' && (
+          <Doughnut
+            ref={chartRef}
+            data={getChartData()}
+            options={doughnutChartOptions}
           />
         )}
       </div>

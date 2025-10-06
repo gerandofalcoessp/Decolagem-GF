@@ -21,7 +21,8 @@ import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { MemberService } from '../services/memberService';
 import { GoalService } from '../services/goalService';
 import { AuthService } from '../services/authService';
-import { useToastContext } from '../contexts/ToastContext';
+import { useNotificationStore } from '../store/notificationStore';
+import { API_BASE_URL } from '../utils/config';
 
 interface TabItem {
   id: string;
@@ -92,7 +93,7 @@ const prefetchTab = (id: string) => {
 
 export default function Configuracoes() {
   const [activeTab, setActiveTab] = useState('senhas');
-  const toast = useToastContext();
+  const { showSuccess, showError, showConfirmation } = useNotificationStore();
 
   // Prefetch inicial de abas mais acessadas
   useEffect(() => {
@@ -159,6 +160,7 @@ export default function Configuracoes() {
       
       return {
         id: user.id || `user-${index + 1}`,
+        auth_user_id: user.auth_user_id || user.id,
         usuario: user.nome || user.email?.split('@')[0] || 'Usuário',
         email: user.email || '',
         tipo: user.tipo || (user.role === 'super_admin' ? 'Nacional' : 'Regional'), // Usar campo tipo ou inferir do role
@@ -256,7 +258,7 @@ export default function Configuracoes() {
   const handleBlockUser = async (userId: string) => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/auth/users/${userId}/block`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/users/${userId}/block`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -267,21 +269,21 @@ export default function Configuracoes() {
 
       if (response.ok) {
         await refetchUsers();
-        alert('Usuário bloqueado com sucesso!');
+        showSuccess('Usuário bloqueado com sucesso!');
       } else {
         const error = await response.json();
-        alert(`Erro ao bloquear usuário: ${error.error}`);
+        showError('Erro ao bloquear usuário', error.error);
       }
     } catch (error) {
       console.error('Erro ao bloquear usuário:', error);
-      alert('Erro ao bloquear usuário');
+      showError('Erro ao bloquear usuário');
     }
   };
 
   const handleUnblockUser = async (userId: string) => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/auth/users/${userId}/unblock`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/users/${userId}/unblock`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -291,25 +293,36 @@ export default function Configuracoes() {
 
       if (response.ok) {
         await refetchUsers();
-        alert('Usuário desbloqueado com sucesso!');
+        showSuccess('Usuário desbloqueado com sucesso!');
       } else {
         const error = await response.json();
-        alert(`Erro ao desbloquear usuário: ${error.error}`);
+        showError('Erro ao desbloquear usuário', error.error);
       }
     } catch (error) {
       console.error('Erro ao desbloquear usuário:', error);
-      alert('Erro ao desbloquear usuário');
+      showError('Erro ao desbloquear usuário');
     }
   };
 
   const handleDeleteUser = async (userId: string) => {
-    if (!confirm('Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.')) {
+    // Encontrar o usuário pelos dados (usar auth_user_id)
+    const user = usuarios.find((u: any) => u.auth_user_id === userId);
+    if (!user) {
+      showError('Usuário não encontrado');
       return;
     }
+    
+    // Abrir modal de confirmação
+    setSelectedUser(user);
+    setShowDeleteUserModal(true);
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!selectedUser) return;
 
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/auth/users/${userId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/users/${selectedUser.auth_user_id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -319,14 +332,24 @@ export default function Configuracoes() {
 
       if (response.ok) {
         await refetchUsers();
-        alert('Usuário excluído com sucesso!');
+        setShowDeleteUserModal(false);
+        setSelectedUser(null);
+        showSuccess('Usuário excluído com sucesso!');
       } else {
-        const error = await response.json();
-        alert(`Erro ao excluir usuário: ${error.error}`);
+        // Verificar se a resposta tem conteúdo JSON
+        let errorMessage = 'Erro ao excluir usuário';
+        try {
+          const error = await response.json();
+          errorMessage = error.error || errorMessage;
+        } catch (jsonError) {
+          // Se não conseguir fazer parse do JSON, usar mensagem padrão
+          console.warn('Resposta não contém JSON válido:', jsonError);
+        }
+        showError('Erro ao excluir usuário', errorMessage);
       }
     } catch (error) {
       console.error('Erro ao excluir usuário:', error);
-      alert('Erro ao excluir usuário');
+      showError('Erro ao excluir usuário');
     }
   };
 
@@ -391,10 +414,10 @@ export default function Configuracoes() {
         regional: ''
       });
       
-      alert('Membro atualizado com sucesso!');
+      showSuccess('Membro atualizado com sucesso!');
     } catch (error) {
       console.error('Erro ao atualizar membro:', error);
-      alert('Erro ao atualizar membro. Tente novamente.');
+      showError('Erro ao atualizar membro', 'Tente novamente.');
     }
   };
 
@@ -455,7 +478,7 @@ export default function Configuracoes() {
 
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/auth/users/${selectedUser.id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/users/${selectedUser.auth_user_id}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -476,22 +499,22 @@ export default function Configuracoes() {
         
         setShowEditUserModal(false);
         setSelectedUser(null);
-        alert('Usuário atualizado com sucesso!');
+        showSuccess('Usuário atualizado com sucesso!');
       } else {
         const error = await response.json();
         console.error('❌ Erro da API:', error);
-        alert(`Erro ao atualizar usuário: ${error.error}`);
+        showError('Erro ao atualizar usuário', error.error);
       }
     } catch (error) {
       console.error('❌ Erro ao atualizar usuário:', error);
-      alert('Erro ao atualizar usuário');
+      showError('Erro ao atualizar usuário');
     }
   };
 
-  const handleGeneratePassword = async (userId: number) => {
+  const handleGeneratePassword = async (userId: string) => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/auth/users/${userId}/generate-password`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/users/${userId}/generate-password`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -501,15 +524,15 @@ export default function Configuracoes() {
 
       if (response.ok) {
         const data = await response.json();
-        alert(`Nova senha gerada com sucesso!\n\nSenha temporária: ${data.password}\n\nAnote esta senha e repasse ao usuário. Por segurança, esta senha não será exibida novamente.`);
+        showSuccess('Nova senha gerada com sucesso!', `Senha temporária: ${data.password}\n\nAnote esta senha e repasse ao usuário. Por segurança, esta senha não será exibida novamente.`);
         await refetchUsers();
       } else {
         const error = await response.json();
-        alert(`Erro ao gerar nova senha: ${error.error}`);
+        showError('Erro ao gerar nova senha', error.error);
       }
     } catch (error) {
       console.error('Erro ao gerar nova senha:', error);
-      alert('Erro ao gerar nova senha');
+      showError('Erro ao gerar nova senha');
     }
   };
 
@@ -573,8 +596,8 @@ export default function Configuracoes() {
       // Criar descrição com detalhes da meta
       const mesesTexto = newMeta.mes.join(', ');
       const regionaisTexto = newMeta.regionais.join(', ');
-      const unit = newMeta.nome === 'Retenção' ? '%' : ((newMeta.nome === 'Atendidos Indiretamente' || newMeta.nome === 'Atendidos Diretamente' || newMeta.nome === 'Pessoas Atendidas') ? ' pessoas' : ' unidades');
-      const description = `Meta: ${targetValue}${unit} | Meses: ${mesesTexto} | Regionais: ${regionaisTexto}`;
+      const unit = newMeta.nome === 'Retenção' ? '%' : ((newMeta.nome === 'Atendidos Indiretos Decolagem' || newMeta.nome === 'Atendidos Diretos Decolagem' || newMeta.nome === 'Pessoas Atendidas') ? ' pessoas' : ' unidades');
+      const description = `Meta: ${targetValue}${unit} | Meses: ${mesesTexto} | Área: ${regionaisTexto}`;
       
       // Calcular deadline baseado no último mês selecionado
       let ultimoMes: number;
@@ -658,7 +681,7 @@ export default function Configuracoes() {
         console.log(`Definindo nova senha para o usuário: ${selectedUser.usuario}`);
         
         // Chamar a API para atualizar a senha
-        await AuthService.updateUserPassword(selectedUser.id, newPassword);
+        await AuthService.updateUserPassword(selectedUser.auth_user_id!, newPassword);
         
         // Atualizar os dados dos usuários
         await refetchUsers();
@@ -1546,23 +1569,7 @@ export default function Configuracoes() {
                 Cancelar
               </Button>
               <Button 
-                onClick={async () => {
-                  try {
-                    // Aqui você implementaria a lógica real de deletar usuário via API
-                    // await AuthService.deleteUser(selectedUser.id);
-                    
-                    // Atualizar os dados dos usuários
-                    await refetchUsers();
-                    
-                    setShowDeleteUserModal(false);
-                    setSelectedUser(null);
-                    
-                    toast.success('Usuário excluído', 'Usuário excluído com sucesso.');
-                  } catch (error) {
-                    console.error('Erro ao excluir usuário:', error);
-                    toast.error('Erro', 'Erro ao excluir usuário');
-                  }
-                }}
+                onClick={confirmDeleteUser}
                 className="bg-red-600 hover:bg-red-700"
               >
                 Excluir
@@ -1709,8 +1716,8 @@ export default function Configuracoes() {
                   const targetValue = parseFloat(newMeta.quantidade);
                   const mesesTexto = newMeta.mes.join(', ');
                   const regionaisTexto = newMeta.regionais.join(', ');
-                  const unit = newMeta.nome === 'Retenção' ? '%' : ((newMeta.nome === 'Atendidos Indiretamente' || newMeta.nome === 'Atendidos Diretamente' || newMeta.nome === 'Pessoas Atendidas') ? ' pessoas' : ' unidades');
-                  const description = `Meta: ${targetValue}${unit} | Meses: ${mesesTexto} | Regionais: ${regionaisTexto}`;
+                  const unit = newMeta.nome === 'Retenção' ? '%' : ((newMeta.nome === 'Atendidos Indiretos Decolagem' || newMeta.nome === 'Atendidos Diretos Decolagem' || newMeta.nome === 'Pessoas Atendidas') ? ' pessoas' : ' unidades');
+                  const description = `Meta: ${targetValue}${unit} | Meses: ${mesesTexto} | Área: ${regionaisTexto}`;
 
                   let ultimoMes: number;
                   if (newMeta.mes.length === 0 || newMeta.mes.includes('todo-ano')) {

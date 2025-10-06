@@ -1,5 +1,3 @@
-import React from 'react';
-
 export type ConflictDetail = { title: string; range: string };
 export type ConflictWarning = {
   hasConflict: boolean;

@@ -1,36 +1,18 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { X } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
-import type { TipoAtividade, Programa, Evidencia } from '@/types';
+import { useEffect, useRef, useState } from 'react';
+import { X, CalendarPlus } from 'lucide-react';
+import { Button } from '../../../components/ui/Button';
+import type { TipoAtividade, Programa, Evidencia, EventForm, Regional } from '../../../types';
 import ConflictBanner from './ConflictBanner';
-import type { ConflictWarning } from './ConflictBanner';
-import { REGIONAL_STATES, STATE_LABELS, PROGRAMA_LABELS } from '@/pages/calendario/constants'
+import { REGIONAL_STATES, STATE_LABELS, PROGRAMA_LABELS } from '../constants';
+import { useUsersWithMembers } from '@/hooks/useApi';
 
 interface EventModalProps {
   isOpen: boolean;
   editingId: string | null;
-  form: {
-    atividade: TipoAtividade | '';
-    atividadeLabel: string;
-    atividadeCustomLabel: string;
-    responsavel: string;
-    descricao: string;
-    dataAtividade: string; // novo: única data de atividade
-    regional: string;
-    // removendo UI de local (mantém no formulário para compatibilidade externa, mas não exibe)
-    local: string;
-    estados: string[]; // novo: seleção múltipla de UFs
-    // novos campos
-    programa?: Programa | '';
-    instituicaoId?: string;
-    // Novo: evidências de imagens
-    evidencias?: Evidencia[];
-    // Novo: quantidade
-    quantidade?: number;
-  };
-  setForm: React.Dispatch<React.SetStateAction<EventModalProps['form']>>;
+  form: EventForm;
+  setForm: (form: EventForm) => void;
   customTypes: { value: TipoAtividade; label: string }[];
-  setCustomTypes: React.Dispatch<React.SetStateAction<{ value: TipoAtividade; label: string }[]>>;
+  setCustomTypes: (types: { value: TipoAtividade; label: string }[]) => void;
   REGIONAL_LABELS: Record<string, string>;
   ATIVIDADE_OPTIONS: { value: TipoAtividade; label: string }[];
   onClose: () => void;
@@ -66,6 +48,57 @@ export default function EventModal({
   const previouslyFocusedElement = useRef<HTMLElement | null>(null);
   const [ongs, setOngs] = useState<Array<{ id: string; nome: string }>>([]);
   const [evidenciaError, setEvidenciaError] = useState<string>('');
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
+
+  // Buscar usuários para popular o campo Responsável
+  const { data: usersWithMembers, loading: usersLoading, error: usersError } = useUsersWithMembers();
+  
+  // Função utilitária para normalizar strings (minúsculas, sem acentos e sem espaços/sinais)
+  const normalize = (s: string) => (s || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, '')
+    .trim();
+
+  // Mapeamento de chaves de regional para aliases que podem aparecer em user.area/user.regional
+  const REGIONAL_ALIASES: Record<string, string[]> = {
+    nacional: ['nacional'],
+    comercial: ['comercial'],
+    centro_oeste: ['centrooeste'],
+    mg_es: ['mges'],
+    nordeste_1: ['nordeste1'],
+    nordeste_2: ['nordeste2'],
+    norte: ['norte'],
+    rj: ['rj', 'riodejaneiro'],
+    sp: ['sp', 'saopaulo'],
+    sul: ['sul'],
+  };
+
+  const filteredUsers = (usersWithMembers || [])
+    .filter((u: any) => {
+      // First filter: only users with valid IDs
+      if (!u.id || typeof u.id !== 'string' || u.id.trim() === '') {
+        return false;
+      }
+      
+      const aff = normalize(u.area || u.regional || '');
+      const matchers = REGIONAL_ALIASES[form.regional] || [];
+      const byRegional = matchers.some((m) => aff.includes(m));
+      const isNational = aff === 'nacional';
+      
+      // Usuários nacionais só aparecem na regional "nacional"
+      if (form.regional === 'nacional') {
+        return byRegional || isNational;
+      }
+      
+      // Para outras regionais, mostrar apenas usuários da regional específica
+      return byRegional;
+    })
+    .sort((a: any, b: any) => (
+      (a.nome || a.email || '').localeCompare(b.nome || b.email || '')
+    ));
   
   const handleEvidenciasChange = async (files: FileList | null) => {
     if (!files) return;
@@ -105,24 +138,33 @@ export default function EventModal({
       });
     }
   
-    setForm(prev => ({ ...prev, evidencias: [...current, ...newItems].slice(0, MAX_FILES) }));
+    const currentEvidencias = form.evidencias || [];
+    setForm({ ...form, evidencias: [...currentEvidencias, ...newItems].slice(0, MAX_FILES) });
   };
   
   const removeEvidencia = (id: string) => {
-    setForm(prev => ({ ...prev, evidencias: (prev.evidencias || []).filter(ev => ev.id !== id) }));
+    setForm({ ...form, evidencias: (form.evidencias || []).filter((ev: Evidencia) => ev.id !== id) });
   };
   
   useEffect(() => {
     if (!isOpen) return;
-    try {
-      const raw = localStorage.getItem('ongs');
-      const parsed = raw ? JSON.parse(raw) : [];
-      const list = Array.isArray(parsed) ? parsed : [];
-      const mapped = list.map((o: any) => ({ id: o.id, nome: o.nome })).filter((o: any) => o.id && o.nome);
-      setOngs(mapped);
-    } catch {
-      setOngs([]);
-    }
+    
+    const loadOngs = async () => {
+      try {
+        const { InstituicaoService } = await import('@/services/instituicaoService');
+        const instituicoes = await InstituicaoService.getInstituicoes();
+        const mapped = instituicoes.map((inst) => ({ 
+          id: inst.id!, 
+          nome: inst.nome 
+        })).filter((o) => o.id && o.nome);
+        setOngs(mapped);
+      } catch (error) {
+        console.error('Erro ao carregar instituições:', error);
+        setOngs([]);
+      }
+    };
+    
+    loadOngs();
   }, [isOpen]);
 
   useEffect(() => {
@@ -138,7 +180,7 @@ export default function EventModal({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
-        onClose();
+        onCloseRef.current?.();
         return;
       }
       if (e.key === 'Tab' && containerRef.current) {
@@ -168,15 +210,21 @@ export default function EventModal({
       document.removeEventListener('keydown', handleKeyDown);
       previouslyFocusedElement.current?.focus();
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-label={editingId ? 'Editar Evento' : 'Novo Evento'}>
-      <div className="bg-white rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto" ref={containerRef} tabIndex={-1}>
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-label={editingId ? 'Editar Evento' : 'Novo Evento'}>
+      <div className="bg-white rounded-2xl p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl ring-1 ring-gray-200" ref={containerRef} tabIndex={-1}>
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-2xl font-bold text-gray-900">{editingId ? 'Editar Evento' : 'Novo Evento'}</h3>
+          <div className="flex items-center gap-3">
+            <CalendarPlus className="w-6 h-6 text-pink-500" aria-hidden="true" />
+            <div>
+              <h3 className="text-xl font-semibold text-gray-900 leading-tight">{editingId ? 'Editar Evento' : 'Novo Evento'}</h3>
+              <p className="text-sm text-gray-500">Preencha os detalhes abaixo</p>
+            </div>
+          </div>
           <button aria-label="Fechar modal" className="p-2 rounded-xl hover:bg-gray-100 transition-colors" onClick={onClose}>
             <X className="w-5 h-5" aria-hidden="true" />
           </button>
@@ -193,9 +241,9 @@ export default function EventModal({
                 onChange={(e) => {
                   const value = e.target.value as TipoAtividade;
                   const label = e.target.options[e.target.selectedIndex]?.text || '';
-                  setForm((f) => ({ ...f, atividade: value, atividadeLabel: label }));
+                  setForm({ ...form, atividade: value, atividadeLabel: label });
                 }}
-                className="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm shadow-sm transition-colors"
               >
                 <option value="">Selecione uma atividade</option>
                 {[...ATIVIDADE_OPTIONS.filter(o => o.label !== 'OUTRA'), ...customTypes, { value: 'outros' as TipoAtividade, label: 'OUTRA' }].map((opt) => (
@@ -208,8 +256,8 @@ export default function EventModal({
                     type="text"
                     aria-label="Nome da nova atividade"
                     value={form.atividadeCustomLabel}
-                    onChange={(e) => setForm((f) => ({ ...f, atividadeCustomLabel: e.target.value }))}
-                    className="flex-1 border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    onChange={(e) => setForm({ ...form, atividadeCustomLabel: e.target.value })}
+                    className="flex-1 border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm shadow-sm transition-colors"
                     placeholder="Nome da nova atividade"
                   />
                   <Button
@@ -217,10 +265,10 @@ export default function EventModal({
                     onClick={() => {
                       const name = form.atividadeCustomLabel.trim();
                       if (!name) return;
-                      setCustomTypes((prev) => [...prev, { value: 'outros', label: name }]);
-                      setForm((f) => ({ ...f, atividadeLabel: name }));
+                      setCustomTypes([...customTypes, { value: 'outros' as TipoAtividade, label: name }]);
+                      setForm({ ...form, atividadeLabel: name });
                     }}
-                    className="whitespace-nowrap"
+                    className="whitespace-nowrap rounded-xl shadow-sm"
                   >
                     Salvar no filtro
                   </Button>
@@ -234,8 +282,8 @@ export default function EventModal({
               <select
                 aria-label="Selecionar programa"
                 value={form.programa || ''}
-                onChange={(e) => setForm((f) => ({ ...f, programa: e.target.value as Programa }))}
-                className="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                onChange={(e) => setForm({ ...form, programa: e.target.value as Programa })}
+                className="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm shadow-sm transition-colors"
               >
                 <option value="">Selecione um programa</option>
                 {Object.entries(PROGRAMA_LABELS).map(([key, label]) => (
@@ -254,14 +302,15 @@ export default function EventModal({
                 aria-label="Quantidade"
                 value={typeof form.quantidade === 'number' ? form.quantidade : ''}
                 onChange={(e) => {
+                  console.log('Quantidade onChange:', e.target.value);
                   const val = e.target.value;
                   const num = val === '' ? undefined : Math.max(0, Math.floor(Number(val)));
-                  setForm((f) => ({ ...f, quantidade: num }));
+                  setForm({ ...form, quantidade: num });
                 }}
-                className="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm transition-colors"
                 placeholder="Informe a quantidade (opcional)"
               />
-              <p className="mt-1 text-xs text-gray-500">Use para contabilizar itens como famílias atendidas, encontros realizados, etc.</p>
+              <p className="mt-1 text-xs text-gray-500">Use para contabilizar itens como pessoas atendidas, encontros realizados, etc.</p>
             </div>
 
             {/* Instituição */}
@@ -270,8 +319,8 @@ export default function EventModal({
               <select
                 aria-label="Selecionar instituição"
                 value={form.instituicaoId || ''}
-                onChange={(e) => setForm((f) => ({ ...f, instituicaoId: e.target.value }))}
-                className="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                onChange={(e) => setForm({ ...form, instituicaoId: e.target.value })}
+                className="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm transition-colors"
               >
                 <option value="">Selecione uma instituição</option>
                 {ongs.map((o) => (
@@ -288,8 +337,8 @@ export default function EventModal({
               <select
                 aria-label="Selecionar regional"
                 value={form.regional}
-                onChange={(e) => setForm((f) => ({ ...f, regional: e.target.value }))}
-                className="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                onChange={(e) => setForm({ ...form, regional: e.target.value as Regional })}
+                className="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm shadow-sm transition-colors"
               >
                 {Object.entries(REGIONAL_LABELS).filter(([key]) => key !== 'todas').map(([key, label]) => (
                   <option key={key} value={key}>{label}</option>
@@ -305,14 +354,18 @@ export default function EventModal({
             <select
               aria-label="Selecionar responsável"
               value={form.responsavel}
-              onChange={(e) => setForm((f) => ({ ...f, responsavel: e.target.value }))}
-              className="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              onChange={(e) => setForm({ ...form, responsavel: e.target.value })}
+              className="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm shadow-sm transition-colors"
             >
               <option value="">Nenhum responsável</option>
-              <option value="Líder Regional">Líder Regional</option>
-              <option value="Coordenador Nacional">Coordenador Nacional</option>
-              <option value="Gerente Comercial">Gerente Comercial</option>
-              <option value="Consultor">Consultor</option>
+              {/* Estados de carregamento/erro */}
+              {usersLoading && (<option disabled>Carregando usuários...</option>)}
+              {!usersLoading && usersError && (<option disabled>Erro ao carregar usuários</option>)}
+              {/* Lista dinâmica por regional + nacional */}
+              {!usersLoading && !usersError && filteredUsers.map((u: any) => {
+                const label = u.nome || (u.email?.split('@')[0]) || 'Usuário';
+                return (<option key={u.id} value={u.id}>{label}</option>);
+              })}
             </select>
           </div>
 
@@ -328,8 +381,11 @@ export default function EventModal({
               type="date" 
               aria-label="Data da atividade"
               value={form.dataAtividade} 
-              onChange={(e) => setForm((f) => ({ ...f, dataAtividade: e.target.value }))} 
-              className="w-full md:max-w-[220px] border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+              onChange={(e) => {
+                console.log('Data da atividade onChange:', e.target.value);
+                setForm({ ...form, dataAtividade: e.target.value });
+              }} 
+              className="w-full md:max-w-[220px] border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm shadow-sm transition-colors" 
               placeholder="dd/mm/yyyy"
             />
           </div>
@@ -344,7 +400,7 @@ export default function EventModal({
                   className="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50"
                   onClick={() => {
                     const all = REGIONAL_STATES[form.regional] || [];
-                    setForm((f) => ({ ...f, estados: all }));
+                    setForm({ ...form, estados: all });
                   }}
                 >
                   Selecionar todos
@@ -352,7 +408,7 @@ export default function EventModal({
                 <button
                   type="button"
                   className="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50"
-                  onClick={() => setForm((f) => ({ ...f, estados: [] }))}
+                  onClick={() => setForm({ ...form, estados: [] })}
                 >
                   Limpar
                 </button>
@@ -360,7 +416,7 @@ export default function EventModal({
             </div>
             <div
               aria-label="Selecionar estados"
-              className="w-full border border-gray-300 rounded-xl p-3 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 max-h-40 overflow-y-auto bg-white"
+              className="w-full border border-gray-300 rounded-xl p-3 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 max-h-40 overflow-y-auto bg-white shadow-sm"
             >
               {(REGIONAL_STATES[form.regional] || []).map((uf) => (
                 <label key={uf} className="flex items-center gap-2 py-1">
@@ -370,12 +426,13 @@ export default function EventModal({
                     checked={form.estados.includes(uf)}
                     onChange={(e) => {
                       const checked = e.target.checked;
-                      setForm((f) => ({
-                        ...f,
+                      const newForm = {
+                        ...form,
                         estados: checked
-                          ? Array.from(new Set([...f.estados, uf]))
-                          : f.estados.filter((s) => s !== uf),
-                      }));
+                          ? Array.from(new Set([...form.estados, uf]))
+                          : form.estados.filter((s: string) => s !== uf),
+                      };
+                      setForm(newForm);
                     }}
                     className="w-4 h-4"
                   />
@@ -393,8 +450,8 @@ export default function EventModal({
           <textarea
             aria-label="Descrição do evento"
             value={form.descricao}
-            onChange={(e) => setForm((f) => ({ ...f, descricao: e.target.value }))}
-            className="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            onChange={(e) => setForm({ ...form, descricao: e.target.value })}
+            className="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm transition-colors"
             rows={3}
             placeholder="Descrição detalhada do evento"
           />
@@ -427,7 +484,7 @@ export default function EventModal({
                     <p className="text-sm text-gray-800 truncate">{ev.filename}</p>
                     <p className="text-xs text-gray-500">{(ev.size / (1024*1024)).toFixed(2)} MB</p>
                   </div>
-                  <Button variant="outline" onClick={() => removeEvidencia(ev.id)} className="text-red-600">Remover</Button>
+                  <Button variant="destructive" onClick={() => removeEvidencia(ev.id)} className="rounded-md">Remover</Button>
                 </div>
               ))}
             </div>
@@ -439,12 +496,12 @@ export default function EventModal({
         )}
 
         <div className="flex items-center justify-end space-x-3 pt-4 border-t border-gray-200">
-          <Button variant="outline" onClick={onClose} className="px-6">
+          <Button variant="outline" onClick={onClose} className="px-6 rounded-xl shadow-sm">
             Cancelar
           </Button>
           <Button 
             onClick={onSubmit} 
-            className="px-6 bg-pink-500 hover:bg-pink-600 text-white"
+            className="px-6 bg-pink-500 hover:bg-pink-600 text-white rounded-xl shadow-sm"
             disabled={!form.atividade || !form.dataAtividade || !form.regional || !form.programa}
             aria-disabled={!form.atividade || !form.dataAtividade || !form.regional || !form.programa}
           >

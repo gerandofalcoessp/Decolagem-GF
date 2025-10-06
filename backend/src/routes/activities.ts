@@ -8,7 +8,22 @@ router.get('/', async (req, res) => {
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
   const s = getSupabaseForToken(token);
   if (!s) return res.status(500).json({ error: 'supabase_client_unavailable' });
-  const { data, error } = await s.from('activities').select('*');
+  
+  // Fazer join com a tabela usuarios para obter dados do responsável
+  const { data, error } = await s
+    .from('activities')
+    .select(`
+      *,
+      responsavel:usuarios!activities_responsavel_id_fkey(
+        id,
+        nome,
+        email,
+        regional,
+        funcao,
+        area
+      )
+    `);
+    
   if (error) return res.status(400).json({ error: error.message });
   res.json({ data });
 });

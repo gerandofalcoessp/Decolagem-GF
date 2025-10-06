@@ -37,9 +37,12 @@ export function supabaseConfigStatus() {
 }
 
 export async function getUserFromToken(token?: string) {
-  if (!token || !supabase) return null;
+  if (!token) return null;
+  // Preferir cliente anon; caso não esteja configurado, usar admin como fallback
+  const client = supabase ?? supabaseAdmin;
+  if (!client) return null;
   try {
-    const { data, error } = await supabase.auth.getUser(token);
+    const { data, error } = await client.auth.getUser(token);
     if (error) return null;
     return data.user ?? null;
   } catch {

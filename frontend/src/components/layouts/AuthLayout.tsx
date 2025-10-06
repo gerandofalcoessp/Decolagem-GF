@@ -2,6 +2,9 @@ interface AuthLayoutProps {
   children: React.ReactNode;
 }
 
+// Importar a logo das Maras
+const asMarasLogo = new URL('../../assets/logos/logo as maras.png', import.meta.url).href;
+
 export default function AuthLayout({ children }: AuthLayoutProps) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50">
@@ -27,10 +30,16 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
             <div className="max-w-md">
               {/* Logo */}
               <div className="mb-8">
-                <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mb-4 backdrop-blur-sm">
-                  <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-                  </svg>
+                <div className="w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center mb-4 backdrop-blur-sm">
+                  <img 
+                    src={asMarasLogo} 
+                    alt="As Maras" 
+                    className="w-16 h-16 object-contain"
+                    style={{
+                      filter: 'brightness(0) saturate(100%) invert(100%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(100%) contrast(100%)',
+                      WebkitFilter: 'brightness(0) saturate(100%) invert(100%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(100%) contrast(100%)'
+                    }}
+                  />
                 </div>
                 <h1 className="text-3xl font-bold">Sistema Decolagem</h1>
                 <p className="text-primary-100 mt-2">
@@ -46,7 +55,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                 </div>
                 <div className="flex items-center space-x-3">
                   <div className="w-2 h-2 bg-secondary-400 rounded-full"></div>
-                  <span className="text-primary-100">Controle de Microcrédito</span>
+                  <span className="text-primary-100">Gestão do programa Decolagem</span>
                 </div>
                 
                 <div className="flex items-center space-x-3">
@@ -55,17 +64,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                 </div>
               </div>
 
-              {/* Estatísticas */}
-              <div className="mt-12 grid grid-cols-2 gap-6">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-white">500+</div>
-                  <div className="text-sm text-primary-200">Participantes</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-white">15</div>
-                  <div className="text-sm text-primary-200">Regionais</div>
-                </div>
-              </div>
+
             </div>
           </div>
 
@@ -80,10 +79,15 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
           <div className="mx-auto w-full max-w-md">
             {/* Logo mobile */}
             <div className="lg:hidden text-center mb-8">
-              <div className="w-16 h-16 bg-primary-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-primary-600" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-                </svg>
+              <div className="w-20 h-20 bg-primary-100 rounded-2xl flex items-center justify-center mx-auto mb-4 relative">
+                <img 
+                  src={asMarasLogo} 
+                  alt="As Maras" 
+                  className="w-16 h-16 object-contain"
+                  style={{
+                    filter: 'brightness(0) saturate(100%) invert(14%) sepia(93%) saturate(7151%) hue-rotate(318deg) brightness(92%) contrast(92%)'
+                  }}
+                />
               </div>
               <h1 className="text-2xl font-bold text-gray-900">Sistema Decolagem</h1>
               <p className="text-gray-600 mt-1">Gestão de Programas Sociais</p>

@@ -6,6 +6,7 @@ export interface User {
   nome: string;
   email: string;
   role: UserRole;
+  funcao?: string;
   regional?: Regional;
   ativo: boolean;
   created_at: string;
@@ -44,7 +45,10 @@ export type TipoAtividade =
   | 'ong_mara'
   | 'ong_decolagem'
   | 'encontro_lider_maras'
-  | 'familia_atendida';
+  | 'familia_atendida'
+  // Novos tipos adicionados
+  | 'ligas_maras_formadas'
+  | 'atendidos_diretos_decolagem';
 
 // Interface para ONG
 export interface ONG {
@@ -62,6 +66,11 @@ export interface ONG {
   status: Status;
   motivo_inativacao?: string;
   data_inativacao?: string;
+  evasao?: {
+    motivo: string;
+    data: string;
+    registradoEm: string;
+  };
   observacoes?: string;
   created_at: string;
   updated_at: string;
@@ -304,7 +313,7 @@ export interface ONGForm {
   observacoes?: string;
   // Novos campos
   nome_lider?: string;
-  documentos?: File[];
+  documentos?: (File | string)[]; // Pode ser File objects (novos uploads) ou strings (dados existentes)
 }
 
 // Tipos para filtros
@@ -372,4 +381,21 @@ export interface Evidencia {
   size: number; // bytes
   url?: string; // data URL para preview local
   created_at: string;
+}
+
+// Tipo específico para o form do EventModal
+export interface EventForm {
+  atividade: TipoAtividade | '';
+  atividadeLabel: string;
+  atividadeCustomLabel: string;
+  responsavel: string;
+  descricao: string;
+  dataAtividade: string;
+  regional: Regional;
+  local: string;
+  estados: string[];
+  programa: Programa | '';
+  instituicaoId: string;
+  evidencias: Evidencia[];
+  quantidade: number | undefined;
 }

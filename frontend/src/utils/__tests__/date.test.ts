@@ -25,16 +25,16 @@ describe('utils/date', () => {
     expect(rangesOverlap(aStart, aEnd, bStart, bEnd)).toBe(true); // toque no limite
   });
 
-  it('rangesOverlap deve considerar evento pontual quando end é undefined e horários iguais', () => {
+  it('rangesOverlap deve considerar sobreposição para eventos pontuais no mesmo horário', () => {
     const startA = new Date('2024-01-01T10:00:00Z');
     const startB = new Date('2024-01-01T10:00:00Z');
-    expect(rangesOverlap(startA, undefined, startB, undefined)).toBe(true);
+    expect(rangesOverlap(startA, startB, undefined, undefined)).toBe(true);
   });
 
   it('rangesOverlap não deve considerar sobreposição para eventos pontuais com horários diferentes', () => {
     const startA = new Date('2024-01-01T10:00:00Z');
     const startB = new Date('2024-01-01T10:30:00Z');
-    expect(rangesOverlap(startA, undefined, startB, undefined)).toBe(false);
+    expect(rangesOverlap(startA, startB, undefined, undefined)).toBe(false);
   });
 
   it('formatRange deve formatar corretamente com padrão default', () => {

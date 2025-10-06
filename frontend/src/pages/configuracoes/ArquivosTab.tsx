@@ -8,7 +8,7 @@ const ArquivosTab: FC = () => {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-gray-900">Gestão de Arquivos</h2>
-        <p className="text-gray-600 mt-1">Importe e exporte dados do sistema</p>
+        <p className="text-gray-600 mt-1 text-sm">Importe e exporte dados do sistema</p>
       </div>
 
       {/* Status do Sistema */}
@@ -17,13 +17,13 @@ const ArquivosTab: FC = () => {
           <div className="flex items-center space-x-3">
             <Info className="w-5 h-5 text-green-600" />
             <div>
-              <p className="font-medium text-green-900">
+              <p className="font-medium text-green-900 text-sm">
                 <strong>Status do Sistema:</strong> Sistema funcionando - 1000 atividades carregadas
               </p>
-              <p className="text-green-700">
-                <strong>Regionais:</strong> 8 | <strong>Selecionada:</strong> Nenhuma
+              <p className="text-green-700 text-sm">
+                <strong>Área:</strong> 8 | <strong>Selecionada:</strong> Nenhuma
               </p>
-              <p className="text-green-700">
+              <p className="text-green-700 text-sm">
                 <strong>Centro-Oeste:</strong> 130 atividades
               </p>
             </div>
@@ -39,7 +39,7 @@ const ArquivosTab: FC = () => {
               <Upload className="w-6 h-6 text-blue-600" />
               <h3 className="text-lg font-semibold text-gray-900">Importação de Atividades</h3>
             </div>
-            <p className="text-gray-600 mb-4">Importe atividades usando o template Excel com formatação correta</p>
+            <p className="text-gray-600 mb-4 text-sm">Importe atividades usando o template Excel com formatação correta</p>
             
             <div className="space-y-4">
               <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
@@ -77,12 +77,12 @@ const ArquivosTab: FC = () => {
               <Download className="w-6 h-6 text-green-600" />
               <h3 className="text-lg font-semibold text-gray-900">Exportação de Dados</h3>
             </div>
-            <p className="text-gray-600 mb-4">Exporte os dados das atividades para Excel (.xlsx) ou HTML com formatação correta</p>
+            <p className="text-gray-600 mb-4 text-sm">Exporte os dados das atividades para Excel (.xlsx) ou HTML com formatação correta</p>
             
             <div className="space-y-4">
               <div>
                 <label className="text-sm font-medium text-gray-900 mb-2 block">Selecione a Regional</label>
-                <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm">
                   <option>Escolha uma regional...</option>
                   <option>Centro-Oeste</option>
                   <option>MG/ES</option>

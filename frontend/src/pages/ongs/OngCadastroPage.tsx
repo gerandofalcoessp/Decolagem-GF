@@ -1,24 +1,36 @@
-import { useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useMemo, useState, useEffect } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 // import { Input } from '@/components/ui/Input';
 // import { Select } from '@/components/ui/Select';
 import { ONGForm, Programa, Regional } from '@/types';
 import { Building2, Save } from 'lucide-react';
+import { useNotificationStore } from '@/store/notificationStore';
+import { InstituicaoService, CreateInstituicaoData, UpdateInstituicaoData } from '@/services/instituicaoService';
 
 export default function OngCadastroPage() {
   const navigate = useNavigate();
-  const { search } = useLocation();
+  const location = useLocation();
+  const { id } = useParams();
+  const isEditing = !!id;
+  const ongToEdit = location.state?.ong;
   const [saving, setSaving] = useState(false);
   const [cepLoading, setCepLoading] = useState(false);
   const [cepError, setCepError] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const { showSuccess, showError } = useNotificationStore();
 
-  const initialRegional = useMemo(() => (
-    (new URLSearchParams(search).get('regional') || 'nacional') as Regional
-  ), [search]);
+  // Extrair regional inicial da URL ou do objeto de edição
+  const initialRegional = useMemo(() => {
+    if (isEditing && ongToEdit) {
+      return ongToEdit.regional;
+    }
+    const params = new URLSearchParams(location.search);
+    const regional = params.get('regional');
+    return regional as Regional || 'nacional';
+  }, [location.search, isEditing, ongToEdit]);
 
   const [form, setForm] = useState<ONGForm>({
     nome: '',
@@ -32,7 +44,43 @@ export default function OngCadastroPage() {
     regional: initialRegional,
     programa: 'decolagem',
     observacoes: '',
+    nome_lider: '',
+    documentos: []
   });
+
+  // Carregar dados da ONG para edição
+  useEffect(() => {
+    if (isEditing && ongToEdit) {
+      setForm(ongToEdit);
+    } else if (isEditing && id) {
+      // Carregar dados da API se não temos os dados no state
+      const loadInstituicao = async () => {
+        try {
+          const instituicao = await InstituicaoService.getInstituicaoById(id);
+          setForm({
+            nome: instituicao.nome,
+            cnpj: instituicao.cnpj,
+            endereco: instituicao.endereco,
+            cidade: instituicao.cidade,
+            estado: instituicao.estado,
+            cep: instituicao.cep,
+            telefone: instituicao.telefone,
+            email: instituicao.email,
+            regional: instituicao.regional,
+            programa: instituicao.programa,
+            observacoes: instituicao.observacoes || '',
+            nome_lider: instituicao.nome_lider,
+            documentos: instituicao.documentos || []
+          });
+        } catch (error) {
+          console.error('Erro ao carregar instituição:', error);
+          showError('Erro ao carregar dados da instituição');
+          navigate('/ongs');
+        }
+      };
+      loadInstituicao();
+    }
+  }, [isEditing, ongToEdit, id, showError, navigate]);
 
   const onlyDigits = (s: string) => (s || '').replace(/\D/g, '');
 
@@ -50,18 +98,8 @@ export default function OngCadastroPage() {
     const d = onlyDigits(cnpj);
     if (!d) return '';
     if (d.length !== 14) return 'CNPJ deve ter 14 dígitos';
-    if (/^(\d)\1+$/.test(d)) return 'CNPJ inválido';
-    const calc = (base: string, factors: number[]) => {
-      let sum = 0;
-      for (let i = 0; i < factors.length; i++) sum += parseInt(base[i], 10) * factors[i];
-      const mod = sum % 11;
-      return mod < 2 ? 0 : 11 - mod;
-    };
-    const base12 = d.slice(0, 12);
-    const d1 = calc(base12, [5,4,3,2,9,8,7,6,5,4,3,2]);
-    const d2 = calc(base12 + String(d1), [6,5,4,3,2,9,8,7,6,5,4,3,2]);
-    const ok = d.endsWith(String(d1) + String(d2));
-    return ok ? '' : 'CNPJ inválido';
+    // Aceita qualquer número de 14 dígitos sem validar se é um CNPJ válido
+    return '';
   };
 
   const formatCEP = (value: string) => {
@@ -110,14 +148,22 @@ export default function OngCadastroPage() {
   };
 
   const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+    
+    // Validar campo nome obrigatório
+    if (!form.nome || form.nome.trim() === '') {
+      newErrors.nome = 'Nome é obrigatório';
+    }
+    
+    // Validar outros campos
     const fields: Array<[('cnpj'|'cep'|'telefone'|'email'), string]> = [
       ['cnpj', form.cnpj || ''],
       ['cep', form.cep || ''],
       ['telefone', form.telefone || ''],
       ['email', form.email || ''],
     ];
-    const newErrors: Record<string, string> = {};
     fields.forEach(([f, v]) => { newErrors[f] = validateField(f, v); });
+    
     setErrors(newErrors);
     return Object.values(newErrors).every(msg => !msg);
   };
@@ -128,46 +174,79 @@ export default function OngCadastroPage() {
     if (field === 'cep') newValue = formatCEP(value);
     if (field === 'telefone') newValue = formatTelefone(value);
     setForm(prev => ({ ...prev, [field]: newValue }));
+    
+    // Validar campos específicos em tempo real
     if (['cnpj','cep','telefone','email'].includes(field as string)) {
       const msg = validateField(field as any, newValue);
       setErrors(prev => ({ ...prev, [field]: msg }));
     }
+    
+    // Limpar erro do nome quando o usuário começar a digitar
+    if (field === 'nome' && errors.nome) {
+      setErrors(prev => ({ ...prev, nome: '' }));
+    }
   };
 
   const handleSubmit = async () => {
-    setSaving(true);
-    const isValid = validateForm();
-    if (!isValid) {
-      setSaving(false);
-      return;
-    }
-    try {
-      // TODO: integrar com backend quando endpoint estiver disponível
-      // Ex: await api.post('/ongs', form)
-      await new Promise(res => setTimeout(res, 800));
+    if (!validateForm()) return;
 
-      // Persistência simples em localStorage para uso no calendário
-      try {
-        const raw = localStorage.getItem('ongs');
-        const current = raw ? JSON.parse(raw) : [];
-        const list = Array.isArray(current) ? current : [];
-        const record = {
-          id: `ong-${Date.now()}`,
+    setSaving(true);
+    try {
+      // Converter File objects para nomes de arquivos
+      const documentosNomes = (form.documentos || []).map(doc => {
+        // Se já é string (caso de edição), manter como está
+        if (typeof doc === 'string') return doc;
+        // Se é File object, extrair apenas o nome
+        return doc.name;
+      });
+
+      if (isEditing && id) {
+        // Atualizar instituição existente
+        const updateData: UpdateInstituicaoData = {
           nome: form.nome,
+          cnpj: form.cnpj,
+          endereco: form.endereco,
+          cidade: form.cidade,
+          estado: form.estado,
+          cep: form.cep,
+          telefone: form.telefone,
+          email: form.email,
           regional: form.regional,
           programa: form.programa,
-          created_at: new Date().toISOString(),
+          observacoes: form.observacoes,
+          nome_lider: form.nome_lider,
+          documentos: documentosNomes
         };
-        const updated = [...list, record];
-        localStorage.setItem('ongs', JSON.stringify(updated));
-      } catch (e) {
-        // Se falhar, apenas segue navegação
-        console.warn('Falha ao salvar ONG no localStorage', e);
+        
+        await InstituicaoService.updateInstituicao(id, updateData);
+        showSuccess('Instituição atualizada com sucesso!');
+      } else {
+        // Criar nova instituição
+        const createData: CreateInstituicaoData = {
+          nome: form.nome,
+          cnpj: form.cnpj,
+          endereco: form.endereco,
+          cidade: form.cidade,
+          estado: form.estado,
+          cep: form.cep,
+          telefone: form.telefone,
+          email: form.email,
+          regional: form.regional,
+          programa: form.programa,
+          observacoes: form.observacoes,
+          nome_lider: form.nome_lider,
+          documentos: documentosNomes,
+          status: 'ativa'
+        };
+        
+        await InstituicaoService.createInstituicao(createData);
+        showSuccess('Instituição cadastrada com sucesso!');
       }
-
-      navigate('/programas/decolagem');
-    } catch (e) {
-      console.error('Erro ao salvar ONG', e);
+      
+      navigate('/ongs');
+    } catch (error) {
+      console.error('Erro ao salvar instituição:', error);
+      showError(error instanceof Error ? error.message : 'Erro ao salvar instituição');
     } finally {
       setSaving(false);
     }
@@ -236,7 +315,9 @@ export default function OngCadastroPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Building2 className="h-6 w-6 text-pink-600" />
-          <h1 className="text-2xl font-bold text-gray-900">Cadastrar ONG</h1>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {isEditing ? 'Editar ONG' : 'Cadastrar ONG'}
+          </h1>
         </div>
         <Button className="bg-gray-100 text-gray-700 hover:bg-gray-200" onClick={() => navigate(-1)}>Voltar</Button>
       </div>
@@ -245,7 +326,14 @@ export default function OngCadastroPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
-            <input className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" value={form.nome} onChange={e => handleChange('nome', e.target.value)} placeholder="Nome da ONG" />
+            <input 
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" 
+              value={form.nome} 
+              onChange={e => handleChange('nome', e.target.value)} 
+              placeholder="Nome da ONG" 
+              spellCheck="false"
+            />
+            {errors.nome && (<p className="text-xs text-red-600 mt-1">{errors.nome}</p>)}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">CNPJ</label>
@@ -254,15 +342,33 @@ export default function OngCadastroPage() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Líder</label>
-            <input className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" value={form.nome_lider || ''} onChange={e => setForm(prev => ({ ...prev, nome_lider: e.target.value }))} placeholder="Nome do líder responsável" />
+            <input 
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" 
+              value={form.nome_lider || ''} 
+              onChange={e => setForm(prev => ({ ...prev, nome_lider: e.target.value }))} 
+              placeholder="Nome do líder responsável" 
+              spellCheck="false"
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Endereço</label>
-            <input className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" value={form.endereco || ''} onChange={e => handleChange('endereco', e.target.value)} placeholder="Rua, número" />
+            <input 
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" 
+              value={form.endereco || ''} 
+              onChange={e => handleChange('endereco', e.target.value)} 
+              placeholder="Rua, número" 
+              spellCheck="false"
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Cidade</label>
-            <input className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" value={form.cidade || ''} onChange={e => handleChange('cidade', e.target.value)} placeholder="Cidade" />
+            <input 
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" 
+              value={form.cidade || ''} 
+              onChange={e => handleChange('cidade', e.target.value)} 
+              placeholder="Cidade" 
+              spellCheck="false"
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
@@ -308,18 +414,36 @@ export default function OngCadastroPage() {
               <option value="decolagem">Decolagem</option>
             </select>
           </div>
+          {isEditing && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+              <select 
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" 
+                value={ongToEdit?.status || 'ativa'} 
+                onChange={e => setForm(prev => ({ ...prev, status: e.target.value as 'ativa' | 'inativa' | 'evadida' }))}
+              >
+                <option value="ativa">Ativa</option>
+                <option value="inativa">Inativa</option>
+                <option value="evadida">Evadida</option>
+              </select>
+            </div>
+          )}
           <div className="md:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">Documentos</label>
             <input type="file" multiple onChange={e => handleFilesChange(e.target.files)} className="w-full" />
             {uploadError && (<p className="text-xs text-red-600 mt-1">{uploadError}</p>)}
             {Boolean(form.documentos && form.documentos.length) && (
               <ul className="mt-2 space-y-2">
-                {(form.documentos || []).map((file, idx) => (
-                  <li key={`${file.name}-${idx}`} className="flex items-center justify-between text-sm text-gray-700 bg-gray-50 px-3 py-2 rounded">
-                    <span className="truncate mr-3">{file.name}</span>
-                    <button type="button" className="text-red-600 hover:underline" onClick={() => removeDocumento(idx)}>Remover</button>
-                  </li>
-                ))}
+                {(form.documentos || []).map((file, idx) => {
+                  // Obter o nome do arquivo (seja File object ou string)
+                  const fileName = typeof file === 'string' ? file : file.name;
+                  return (
+                    <li key={`${fileName}-${idx}`} className="flex items-center justify-between text-sm text-gray-700 bg-gray-50 px-3 py-2 rounded">
+                      <span className="truncate mr-3">{fileName}</span>
+                      <button type="button" className="text-red-600 hover:underline" onClick={() => removeDocumento(idx)}>Remover</button>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>
@@ -333,7 +457,7 @@ export default function OngCadastroPage() {
           <Button className="bg-gray-200 text-gray-800 hover:bg-gray-300" onClick={() => navigate(-1)}>Cancelar</Button>
           <Button className="bg-pink-600 hover:bg-pink-700 text-white" onClick={handleSubmit} disabled={saving}>
             <Save className="h-4 w-4 mr-2" />
-            {saving ? 'Salvando...' : 'Salvar ONG'}
+            {saving ? 'Salvando...' : (isEditing ? 'Atualizar ONG' : 'Salvar ONG')}
           </Button>
         </div>
       </Card>

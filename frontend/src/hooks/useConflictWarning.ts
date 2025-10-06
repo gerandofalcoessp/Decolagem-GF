@@ -28,7 +28,7 @@ export function useConflictWarning(
     const overlapping = events.filter(
       (e) =>
         e.id !== editingId &&
-        rangesOverlap(new Date(e.data_inicio), e.data_fim ? new Date(e.data_fim) : null, startDate, endDate)
+        rangesOverlap(new Date(e.data_inicio), startDate, e.data_fim ? new Date(e.data_fim) : null, endDate)
     )
 
     if (overlapping.length === 0) {

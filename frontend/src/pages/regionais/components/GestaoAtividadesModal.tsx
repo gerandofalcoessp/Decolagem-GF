@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { X, Filter, FileDown, FileText, Star, Image as ImageIcon, Users, MapPin, Calendar as CalendarIcon, Edit, Trash2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { X, FileDown, FileText, Image as ImageIcon, Users, MapPin, Calendar as CalendarIcon, Edit, Trash2 } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { format } from 'date-fns';
@@ -95,8 +95,8 @@ export default function GestaoAtividadesModal({ isOpen, onClose, events, onEdit,
         <td>${e.regional ?? ''}</td>
         <td>${e.programa ?? ''}</td>
         <td>${e.responsavel?.nome ?? ''}</td>
-        <td>${e.participantes_confirmados ?? 0}</td>
-        <td>${e.quantidade ?? ''}</td>
+        <td>${e.participantes_confirmados > 0 ? e.participantes_confirmados : ''}</td>
+        <td>${e.quantidade && e.quantidade > 0 ? e.quantidade : ''}</td>
         <td>${evid}</td>
       </tr>`;
     }).join('');

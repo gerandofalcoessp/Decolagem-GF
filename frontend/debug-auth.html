@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Autenticação</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .log { margin: 10px 0; padding: 10px; border-left: 4px solid #007bff; background: #f8f9fa; }
+        .error { border-left-color: #dc3545; background: #f8d7da; }
+        .success { border-left-color: #28a745; background: #d4edda; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        #logs { max-height: 400px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <h1>Debug de Autenticação - Frontend</h1>
+    
+    <div>
+        <button onclick="testLogin()">Testar Login</button>
+        <button onclick="testCheckAuth()">Testar CheckAuth</button>
+        <button onclick="clearLogs()">Limpar Logs</button>
+        <button onclick="checkLocalStorage()">Verificar LocalStorage</button>
+    </div>
+    
+    <div id="logs"></div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:4000/api';
+        
+        function log(message, type = 'info') {
+            const logsDiv = document.getElementById('logs');
+            const logDiv = document.createElement('div');
+            logDiv.className = `log ${type}`;
+            logDiv.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong>: ${message}`;
+            logsDiv.appendChild(logDiv);
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+        
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+        }
+        
+        function checkLocalStorage() {
+            const token = localStorage.getItem('auth_token');
+            const refreshToken = localStorage.getItem('refresh_token');
+            
+            log(`Token: ${token ? 'Presente' : 'Ausente'}`, token ? 'success' : 'error');
+            log(`Refresh Token: ${refreshToken ? 'Presente' : 'Ausente'}`, refreshToken ? 'success' : 'error');
+            
+            if (token) {
+                log(`Token: ${token.substring(0, 50)}...`);
+            }
+        }
+        
+        async function testLogin() {
+            log('🔐 Iniciando teste de login...');
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: 'superadmin@decolagem.com',
+                        password: 'SuperAdmin123!'
+                    }),
+                });
+                
+                log(`Status da resposta: ${response.status}`);
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Erro no login');
+                }
+                
+                log('✅ Login bem-sucedido!', 'success');
+                log(`Dados recebidos: ${JSON.stringify(data, null, 2)}`);
+                
+                // Simular o que o AuthService faz
+                if (data.session?.access_token) {
+                    localStorage.setItem('auth_token', data.session.access_token);
+                    localStorage.setItem('refresh_token', data.session.refresh_token);
+                    log('💾 Token salvo no localStorage', 'success');
+                } else {
+                    log('❌ Token não encontrado na resposta!', 'error');
+                }
+                
+            } catch (error) {
+                log(`❌ Erro no login: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testCheckAuth() {
+            log('🔍 Iniciando teste de checkAuth...');
+            
+            const token = localStorage.getItem('auth_token');
+            if (!token) {
+                log('❌ Nenhum token encontrado no localStorage', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/auth/me`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    },
+                });
+                
+                log(`Status da resposta: ${response.status}`);
+                
+                if (!response.ok) {
+                    throw new Error(`Erro HTTP: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                log('✅ CheckAuth bem-sucedido!', 'success');
+                log(`Dados do usuário: ${JSON.stringify(data, null, 2)}`);
+                
+            } catch (error) {
+                log(`❌ Erro no checkAuth: ${error.message}`, 'error');
+            }
+        }
+        
+        // Interceptar erros do console
+        window.addEventListener('error', function(e) {
+            log(`💥 Erro JavaScript: ${e.message} em ${e.filename}:${e.lineno}`, 'error');
+        });
+        
+        window.addEventListener('unhandledrejection', function(e) {
+            log(`💥 Promise rejeitada: ${e.reason}`, 'error');
+        });
+        
+        log('🚀 Debug de autenticação carregado!', 'success');
+    </script>
+</body>
+</html>

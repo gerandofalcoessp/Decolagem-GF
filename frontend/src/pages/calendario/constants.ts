@@ -1,4 +1,4 @@
-import type { TipoAtividade, Programa } from '@/types';
+import type { TipoAtividade, Programa } from '../../types';
 
 export const REGIONAL_LABELS: Record<string, string> = {
   todas: 'Todas as Regionais',
@@ -16,24 +16,23 @@ export const REGIONAL_LABELS: Record<string, string> = {
 
 export const DEPARTAMENTO_LABELS: Record<string, string> = {
   todos: 'Todos os Departamentos',
-  regionais: 'Regionais',
+  regionais: 'Área',
   comercial: 'Comercial',
   nacional: 'Nacional',
 };
 
 export const ATIVIDADE_OPTIONS: { value: TipoAtividade; label: string }[] = [
-  { value: 'formacao_ligas', label: 'Formação maras' },
-  { value: 'formacao_ligas', label: 'Formação líder mara' },
+  // Removidos: Formação maras, Formação líder mara, Visita Ong, ONG Mara, ONG Decolagem, Família Atendida
   { value: 'formacao_ligas', label: 'Formação Liga' },
   { value: 'imersao', label: 'Imersão Maras' },
   { value: 'seletivas', label: 'Processo seletivo' },
-  { value: 'outros', label: 'Visita Ong' },
   { value: 'nps', label: 'NPS' },
-  { value: 'ong_mara', label: 'ONG Mara' },
-  { value: 'ong_decolagem', label: 'ONG Decolagem' },
   { value: 'inadimplencia', label: 'Inadimplência' },
   { value: 'encontro_lider_maras', label: 'Encontro Líder Maras' },
-  { value: 'familia_atendida', label: 'Família Atendida' },
+  // Acrescentados
+  { value: 'ligas_maras_formadas', label: 'Ligas Maras Formadas' },
+  { value: 'atendidos_diretos_decolagem', label: 'Atendidos Diretos Decolagem' },
+  // Opção de customização
   { value: 'outros', label: 'OUTRA' },
 ];
 
@@ -50,6 +49,9 @@ export const TYPE_COLOR_CLASSES: Record<TipoAtividade, string> = {
   ong_decolagem: 'bg-purple-500',
   encontro_lider_maras: 'bg-blue-600',
   familia_atendida: 'bg-emerald-600',
+  // Novos tipos
+  ligas_maras_formadas: 'bg-fuchsia-600',
+  atendidos_diretos_decolagem: 'bg-sky-600',
 };
 
 export const REGIONAL_COLOR_CLASSES: Record<string, string> = {

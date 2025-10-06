@@ -1,6 +1,5 @@
 import { ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react';
-import { cn } from '@/utils/cn';
-import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import { cn } from '../../utils/cn';
 
 interface StatsCardProps {
   title: string;

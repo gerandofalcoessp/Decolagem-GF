@@ -1,10 +1,10 @@
-import { Calendar as CalendarIcon, MapPin, Clock } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
-import { format, parseISO, isAfter, compareAsc, addDays, setHours, setMinutes } from 'date-fns';
+import { Calendar as CalendarIcon, MapPin, Clock, Users } from 'lucide-react';
+import { useMemo } from 'react';
+import { format, parseISO, isAfter, compareAsc } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import LoadingSpinner from '@/components/ui/LoadingSpinner';
-import type { Atividade } from '@/types';
-import { REGIONAL_LABELS, REGIONAL_COLOR_CLASSES, TYPE_COLOR_CLASSES, ATIVIDADE_OPTIONS, PROGRAMA_LABELS } from '@/pages/calendario/constants';
+import type { Atividade } from '../../types';
+import { REGIONAL_LABELS, REGIONAL_COLOR_CLASSES, TYPE_COLOR_CLASSES, ATIVIDADE_OPTIONS, PROGRAMA_LABELS } from '../../pages/calendario/constants';
+import { useCalendarEvents } from '../../hooks/useApi';
 
 interface RecentActivitiesProps {
   isLoading?: boolean;
@@ -16,61 +16,20 @@ function getTipoLabel(tipo: Atividade['tipo']) {
 }
 
 export default function RecentActivities({ isLoading = false }: RecentActivitiesProps) {
-  const [events, setEvents] = useState<Atividade[]>([]);
-
-  // Mock apenas em ambiente de teste, respeitando a regra de não simular para dev/prod
-  useEffect(() => {
-    if (import.meta.env.MODE === 'test' && events.length === 0) {
-      const today = new Date();
-      const mk = (id: string, titulo: string, tipo: Atividade['tipo'], dias: number, hora: number, min: number, regional: Atividade['regional'], programa: Atividade['programa'], local?: string): Atividade => {
-        const dt = setMinutes(setHours(addDays(today, dias), hora), min);
-        return {
-          id,
-          titulo,
-          descricao: undefined,
-          tipo,
-          data_inicio: dt.toISOString(),
-          data_fim: undefined,
-          local,
-          regional,
-          programa,
-          responsavel_id: undefined,
-          responsavel: undefined,
-          participantes_esperados: undefined,
-          participantes_confirmados: 0,
-          quantidade: undefined,
-          status: 'ativo',
-          observacoes: undefined,
-          evidencias: [],
-          created_at: today.toISOString(),
-          updated_at: today.toISOString(),
-        };
-      };
-
-      const mockEvents: Atividade[] = [
-        mk('1', 'Formação Liga - Vila Mariana', 'formacao_ligas', 2, 9, 0, 'sp', 'as_maras', 'SP - Vila Mariana'),
-        mk('2', 'Imersão Maras - RJ Centro', 'imersao', 3, 14, 30, 'rj', 'as_maras', 'RJ - Centro'),
-        mk('3', 'Processo Seletivo - CO', 'seletivas', 5, 10, 0, 'centro_oeste', 'decolagem', 'DF - Asa Sul'),
-        mk('4', 'ONG Decolagem - Norte', 'ong_decolagem', 6, 16, 0, 'norte', 'decolagem', 'PA - Belém'),
-        mk('5', 'Encontro Líder Maras - Sul', 'encontro_lider_maras', 1, 18, 0, 'sul', 'as_maras', 'PR - Curitiba'),
-        mk('6', 'Família Atendida - MG/ES', 'familia_atendida', 4, 11, 0, 'mg_es', 'decolagem', 'ES - Vitória'),
-        mk('7', 'Visita ONG - Nordeste 1', 'outros', 7, 9, 30, 'nordeste_1', 'as_maras', 'CE - Fortaleza'),
-        mk('8', 'NPS - Nacional', 'nps', 2, 15, 0, 'nacional', 'microcredito', 'Online'),
-      ];
-      setEvents(mockEvents);
-    }
-  }, [events.length]);
+  const { data: activities } = useCalendarEvents();
 
   const upcomingEvents = useMemo(() => {
+    if (!activities || !Array.isArray(activities)) return [];
+    
     const now = new Date();
-    return events
-      .filter(e => {
+    return (activities as Atividade[])
+      .filter((e: Atividade) => {
         const di = parseISO(e.data_inicio);
         return isAfter(di, now);
       })
-      .sort((a, b) => compareAsc(parseISO(a.data_inicio), parseISO(b.data_inicio)))
-      .slice(0, 30);
-  }, [events]);
+      .sort((a: Atividade, b: Atividade) => compareAsc(parseISO(a.data_inicio), parseISO(b.data_inicio)))
+      .slice(0, 5);
+  }, [activities]);
 
   const eventsByRegional = useMemo(() => {
     const map: Record<string, Atividade[]> = {};
@@ -146,6 +105,12 @@ export default function RecentActivities({ isLoading = false }: RecentActivities
                             <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">{programaLabel}</span>
                           )}
                           <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">{getTipoLabel(evt.tipo)}</span>
+                          {evt.responsavel?.nome && (
+                            <span className="inline-flex items-center">
+                              <Users className="w-3.5 h-3.5 mr-1 text-gray-500" />
+                              {evt.responsavel.nome}
+                            </span>
+                          )}
                           {evt.local && (
                             <span className="inline-flex items-center">
                               <MapPin className="w-3.5 h-3.5 mr-1 text-gray-500" />

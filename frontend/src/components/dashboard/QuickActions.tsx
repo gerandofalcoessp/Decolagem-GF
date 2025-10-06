@@ -9,7 +9,7 @@ import {
   Plus,
   ArrowRight
 } from 'lucide-react';
-import { useAuth, hasPermission } from '@/store/authStore';
+import { useAuth, hasPermission } from '../../store/authStore';
 
 interface QuickAction {
   title: string;
@@ -131,8 +131,8 @@ export default function QuickActions() {
                 Consulte o manual do usuário ou entre em contato com o suporte.
               </p>
               <button className="text-xs text-primary-600 hover:text-primary-700 font-medium">
-                Ver documentação →
-              </button>
+              Ver documentação →
+            </button>
             </div>
           </div>
         </div>

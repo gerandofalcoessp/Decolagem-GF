@@ -1,33 +1,31 @@
-import React, { useState } from 'react';
+import { useState, ComponentType, ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   Home, 
-  Users, 
+  Target, 
+  MapPin, 
+  Calendar, 
   Settings, 
-  LogOut, 
   Menu, 
   X, 
   ChevronDown,
-  MapPin,
-  Calendar,
-  TrendingUp,
-  CreditCard,
-  Target
+  LogOut,
+  Building2
 } from 'lucide-react';
-import { useAuth, hasPermission } from '../../store/authStore';
-import { useAuthActions } from '../../store/authStore';
-
-const asMarasPng = new URL('../../assets/logos/logo as maras.png', import.meta.url).href;
-const gfLogoSvg = new URL('../../assets/logos/AF_Logo_Gerando-Falcoes-MONOCOR.svg', import.meta.url).href;
+import { useAuthStore, useAuthActions, hasPermission } from '@/store/authStore';
+import { ToastContainer } from '@/components/ui/ToastContainer';
+import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog';
+import asMarasPng from '@/assets/logos/logo as maras.png';
+import gfLogoSvg from '@/assets/logos/AF_Logo_Gerando-Falcoes-MONOCOR.svg';
 
 interface DashboardLayoutProps {
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 interface MenuItem {
   name: string;
   href: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string }>;
   requiredRole?: 'super_admin' | 'equipe_interna';
   children?: MenuItem[];
 }
@@ -49,6 +47,11 @@ const menuItems: MenuItem[] = [
     icon: MapPin,
   },
   {
+    name: 'Instituições',
+    href: '/ongs',
+    icon: Building2,
+  },
+  {
     name: 'Calendário',
     href: '/calendario',
     icon: Calendar,
@@ -66,7 +69,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [expandedMenus, setExpandedMenus] = useState<string[]>([]);
   const location = useLocation();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user } = useAuthStore();
   const { logout } = useAuthActions();
 
   const handleLogout = () => {
@@ -273,6 +276,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           {children}
         </main>
       </div>
+      
+      {/* Notification Components */}
+      <ToastContainer />
+      <ConfirmationDialog />
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
 
 import { useAuthActions } from '@/store/authStore';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import asMarasLogoPng from '@/assets/logos/logo as maras.png';
 
 const loginSchema = z.object({
   email: z
@@ -51,11 +52,24 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <main className="space-y-6" aria-labelledby="login-title">
       {/* Cabeçalho */}
       <div className="text-center">
-        <h2 className="text-3xl font-bold text-gray-900">
-          Bem-vindo de volta
+        {/* Logo As Maras */}
+        <div className="mb-6 flex justify-center">
+          <img 
+            src={asMarasLogoPng} 
+            alt="As Maras" 
+            className="w-20 h-20 object-contain"
+            style={{
+              filter: 'brightness(0) saturate(100%) invert(18%) sepia(89%) saturate(2476%) hue-rotate(315deg) brightness(95%) contrast(95%)',
+              WebkitFilter: 'brightness(0) saturate(100%) invert(18%) sepia(89%) saturate(2476%) hue-rotate(315deg) brightness(95%) contrast(95%)'
+            }}
+          />
+        </div>
+        
+        <h2 id="login-title" className="text-3xl font-bold text-gray-900">
+          Gestão Decolagem / Maras
         </h2>
         <p className="mt-2 text-gray-600">
           Faça login para acessar o sistema
@@ -63,27 +77,35 @@ export default function LoginPage() {
       </div>
 
       {/* Formulário */}
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" aria-describedby="form-status" noValidate>
+        {/* Região de status acessível */}
+        <div id="form-status" aria-live="polite" className="sr-only">
+          {isLoading ? 'Processando login…' : (errors.email || errors.password) ? 'Há erros no formulário.' : 'Pronto para enviar.'}
+        </div>
+
         {/* Email */}
         <div>
           <label htmlFor="email" className="label">
             Email
           </label>
           <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Mail className="h-5 w-5 text-gray-400" />
-            </div>
+            <Mail aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
               {...register('email')}
               type="email"
               id="email"
+              autoComplete="email"
+              autoFocus
+              spellCheck="false"
+              aria-invalid={!!errors.email}
+              aria-describedby={errors.email ? 'email-error' : undefined}
               className={`input pl-10 ${errors.email ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}`}
               placeholder="seu@email.com"
               disabled={isLoading}
             />
           </div>
           {errors.email && (
-            <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
+            <p id="email-error" role="alert" className="mt-1 text-sm text-red-600">{errors.email.message}</p>
           )}
         </div>
 
@@ -93,13 +115,14 @@ export default function LoginPage() {
             Senha
           </label>
           <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Lock className="h-5 w-5 text-gray-400" />
-            </div>
+            <Lock aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
               {...register('password')}
               type={showPassword ? 'text' : 'password'}
               id="password"
+              autoComplete="current-password"
+              aria-invalid={!!errors.password}
+              aria-describedby={errors.password ? 'password-error' : undefined}
               className={`input pl-10 pr-10 ${errors.password ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}`}
               placeholder="Sua senha"
               disabled={isLoading}
@@ -108,6 +131,8 @@ export default function LoginPage() {
               type="button"
               className="absolute inset-y-0 right-0 pr-3 flex items-center"
               onClick={() => setShowPassword(!showPassword)}
+              aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+              aria-pressed={showPassword}
               disabled={isLoading}
             >
               {showPassword ? (
@@ -118,7 +143,7 @@ export default function LoginPage() {
             </button>
           </div>
           {errors.password && (
-            <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
+            <p id="password-error" role="alert" className="mt-1 text-sm text-red-600">{errors.password.message}</p>
           )}
         </div>
 
@@ -126,11 +151,13 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full btn-primary flex items-center justify-center"
+          className="w-full btn-primary flex items-center justify-center py-2 px-4 text-sm"
+          aria-busy={isLoading}
         >
           {isLoading ? (
             <>
               <LoadingSpinner size="sm" color="white" className="mr-2" />
+              <span className="sr-only">Carregando</span>
               Entrando...
             </>
           ) : (
@@ -139,23 +166,7 @@ export default function LoginPage() {
         </button>
       </form>
 
-      {/* Informações de teste */}
-      <div className="mt-8 p-4 bg-gray-50 rounded-lg border">
-        <h3 className="text-sm font-medium text-gray-900 mb-2">
-          Contas de teste:
-        </h3>
-        <div className="space-y-2 text-sm text-gray-600">
-          <div>
-            <strong>Super Admin:</strong> admin@decolagem.com / 123456
-          </div>
-          <div>
-            <strong>Equipe SP:</strong> equipe.sp@decolagem.com / 123456
-          </div>
-          <div>
-            <strong>Equipe RJ:</strong> equipe.rj@decolagem.com / 123456
-          </div>
-        </div>
-      </div>
+
 
       {/* Links adicionais */}
       <div className="text-center">
@@ -164,12 +175,12 @@ export default function LoginPage() {
           <button 
             type="button"
             className="font-medium text-primary-600 hover:text-primary-500"
-            onClick={() => toast.info('Entre em contato com o administrador do sistema')}
+            onClick={() => toast('Fale com seu Líder')}
           >
-            Entre em contato
+            Fale com seu Líder
           </button>
         </p>
       </div>
-    </div>
+    </main>
   );
 }

@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug FormData</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+        input { margin: 5px; padding: 5px; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Debug FormData - Teste de Upload com Autenticação</h1>
+    
+    <!-- Seção de Login -->
+    <div class="section">
+        <h2>1. Autenticação</h2>
+        <div>
+            <input type="email" id="emailInput" placeholder="Email" value="admin@decolagem.com">
+            <input type="password" id="passwordInput" placeholder="Senha" value="admin123">
+            <button onclick="doLogin()">Login</button>
+            <button onclick="checkToken()">Verificar Token</button>
+        </div>
+        <div id="authStatus"></div>
+    </div>
+    
+    <!-- Seção de Upload -->
+    <div class="section">
+        <h2>2. Upload de Documentos</h2>
+        <form id="uploadForm">
+            <input type="file" id="fileInput" multiple>
+            <button type="submit">Upload</button>
+        </form>
+        <div id="uploadOutput"></div>
+    </div>
+    
+    <script>
+        const API_BASE_URL = "http://localhost:3001";
+        
+        // Função para fazer login
+        async function doLogin() {
+            const email = document.getElementById("emailInput").value;
+            const password = document.getElementById("passwordInput").value;
+            const authStatus = document.getElementById("authStatus");
+            
+            if (!email || !password) {
+                authStatus.innerHTML = '<div class="error">Por favor, preencha email e senha</div>';
+                return;
+            }
+            
+            try {
+                console.log("🔐 Fazendo login...");
+                authStatus.innerHTML = '<div class="info">Fazendo login...</div>';
+                
+                const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ email, password }),
+                });
+                
+                const data = await response.json();
+                console.log("Resposta do login:", data);
+                
+                if (!response.ok) {
+                    throw new Error(data.error || "Erro no login");
+                }
+                
+                // Salvar token
+                if (data.session?.access_token) {
+                    localStorage.setItem("auth_token", data.session.access_token);
+                    localStorage.setItem("refresh_token", data.session.refresh_token);
+                    authStatus.innerHTML = '<div class="success">✅ Login realizado com sucesso!</div>';
+                    console.log("✅ Token salvo:", data.session.access_token.substring(0, 20) + "...");
+                } else {
+                    throw new Error("Token não encontrado na resposta");
+                }
+                
+            } catch (error) {
+                console.error("❌ Erro no login:", error);
+                authStatus.innerHTML = `<div class="error">❌ Erro no login: ${error.message}</div>`;
+            }
+        }
+        
+        // Função para verificar token
+        function checkToken() {
+            const token = localStorage.getItem("auth_token");
+            const authStatus = document.getElementById("authStatus");
+            
+            if (token) {
+                authStatus.innerHTML = `<div class="success">✅ Token presente: ${token.substring(0, 30)}...</div>`;
+                console.log("Token completo:", token);
+            } else {
+                authStatus.innerHTML = '<div class="error">❌ Nenhum token encontrado</div>';
+            }
+        }
+        
+        // Função de upload
+        document.getElementById("uploadForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            
+            const files = document.getElementById("fileInput").files;
+            const output = document.getElementById("uploadOutput");
+            
+            if (files.length === 0) {
+                output.innerHTML = '<div class="error">Selecione pelo menos um arquivo</div>';
+                return;
+            }
+            
+            // Verificar se há token
+            const token = localStorage.getItem("auth_token");
+            if (!token) {
+                output.innerHTML = '<div class="error">❌ Faça login primeiro para obter um token válido</div>';
+                return;
+            }
+            
+            const formData = new FormData();
+            
+            // Adicionar arquivos com o nome 'files'
+            for (let file of files) {
+                formData.append("files", file);
+            }
+            formData.append("tipo", "documento");
+            
+            // Debug: Mostrar o que está sendo enviado
+            console.log("=== DEBUG FORMDATA ===");
+            for (let [key, value] of formData.entries()) {
+                console.log(`Campo: ${key}, Valor:`, value);
+                if (value instanceof File) {
+                    console.log(`  - Nome do arquivo: ${value.name}`);
+                    console.log(`  - Tipo: ${value.type}`);
+                    console.log(`  - Tamanho: ${value.size}`);
+                }
+            }
+            
+            // Mostrar no HTML também
+            output.innerHTML = "<h3>Campos sendo enviados:</h3>";
+            for (let [key, value] of formData.entries()) {
+                const div = document.createElement("div");
+                if (value instanceof File) {
+                    div.innerHTML = `<strong>${key}:</strong> ${value.name} (${value.type}, ${value.size} bytes)`;
+                } else {
+                    div.innerHTML = `<strong>${key}:</strong> ${value}`;
+                }
+                output.appendChild(div);
+            }
+            
+            try {
+                console.log("📤 Enviando requisição para", `${API_BASE_URL}/instituicoes/1/documentos`);
+                console.log("🔑 Usando token:", token.substring(0, 20) + "...");
+                
+                const response = await fetch(`${API_BASE_URL}/instituicoes/0a412cff-f06b-4a31-9579-ffc4edf3d421/documentos`, {
+                    method: "POST",
+                    body: formData,
+                    headers: {
+                        "Authorization": `Bearer ${token}`
+                    }
+                });
+                
+                console.log("📥 Status da resposta:", response.status);
+                
+                let result;
+                try {
+                    result = await response.json();
+                } catch (jsonError) {
+                    result = { error: "Resposta não é JSON válido", text: await response.text() };
+                }
+                
+                console.log("📋 Resultado:", result);
+                
+                const resultDiv = document.createElement("div");
+                if (response.ok) {
+                    resultDiv.className = "success";
+                    resultDiv.innerHTML = `<h3>✅ Sucesso (${response.status}):</h3><pre>${JSON.stringify(result, null, 2)}</pre>`;
+                } else {
+                    resultDiv.className = "error";
+                    resultDiv.innerHTML = `<h3>❌ Erro (${response.status}):</h3><pre>${JSON.stringify(result, null, 2)}</pre>`;
+                }
+                output.appendChild(resultDiv);
+                
+            } catch (error) {
+                console.error("💥 Erro na requisição:", error);
+                const errorDiv = document.createElement("div");
+                errorDiv.className = "error";
+                errorDiv.innerHTML = `<h3>💥 Erro na requisição:</h3><pre>${error.message}</pre>`;
+                output.appendChild(errorDiv);
+            }
+        });
+        
+        // Verificar token ao carregar a página
+        window.onload = function() {
+            checkToken();
+        };
+    </script>
+</body>
+</html>

@@ -1,22 +1,50 @@
-import { TrendingUp, Users, FileText, BarChart3, Plus, Search, Filter, MoreVertical, UserPlus } from 'lucide-react';
+import { TrendingUp, Users, FileText, BarChart3, Search, Filter, MoreVertical, UserPlus } from 'lucide-react';
 import { useState } from 'react';
+import { useDecolagem } from '../../hooks/useApi';
 
 export default function DecolagemPage() {
   const [searchTerm, setSearchTerm] = useState('');
+  const { data: familias, loading, error } = useDecolagem();
 
-  // Mock data para demonstração
-  const mockStats = {
-    totalFamilias: 2450,
-    ongsAtivas: 45,
-    diagnosticosRealizados: 1890,
-    taxaRetencao: 92
+  // Calcular estatísticas baseadas nos dados reais
+  const stats = {
+    totalFamilias: familias?.length || 0,
+    ongsAtivas: new Set(familias?.map(f => f.ong).filter(Boolean)).size || 0,
+    diagnosticosRealizados: familias?.filter(f => f.diagnostico === 'Concluído').length || 0,
+    taxaRetencao: familias && familias.length > 0 
+      ? Math.round((familias.filter(f => f.status === 'Ativa').length / familias.length) * 100)
+      : 0
   };
 
-  const mockFamilias = [
-    { id: 1, nome: 'Família Silva', ong: 'ONG Esperança', status: 'Ativa', diagnostico: 'Concluído', dataIngresso: '2024-01-10' },
-    { id: 2, nome: 'Família Santos', ong: 'Instituto Futuro', status: 'Em Acompanhamento', diagnostico: 'Pendente', dataIngresso: '2024-01-15' },
-    { id: 3, nome: 'Família Oliveira', ong: 'Projeto Vida', status: 'Ativa', diagnostico: 'Concluído', dataIngresso: '2024-02-01' },
-  ];
+  // Calcular progresso dos diagnósticos
+  const diagnosticoStats = {
+    concluidos: familias?.filter(f => f.diagnostico === 'Concluído').length || 0,
+    emAndamento: familias?.filter(f => f.diagnostico === 'Em Andamento').length || 0,
+    pendentes: familias?.filter(f => f.diagnostico === 'Pendente').length || 0
+  };
+
+  const total = diagnosticoStats.concluidos + diagnosticoStats.emAndamento + diagnosticoStats.pendentes;
+  const progressPercentages = {
+    concluidos: total > 0 ? Math.round((diagnosticoStats.concluidos / total) * 100) : 0,
+    emAndamento: total > 0 ? Math.round((diagnosticoStats.emAndamento / total) * 100) : 0,
+    pendentes: total > 0 ? Math.round((diagnosticoStats.pendentes / total) * 100) : 0
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-lg text-gray-600">Carregando dados...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-lg text-red-600">Erro ao carregar dados: {error}</div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -27,11 +55,11 @@ export default function DecolagemPage() {
           <p className="text-gray-600">Diagnósticos de Famílias</p>
         </div>
         <div className="flex gap-2">
-          <button className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors">
+          <button className="inline-flex items-center px-4 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 transition-colors">
             <FileText className="w-4 h-4 mr-2" />
             Novo Diagnóstico
           </button>
-          <button className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors">
+          <button className="inline-flex items-center px-4 py-2 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 transition-colors">
             <UserPlus className="w-4 h-4 mr-2" />
             Nova Família
           </button>
@@ -47,7 +75,7 @@ export default function DecolagemPage() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Total Famílias</p>
-              <p className="text-2xl font-bold text-gray-900">{mockStats.totalFamilias}</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.totalFamilias}</p>
             </div>
           </div>
         </div>
@@ -59,7 +87,7 @@ export default function DecolagemPage() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">ONGs Ativas</p>
-              <p className="text-2xl font-bold text-gray-900">{mockStats.ongsAtivas}</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.ongsAtivas}</p>
             </div>
           </div>
         </div>
@@ -71,7 +99,7 @@ export default function DecolagemPage() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Diagnósticos</p>
-              <p className="text-2xl font-bold text-gray-900">{mockStats.diagnosticosRealizados}</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.diagnosticosRealizados}</p>
             </div>
           </div>
         </div>
@@ -83,7 +111,7 @@ export default function DecolagemPage() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Taxa Retenção</p>
-              <p className="text-2xl font-bold text-gray-900">{mockStats.taxaRetencao}%</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.taxaRetencao}%</p>
             </div>
           </div>
         </div>
@@ -104,7 +132,7 @@ export default function DecolagemPage() {
               />
             </div>
           </div>
-          <button className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+          <button className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm rounded-lg hover:bg-gray-50 transition-colors">
             <Filter className="w-4 h-4 mr-2" />
             Filtros
           </button>
@@ -118,28 +146,28 @@ export default function DecolagemPage() {
           <div>
             <div className="flex justify-between text-sm text-gray-600 mb-1">
               <span>Diagnósticos Concluídos</span>
-              <span>77%</span>
+              <span>{progressPercentages.concluidos}%</span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
-              <div className="bg-green-600 h-2 rounded-full" style={{ width: '77%' }}></div>
+              <div className="bg-green-600 h-2 rounded-full" style={{ width: `${progressPercentages.concluidos}%` }}></div>
             </div>
           </div>
           <div>
             <div className="flex justify-between text-sm text-gray-600 mb-1">
               <span>Em Andamento</span>
-              <span>15%</span>
+              <span>{progressPercentages.emAndamento}%</span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
-              <div className="bg-yellow-600 h-2 rounded-full" style={{ width: '15%' }}></div>
+              <div className="bg-yellow-600 h-2 rounded-full" style={{ width: `${progressPercentages.emAndamento}%` }}></div>
             </div>
           </div>
           <div>
             <div className="flex justify-between text-sm text-gray-600 mb-1">
               <span>Pendentes</span>
-              <span>8%</span>
+              <span>{progressPercentages.pendentes}%</span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
-              <div className="bg-red-600 h-2 rounded-full" style={{ width: '8%' }}></div>
+              <div className="bg-red-600 h-2 rounded-full" style={{ width: `${progressPercentages.pendentes}%` }}></div>
             </div>
           </div>
         </div>
@@ -175,42 +203,52 @@ export default function DecolagemPage() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {mockFamilias.map((familia) => (
-                <tr key={familia.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{familia.nome}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{familia.ong}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      familia.status === 'Ativa' 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {familia.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      familia.diagnostico === 'Concluído' 
-                        ? 'bg-blue-100 text-blue-800' 
-                        : 'bg-orange-100 text-orange-800'
-                    }`}>
-                      {familia.diagnostico}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {new Date(familia.dataIngresso).toLocaleDateString('pt-BR')}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button className="text-gray-400 hover:text-gray-600">
-                      <MoreVertical className="w-4 h-4" />
-                    </button>
+              {familias && familias.length > 0 ? (
+                familias.map((familia) => (
+                  <tr key={familia.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">{familia.nome || familia.name}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{familia.ong || 'N/A'}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        familia.status === 'Ativa' || familia.status === 'ativo'
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {familia.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        familia.diagnostico === 'Concluído' 
+                          ? 'bg-blue-100 text-blue-800' 
+                          : familia.diagnostico === 'Em Andamento'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-orange-100 text-orange-800'
+                      }`}>
+                        {familia.diagnostico}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {new Date(familia.dataIngresso || familia.created_at).toLocaleDateString('pt-BR')}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <button className="text-gray-400 hover:text-gray-600">
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                    Nenhuma família encontrada
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>

@@ -1,34 +1,21 @@
-import { useEffect, useMemo, useState } from 'react';
-import {
-  Calendar as CalendarIcon,
-  ChevronLeft,
-  ChevronRight,
-  Edit,
-  Trash2,
-  Plus,
-  X,
-  Filter,
-  Users,
-  MapPin,
-  Clock
-} from 'lucide-react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, getDay, isSameMonth } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { Card } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import type { Atividade, TipoAtividade } from '@/types';
+import { useState, useEffect, useMemo } from 'react';
+import { Plus, Filter } from 'lucide-react';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, getDay } from 'date-fns';
+import { Card } from '../../components/ui/Card';
+import { Button } from '../../components/ui/Button';
+import type { Atividade, TipoAtividade, EventForm } from '../../types';
 import FiltersPanel from './components/FiltersPanel';
 import EventsPanel from './components/EventsPanel';
 import EventModal from './components/EventModal';
-import { REGIONAL_LABELS, DEPARTAMENTO_LABELS, ATIVIDADE_OPTIONS, TYPE_COLOR_CLASSES, REGIONAL_COLOR_CLASSES } from './constants';
+import { REGIONAL_LABELS, DEPARTAMENTO_LABELS, ATIVIDADE_OPTIONS, REGIONAL_COLOR_CLASSES } from './constants';
 import CalendarHeader from './components/CalendarHeader';
 import MonthGrid from './components/MonthGrid';
+import { useCalendarEvents } from '../../hooks/useApi';
 
 
 
 export default function CalendarioPage() {
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [events, setEvents] = useState<Atividade[]>([]);
@@ -39,113 +26,14 @@ export default function CalendarioPage() {
   const [selectedDepartamento, setSelectedDepartamento] = useState<string>('todos');
   const [showFilters, setShowFilters] = useState(false);
 
-  // Dados de exemplo para demonstração
+  // Carregar eventos de calendário do backend (modo global)
+  const { data: calendarData, loading, error } = useCalendarEvents(true);
+
   useEffect(() => {
-    if (import.meta.env.MODE === 'test' && events.length === 0) {
-      const year = 2025;
-      const month = 8; // setembro (0-based)
-      const mockEvents: Atividade[] = [
-        // Nacional
-        {
-          id: 'evt-nacional-1',
-          titulo: 'Reunião Estratégica Nacional',
-          descricao: 'Planejamento trimestral',
-          tipo: 'encontros',
-          data_inicio: new Date(year, month, 5, 14, 0).toISOString(),
-          data_fim: new Date(year, month, 5, 17, 0).toISOString(),
-          local: 'Sede Nacional',
-          regional: 'nacional' as any,
-          programa: 'decolagem',
-          participantes_confirmados: 25,
-          status: 'ativo',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        // Comercial
-        {
-          id: 'evt-comercial-1',
-          titulo: 'Treinamento Vendas',
-          descricao: 'Capacitação equipe comercial',
-          tipo: 'formacao_ligas',
-          data_inicio: new Date(year, month, 8, 9, 0).toISOString(),
-          data_fim: new Date(year, month, 8, 12, 0).toISOString(),
-          local: 'Escritório Comercial',
-          regional: 'comercial' as any,
-          programa: 'decolagem',
-          participantes_confirmados: 15,
-          status: 'ativo',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        // Centro-Oeste
-        {
-          id: 'evt-co-1',
-          titulo: 'Imersão Maras Centro-Oeste',
-          descricao: 'Programa intensivo de formação',
-          tipo: 'imersao',
-          data_inicio: new Date(year, month, 12, 8, 0).toISOString(),
-          data_fim: new Date(year, month, 14, 18, 0).toISOString(),
-          local: 'Campo Grande - MS',
-          regional: 'centro_oeste' as any,
-          programa: 'decolagem',
-          participantes_confirmados: 30,
-          status: 'ativo',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        // Nordeste
-        {
-          id: 'evt-ne1-1',
-          titulo: 'Processo Seletivo Nordeste 1',
-          descricao: 'Seleção novos participantes',
-          tipo: 'seletivas',
-          data_inicio: new Date(year, month, 18, 14, 0).toISOString(),
-          data_fim: new Date(year, month, 18, 17, 0).toISOString(),
-          local: 'Recife - PE',
-          regional: 'nordeste_1' as any,
-          programa: 'decolagem',
-          participantes_confirmados: 50,
-          status: 'ativo',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        // São Paulo
-        {
-          id: 'evt-sp-1',
-          titulo: 'Encontro Regional SP',
-          descricao: 'Alinhamento mensal',
-          tipo: 'encontros',
-          data_inicio: new Date(year, month, 22, 19, 0).toISOString(),
-          data_fim: new Date(year, month, 22, 21, 0).toISOString(),
-          local: 'São Paulo - SP',
-          regional: 'sp' as any,
-          programa: 'decolagem',
-          participantes_confirmados: 40,
-          status: 'ativo',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        // Sul
-        {
-          id: 'evt-sul-1',
-          titulo: 'Visita ONGs Parceiras',
-          descricao: 'Acompanhamento projetos',
-          tipo: 'outros',
-          data_inicio: new Date(year, month, 25, 10, 0).toISOString(),
-          data_fim: new Date(year, month, 25, 16, 0).toISOString(),
-          local: 'Porto Alegre - RS',
-          regional: 'sul' as any,
-          programa: 'decolagem',
-          participantes_confirmados: 12,
-          status: 'ativo',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-      ];
-      setEvents(mockEvents);
-      setCurrentMonth(new Date(year, month, 1));
+    if (calendarData) {
+      setEvents(calendarData);
     }
-  }, [events.length]);
+  }, [calendarData]);
 
   const days = useMemo(() => {
     const start = startOfMonth(currentMonth);
@@ -189,19 +77,20 @@ export default function CalendarioPage() {
   }, [eventsOfMonth]);
 
   // Form state para modal
-  const [form, setForm] = useState({
-    atividade: '' as TipoAtividade | '',
+  const [form, setForm] = useState<EventForm>({
+    atividade: '',
     atividadeLabel: '',
     atividadeCustomLabel: '',
     responsavel: '',
     descricao: '',
     dataAtividade: '',
-    regional: 'nacional' as string,
+    regional: 'nacional',
     local: '',
-    estados: [] as string[],
-    programa: '' as any,
-    instituicaoId: '' as string,
-    evidencias: [] as any[],
+    estados: [],
+    programa: '',
+    instituicaoId: '',
+    evidencias: [],
+    quantidade: undefined,
   });
 
   const openCreateModal = () => {
@@ -216,7 +105,7 @@ export default function CalendarioPage() {
       regional: 'nacional',
       local: '',
       estados: [],
-      programa: '' as any,
+      programa: '',
       instituicaoId: '',
       evidencias: [],
       quantidade: undefined,
@@ -235,10 +124,10 @@ export default function CalendarioPage() {
       responsavel: evt.responsavel?.nome ?? '',
       descricao: evt.descricao ?? '',
       dataAtividade: format(di, 'yyyy-MM-dd'),
-      regional: evt.regional as string,
+      regional: evt.regional ?? 'nacional',
       local: evt.local ?? '',
       estados: [],
-      programa: evt.programa ?? 'decolagem',
+      programa: evt.programa ?? '',
       instituicaoId: '',
       evidencias: evt.evidencias || [],
       quantidade: evt.quantidade,
@@ -299,7 +188,7 @@ export default function CalendarioPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Calendário Global</h1>
+          <h1 className="text-lg font-bold text-gray-900">Calendário Global</h1>
           <p className="text-gray-600">Visualize e gerencie eventos de todas as regionais, comercial e nacional</p>
         </div>
         <div className="flex items-center space-x-3">
@@ -344,8 +233,22 @@ export default function CalendarioPage() {
             days={days}
             currentMonth={currentMonth}
             eventsByDay={eventsByDay}
-            onSelectDate={(d) => setSelectedDate(d)}
+            onSelectDate={() => {}} // Função vazia por enquanto
+            dotColorBy="regional"
           />
+          
+          {/* Legenda de Cores por Regional */}
+          <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+            <h3 className="text-sm font-medium text-gray-700 mb-3">Legenda por Regional</h3>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              {Object.entries(REGIONAL_LABELS).map(([key, label]) => (
+                <div key={key} className="flex items-center space-x-2">
+                  <div className={`w-3 h-3 rounded-full ${REGIONAL_COLOR_CLASSES[key as keyof typeof REGIONAL_COLOR_CLASSES] || 'bg-gray-400'}`}></div>
+                  <span className="text-gray-600">{label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </Card>
 
         {/* Eventos do mês */}

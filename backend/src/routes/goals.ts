@@ -8,7 +8,26 @@ router.get('/', async (req, res) => {
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
   const s = getSupabaseForToken(token);
   if (!s) return res.status(500).json({ error: 'supabase_client_unavailable' });
-  const { data, error } = await s.from('goals').select('*');
+
+  const user = await getUserFromToken(token);
+  if (!user) return res.status(401).json({ error: 'unauthorized' });
+
+  const { data: me, error: meErr } = await s.from('members').select('id').eq('auth_user_id', user.id).single();
+  if (meErr || !me) return res.status(404).json({ error: 'member_not_found' });
+
+  // Verificar se o usuário é super_admin
+  const userRole = user.user_metadata?.role;
+  let query = s.from('goals').select('*');
+  
+  if (userRole === 'super_admin') {
+    // Super admin vê todas as metas
+    query = query;
+  } else {
+    // Usuários normais veem apenas suas próprias metas
+    query = query.eq('member_id', me.id);
+  }
+
+  const { data, error } = await query;
   if (error) return res.status(400).json({ error: error.message });
   res.json({ data });
 });

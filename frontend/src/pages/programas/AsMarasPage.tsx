@@ -1,22 +1,39 @@
-import { Users, Plus, Search, Filter, MoreVertical, UserPlus, Target, TrendingUp } from 'lucide-react';
+import { Users, Search, Filter, MoreVertical, UserPlus, Target, TrendingUp } from 'lucide-react';
 import { useState } from 'react';
+import { useAsMaras } from '../../hooks/useApi';
 
 export default function AsMarasPage() {
   const [searchTerm, setSearchTerm] = useState('');
+  const { data: participantes, loading, error } = useAsMaras();
 
-  // Mock data para demonstração
-  const mockStats = {
-    totalParticipantes: 1247,
-    ligasFormadas: 89,
-    metaMensal: 100,
-    atingidoMes: 87
+  // Calcular estatísticas baseadas nos dados reais
+  const stats = {
+    totalParticipantes: participantes?.length || 0,
+    ligasFormadas: participantes?.filter(p => p.status === 'Ativa').length || 0,
+    metaMensal: 100, // Meta fixa ou vinda de configuração
+    atingidoMes: participantes?.filter(p => {
+      const dataIngresso = new Date(p.dataIngresso || p.created_at);
+      const mesAtual = new Date().getMonth();
+      const anoAtual = new Date().getFullYear();
+      return dataIngresso.getMonth() === mesAtual && dataIngresso.getFullYear() === anoAtual;
+    }).length || 0
   };
 
-  const mockParticipantes = [
-    { id: 1, nome: 'Maria Silva', ong: 'ONG Esperança', status: 'Ativa', dataIngresso: '2024-01-15' },
-    { id: 2, nome: 'Ana Santos', ong: 'Instituto Futuro', status: 'Ativa', dataIngresso: '2024-01-20' },
-    { id: 3, nome: 'Carla Oliveira', ong: 'Projeto Vida', status: 'Em Formação', dataIngresso: '2024-02-01' },
-  ];
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-lg text-gray-600">Carregando dados...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-lg text-red-600">Erro ao carregar dados: {error}</div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -26,7 +43,7 @@ export default function AsMarasPage() {
           <h1 className="text-2xl font-bold text-gray-900">Programa As Maras</h1>
           <p className="text-gray-600">Gestão de participantes e formação de ligas</p>
         </div>
-        <button className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors">
+        <button className="inline-flex items-center px-4 py-2 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 transition-colors">
           <UserPlus className="w-4 h-4 mr-2" />
           Nova Participante
         </button>
@@ -41,7 +58,7 @@ export default function AsMarasPage() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Total Participantes</p>
-              <p className="text-2xl font-bold text-gray-900">{mockStats.totalParticipantes}</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.totalParticipantes}</p>
             </div>
           </div>
         </div>
@@ -53,7 +70,7 @@ export default function AsMarasPage() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Ligas Formadas</p>
-              <p className="text-2xl font-bold text-gray-900">{mockStats.ligasFormadas}</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.ligasFormadas}</p>
             </div>
           </div>
         </div>
@@ -65,7 +82,7 @@ export default function AsMarasPage() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Meta Mensal</p>
-              <p className="text-2xl font-bold text-gray-900">{mockStats.metaMensal}</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.metaMensal}</p>
             </div>
           </div>
         </div>
@@ -77,7 +94,7 @@ export default function AsMarasPage() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Atingido no Mês</p>
-              <p className="text-2xl font-bold text-gray-900">{mockStats.atingidoMes}</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.atingidoMes}</p>
             </div>
           </div>
         </div>
@@ -95,10 +112,11 @@ export default function AsMarasPage() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                spellCheck="false"
               />
             </div>
           </div>
-          <button className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+          <button className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm rounded-lg hover:bg-gray-50 transition-colors">
             <Filter className="w-4 h-4 mr-2" />
             Filtros
           </button>
@@ -132,33 +150,41 @@ export default function AsMarasPage() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {mockParticipantes.map((participante) => (
-                <tr key={participante.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{participante.nome}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{participante.ong}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      participante.status === 'Ativa' 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {participante.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {new Date(participante.dataIngresso).toLocaleDateString('pt-BR')}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button className="text-gray-400 hover:text-gray-600">
-                      <MoreVertical className="w-4 h-4" />
-                    </button>
+              {participantes && participantes.length > 0 ? (
+                participantes.map((participante) => (
+                  <tr key={participante.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">{participante.nome || participante.name}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{participante.ong || 'N/A'}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        participante.status === 'Ativa' || participante.status === 'ativo'
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {participante.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {new Date(participante.dataIngresso || participante.created_at).toLocaleDateString('pt-BR')}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <button className="text-gray-400 hover:text-gray-600">
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
+                    Nenhuma participante encontrada
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>

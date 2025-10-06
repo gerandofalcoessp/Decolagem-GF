@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teste Upload</title>
+</head>
+<body>
+    <h1>Teste de Upload de Documentos</h1>
+    <form id="uploadForm">
+        <input type="file" id="fileInput" multiple>
+        <button type="submit">Upload</button>
+    </form>
+    <script>
+        document.getElementById("uploadForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const files = document.getElementById("fileInput").files;
+            if (files.length === 0) {
+                alert("Selecione pelo menos um arquivo");
+                return;
+            }
+            const formData = new FormData();
+            for (let file of files) {
+                formData.append("files", file);
+            }
+            formData.append("tipo", "documento");
+            // Usar um token de teste ou pegar do localStorage
+            const token = localStorage.getItem("auth_token") || "test-token";
+            try {
+                console.log("Enviando requisição...");
+                const response = await fetch("http://localhost:3001/instituicoes/1/documentos", {
+                    method: "POST",
+                    body: formData,
+                    headers: {
+                        "Authorization": `Bearer ${token}`
+                    }
+                });
+                console.log("Status:", response.status);
+                const result = await response.json();
+                console.log("Resultado:", result);
+                alert(`Status: ${response.status}\nResultado: ${JSON.stringify(result, null, 2)}`);
+            } catch (error) {
+                console.error("Erro:", error);
+                alert("Erro: " + error.message);
+            }
+        });
+    </script>
+</body>
+</html>

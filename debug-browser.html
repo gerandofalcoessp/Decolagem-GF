@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Frontend - Metas</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+        .log { max-height: 300px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug Frontend - Sistema de Metas</h1>
+    
+    <div class="section info">
+        <h3>1. Verificação de Configuração</h3>
+        <button onclick="checkConfig()">Verificar Configuração</button>
+        <div id="config-result"></div>
+    </div>
+
+    <div class="section info">
+        <h3>2. Teste de Login</h3>
+        <button onclick="testLogin()">Fazer Login</button>
+        <div id="login-result"></div>
+    </div>
+
+    <div class="section info">
+        <h3>3. Teste de API Goals</h3>
+        <button onclick="testGoalsAPI()">Testar API /goals</button>
+        <div id="goals-result"></div>
+    </div>
+
+    <div class="section info">
+        <h3>4. Verificação de LocalStorage</h3>
+        <button onclick="checkStorage()">Verificar Storage</button>
+        <div id="storage-result"></div>
+    </div>
+
+    <div class="section info">
+        <h3>5. Logs do Console</h3>
+        <div id="console-logs" class="log"></div>
+    </div>
+
+    <script>
+        // Capturar logs do console
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+        
+        const logContainer = document.getElementById('console-logs');
+        
+        function addLog(type, message) {
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = `<strong>[${type.toUpperCase()}]</strong> ${new Date().toLocaleTimeString()}: ${message}`;
+            logContainer.appendChild(logEntry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+        
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            addLog('log', args.join(' '));
+        };
+        
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            addLog('error', args.join(' '));
+        };
+        
+        console.warn = function(...args) {
+            originalWarn.apply(console, args);
+            addLog('warn', args.join(' '));
+        };
+
+        // Funções de teste
+        async function checkConfig() {
+            const result = document.getElementById('config-result');
+            
+            const config = {
+                currentURL: window.location.href,
+                userAgent: navigator.userAgent,
+                localStorage: typeof(Storage) !== "undefined",
+                fetch: typeof(fetch) !== "undefined",
+                apiBaseURL: 'http://localhost:3001' // Assumindo que é esta a URL da API
+            };
+            
+            result.innerHTML = `<pre>${JSON.stringify(config, null, 2)}</pre>`;
+            console.log('Configuração verificada:', config);
+        }
+
+        async function testLogin() {
+            const result = document.getElementById('login-result');
+            result.innerHTML = '<p>Fazendo login...</p>';
+            
+            try {
+                const response = await fetch('http://localhost:3001/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: 'teste@decolagem.com',
+                        password: '123456'
+                    })
+                });
+                
+                console.log('Status do login:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`Erro ${response.status}: ${response.statusText}`);
+                }
+                
+                const loginData = await response.json();
+                console.log('Dados do login:', loginData);
+                
+                const token = loginData.session?.access_token || loginData.token;
+                
+                if (token) {
+                    localStorage.setItem('auth_token', token);
+                    result.innerHTML = `<div class="success">
+                        <p>✅ Login realizado com sucesso!</p>
+                        <p>Token salvo no localStorage</p>
+                        <pre>${JSON.stringify(loginData, null, 2)}</pre>
+                    </div>`;
+                } else {
+                    result.innerHTML = `<div class="error">
+                        <p>❌ Token não encontrado na resposta</p>
+                        <pre>${JSON.stringify(loginData, null, 2)}</pre>
+                    </div>`;
+                }
+                
+            } catch (error) {
+                console.error('Erro no login:', error);
+                result.innerHTML = `<div class="error">
+                    <p>❌ Erro no login: ${error.message}</p>
+                </div>`;
+            }
+        }
+
+        async function testGoalsAPI() {
+            const result = document.getElementById('goals-result');
+            result.innerHTML = '<p>Testando API /goals...</p>';
+            
+            const token = localStorage.getItem('auth_token');
+            
+            if (!token) {
+                result.innerHTML = `<div class="error">
+                    <p>❌ Token não encontrado. Faça login primeiro.</p>
+                </div>`;
+                return;
+            }
+            
+            try {
+                console.log('Fazendo requisição para /goals com token:', token.substring(0, 50) + '...');
+                
+                const response = await fetch('http://localhost:3001/goals', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                console.log('Status da resposta /goals:', response.status);
+                console.log('Headers da resposta:', Object.fromEntries(response.headers.entries()));
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Erro ${response.status}: ${errorText}`);
+                }
+                
+                const goalsData = await response.json();
+                console.log('Dados das metas recebidos:', goalsData);
+                
+                result.innerHTML = `<div class="success">
+                    <p>✅ API /goals funcionando!</p>
+                    <p>Metas encontradas: ${goalsData.data ? goalsData.data.length : 0}</p>
+                    <pre>${JSON.stringify(goalsData, null, 2)}</pre>
+                </div>`;
+                
+            } catch (error) {
+                console.error('Erro na API /goals:', error);
+                result.innerHTML = `<div class="error">
+                    <p>❌ Erro na API /goals: ${error.message}</p>
+                </div>`;
+            }
+        }
+
+        function checkStorage() {
+            const result = document.getElementById('storage-result');
+            
+            const storageData = {
+                localStorage: {},
+                sessionStorage: {}
+            };
+            
+            // Verificar localStorage
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                storageData.localStorage[key] = localStorage.getItem(key);
+            }
+            
+            // Verificar sessionStorage
+            for (let i = 0; i < sessionStorage.length; i++) {
+                const key = sessionStorage.key(i);
+                storageData.sessionStorage[key] = sessionStorage.getItem(key);
+            }
+            
+            result.innerHTML = `<pre>${JSON.stringify(storageData, null, 2)}</pre>`;
+            console.log('Dados do storage:', storageData);
+        }
+
+        // Executar verificação inicial
+        window.onload = function() {
+            console.log('🚀 Debug page carregada');
+            checkConfig();
+        };
+    </script>
+</body>
+</html>

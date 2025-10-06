@@ -1,22 +1,45 @@
-import { CreditCard, DollarSign, Users, TrendingUp, Plus, Search, Filter, MoreVertical, UserPlus, FileText } from 'lucide-react';
+import { CreditCard, DollarSign, TrendingUp, Search, Filter, MoreVertical, UserPlus, FileText } from 'lucide-react';
 import { useState } from 'react';
+import { useMicrocredito } from '../../hooks/useApi';
 
 export default function MicrocreditoPage() {
   const [searchTerm, setSearchTerm] = useState('');
+  const { data: emprestimos, loading, error } = useMicrocredito();
 
-  // Mock data para demonstração
-  const mockStats = {
-    totalEmprestimos: 89500,
-    emprestimosAtivos: 156,
-    taxaAprovacao: 78,
-    inadimplencia: 3.2
+  // Calcular estatísticas baseadas nos dados reais
+  const stats = {
+    totalEmprestimos: emprestimos?.reduce((sum, emp) => sum + (emp.valor || 0), 0) || 0,
+    emprestimosAtivos: emprestimos?.filter(emp => emp.status === 'Ativo').length || 0,
+    taxaAprovacao: emprestimos && emprestimos.length > 0 
+      ? Math.round((emprestimos.filter(emp => emp.status === 'Aprovado' || emp.status === 'Ativo').length / emprestimos.length) * 100)
+      : 0,
+    inadimplencia: emprestimos && emprestimos.length > 0
+      ? Math.round((emprestimos.filter(emp => emp.status === 'Inadimplente').length / emprestimos.length) * 100 * 10) / 10
+      : 0
   };
 
-  const mockEmprestimos = [
-    { id: 1, nome: 'Maria Silva', valor: 5000, status: 'Aprovado', dataAprovacao: '2024-01-15', vencimento: '2024-07-15' },
-    { id: 2, nome: 'Ana Santos', valor: 3500, status: 'Em Análise', dataAprovacao: null, vencimento: null },
-    { id: 3, nome: 'Carla Oliveira', valor: 7500, status: 'Ativo', dataAprovacao: '2024-01-10', vencimento: '2024-12-10' },
-  ];
+  // Calcular estatísticas por status
+  const statusStats = {
+    aprovados: emprestimos?.filter(emp => emp.status === 'Aprovado' || emp.status === 'Ativo').length || 0,
+    emAnalise: emprestimos?.filter(emp => emp.status === 'Em Análise').length || 0,
+    rejeitados: emprestimos?.filter(emp => emp.status === 'Rejeitado').length || 0
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-red-600">Erro ao carregar dados: {error}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -27,11 +50,11 @@ export default function MicrocreditoPage() {
           <p className="text-gray-600">Gestão de empréstimos e financiamentos</p>
         </div>
         <div className="flex gap-2">
-          <button className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+          <button className="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors">
             <FileText className="w-4 h-4 mr-2" />
             Nova Solicitação
           </button>
-          <button className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors">
+          <button className="inline-flex items-center px-4 py-2 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 transition-colors">
             <UserPlus className="w-4 h-4 mr-2" />
             Novo Cliente
           </button>
@@ -47,7 +70,7 @@ export default function MicrocreditoPage() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Total Empréstimos</p>
-              <p className="text-2xl font-bold text-gray-900">R$ {(mockStats.totalEmprestimos / 1000).toFixed(0)}k</p>
+              <p className="text-2xl font-bold text-gray-900">R$ {(stats.totalEmprestimos / 1000).toFixed(0)}k</p>
             </div>
           </div>
         </div>
@@ -59,7 +82,7 @@ export default function MicrocreditoPage() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Empréstimos Ativos</p>
-              <p className="text-2xl font-bold text-gray-900">{mockStats.emprestimosAtivos}</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.emprestimosAtivos}</p>
             </div>
           </div>
         </div>
@@ -71,7 +94,7 @@ export default function MicrocreditoPage() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Taxa Aprovação</p>
-              <p className="text-2xl font-bold text-gray-900">{mockStats.taxaAprovacao}%</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.taxaAprovacao}%</p>
             </div>
           </div>
         </div>
@@ -83,7 +106,7 @@ export default function MicrocreditoPage() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Inadimplência</p>
-              <p className="text-2xl font-bold text-gray-900">{mockStats.inadimplencia}%</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.inadimplencia}%</p>
             </div>
           </div>
         </div>
@@ -104,7 +127,7 @@ export default function MicrocreditoPage() {
               />
             </div>
           </div>
-          <button className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+          <button className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm rounded-lg hover:bg-gray-50 transition-colors">
             <Filter className="w-4 h-4 mr-2" />
             Filtros
           </button>
@@ -116,15 +139,15 @@ export default function MicrocreditoPage() {
         <h3 className="text-lg font-medium text-gray-900 mb-4">Status dos Empréstimos</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="text-center p-4 bg-green-50 rounded-lg">
-            <div className="text-2xl font-bold text-green-600">124</div>
+            <div className="text-2xl font-bold text-green-600">{statusStats.aprovados}</div>
             <div className="text-sm text-green-700">Aprovados</div>
           </div>
           <div className="text-center p-4 bg-yellow-50 rounded-lg">
-            <div className="text-2xl font-bold text-yellow-600">32</div>
+            <div className="text-2xl font-bold text-yellow-600">{statusStats.emAnalise}</div>
             <div className="text-sm text-yellow-700">Em Análise</div>
           </div>
           <div className="text-center p-4 bg-red-50 rounded-lg">
-            <div className="text-2xl font-bold text-red-600">8</div>
+            <div className="text-2xl font-bold text-red-600">{statusStats.rejeitados}</div>
             <div className="text-sm text-red-700">Rejeitados</div>
           </div>
         </div>
@@ -160,38 +183,48 @@ export default function MicrocreditoPage() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {mockEmprestimos.map((emprestimo) => (
-                <tr key={emprestimo.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{emprestimo.nome}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">R$ {emprestimo.valor.toLocaleString('pt-BR')}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      emprestimo.status === 'Aprovado' 
-                        ? 'bg-green-100 text-green-800' 
-                        : emprestimo.status === 'Ativo'
-                        ? 'bg-blue-100 text-blue-800'
-                        : 'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {emprestimo.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {emprestimo.dataAprovacao ? new Date(emprestimo.dataAprovacao).toLocaleDateString('pt-BR') : '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {emprestimo.vencimento ? new Date(emprestimo.vencimento).toLocaleDateString('pt-BR') : '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button className="text-gray-400 hover:text-gray-600">
-                      <MoreVertical className="w-4 h-4" />
-                    </button>
+              {emprestimos && emprestimos.length > 0 ? (
+                emprestimos.map((emprestimo) => (
+                  <tr key={emprestimo.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">{emprestimo.nome}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">R$ {emprestimo.valor?.toLocaleString('pt-BR') || '0'}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        emprestimo.status === 'Aprovado' 
+                          ? 'bg-green-100 text-green-800' 
+                          : emprestimo.status === 'Ativo'
+                          ? 'bg-blue-100 text-blue-800'
+                          : emprestimo.status === 'Em Análise'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {emprestimo.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {emprestimo.dataAprovacao ? new Date(emprestimo.dataAprovacao).toLocaleDateString('pt-BR') : '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {emprestimo.vencimento ? new Date(emprestimo.vencimento).toLocaleDateString('pt-BR') : '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <button className="text-gray-400 hover:text-gray-600">
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                    Nenhum empréstimo encontrado
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
