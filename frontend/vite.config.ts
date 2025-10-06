@@ -26,7 +26,15 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: true,
+    sourcemap: false, // Desabilitar sourcemaps em produção para reduzir tamanho
+    chunkSizeWarningLimit: 1000, // Aumentar limite de warning para chunks
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true,
+      },
+    },
     rollupOptions: {
       output: {
         manualChunks: {
@@ -34,6 +42,8 @@ export default defineConfig({
           router: ['react-router-dom'],
           charts: ['recharts', 'chart.js', 'react-chartjs-2'],
           ui: ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-tabs'],
+          supabase: ['@supabase/supabase-js'],
+          forms: ['react-hook-form', '@hookform/resolvers', 'zod'],
         },
       },
     },
@@ -42,4 +52,7 @@ export default defineConfig({
     entries: ['index.html', './src/main.tsx'],
     include: ['react', 'react-dom', 'react-router-dom'],
   },
+  define: {
+    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')
+  }
 })
