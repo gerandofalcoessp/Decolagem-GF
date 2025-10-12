@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { AuthService } from '../services/authService';
 import { authMiddleware } from '../middlewares/authMiddleware';
+import { logger } from '../utils/logger';
 
 const router = Router();
 
@@ -9,24 +10,54 @@ const router = Router();
  * Realiza login do usuário
  */
 router.post('/login', async (req: Request, res: Response) => {
+  const startTime = Date.now();
+  const { email } = req.body;
+  
   try {
-    const { email, password } = req.body;
+    const { password } = req.body;
 
     if (!email || !password) {
+      logger.logAuthEvent('login_failed', {
+        email,
+        reason: 'missing_credentials',
+        ip: req.ip,
+        userAgent: req.get('User-Agent')
+      });
       return res.status(400).json({
         error: 'Email e senha são obrigatórios',
       });
     }
 
+    logger.logAuthEvent('login_attempt', {
+      email,
+      ip: req.ip,
+      userAgent: req.get('User-Agent')
+    });
+
     const result = await AuthService.signIn(email, password);
 
     if (result.error) {
+      logger.logAuthEvent('login_failed', {
+        email,
+        reason: 'invalid_credentials',
+        error: result.error.message,
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+        duration: Date.now() - startTime
+      });
       return res.status(401).json({
         error: result.error.message,
       });
     }
 
     if (!result.user || !result.session) {
+      logger.logAuthEvent('login_failed', {
+        email,
+        reason: 'no_user_or_session',
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+        duration: Date.now() - startTime
+      });
       return res.status(401).json({
         error: 'Credenciais inválidas',
       });
@@ -34,6 +65,15 @@ router.post('/login', async (req: Request, res: Response) => {
 
     // Buscar dados do membro associado
     const memberData = await AuthService.getMemberData(result.user.id);
+
+    logger.logAuthEvent('login_success', {
+      userId: result.user.id,
+      email: result.user.email,
+      memberRole: memberData?.role,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+      duration: Date.now() - startTime
+    });
 
     return res.json({
       user: {
@@ -49,7 +89,14 @@ router.post('/login', async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('Erro no login:', error);
+    logger.logAuthEvent('login_error', {
+      email,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+      duration: Date.now() - startTime
+    });
     return res.status(500).json({
       error: 'Erro interno do servidor',
     });
@@ -61,29 +108,66 @@ router.post('/login', async (req: Request, res: Response) => {
  * Realiza logout do usuário
  */
 router.post('/logout', authMiddleware, async (req: Request, res: Response) => {
+  const startTime = Date.now();
+  const user = (req as any).user;
+  
   try {
     const authHeader = req.headers.authorization;
     const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : '';
 
     if (!token) {
+      logger.logAuthEvent('logout_failed', {
+        userId: user?.id,
+        reason: 'no_token',
+        ip: req.ip,
+        userAgent: req.get('User-Agent')
+      });
       return res.status(400).json({
         error: 'Token não fornecido',
       });
     }
 
+    logger.logAuthEvent('logout_attempt', {
+      userId: user?.id,
+      ip: req.ip,
+      userAgent: req.get('User-Agent')
+    });
+
     const result = await AuthService.signOut(token);
 
     if (result.error) {
+      logger.logAuthEvent('logout_failed', {
+        userId: user?.id,
+        reason: 'service_error',
+        error: result.error.message,
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+        duration: Date.now() - startTime
+      });
       return res.status(400).json({
         error: result.error.message,
       });
     }
 
+    logger.logAuthEvent('logout_success', {
+      userId: user?.id,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+      duration: Date.now() - startTime
+    });
+
     return res.json({
       message: 'Logout realizado com sucesso',
     });
   } catch (error) {
-    console.error('Erro no logout:', error);
+    logger.logAuthEvent('logout_error', {
+      userId: user?.id,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+      duration: Date.now() - startTime
+    });
     return res.status(500).json({
       error: 'Erro interno do servidor',
     });
@@ -95,10 +179,16 @@ router.post('/logout', authMiddleware, async (req: Request, res: Response) => {
  * Obtém dados do usuário autenticado
  */
 router.get('/me', authMiddleware, async (req: Request, res: Response) => {
+  const startTime = Date.now();
+  const user = (req as any).user;
+  
   try {
-    const user = (req as any).user;
-
     if (!user) {
+      logger.logAuthEvent('get_user_failed', {
+        reason: 'no_user',
+        ip: req.ip,
+        userAgent: req.get('User-Agent')
+      });
       return res.status(401).json({
         error: 'Usuário não autenticado',
       });
@@ -106,6 +196,13 @@ router.get('/me', authMiddleware, async (req: Request, res: Response) => {
 
     // Buscar dados do membro associado
     const memberData = await AuthService.getMemberData(user.id);
+
+    logger.info('User data retrieved successfully', {
+      userId: user.id,
+      email: user.email,
+      memberRole: memberData?.role,
+      duration: Date.now() - startTime
+    });
 
     return res.json({
       user: {
@@ -116,7 +213,14 @@ router.get('/me', authMiddleware, async (req: Request, res: Response) => {
       member: memberData,
     });
   } catch (error) {
-    console.error('Erro ao obter dados do usuário:', error);
+    logger.error('Error retrieving user data', {
+      userId: user?.id,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+      duration: Date.now() - startTime
+    });
     return res.status(500).json({
       error: 'Erro interno do servidor',
     });

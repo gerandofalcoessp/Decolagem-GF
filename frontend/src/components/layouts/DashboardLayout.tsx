@@ -15,8 +15,10 @@ import {
 import { useAuthStore, useAuthActions, hasPermission } from '@/store/authStore';
 import { ToastContainer } from '@/components/ui/ToastContainer';
 import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog';
-import asMarasPng from '@/assets/logos/logo as maras.png';
+import LazyImage from '@/components/ui/LazyImage';
+import logoDecolagemPng from '@/assets/logos/Logo decolagem.png';
 import gfLogoSvg from '@/assets/logos/AF_Logo_Gerando-Falcoes-MONOCOR.svg';
+import gfLogoPng from '@/assets/logos/AF_Logo_Gerando Falcoes-MONOCOR.png';
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -124,7 +126,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           {/* Logo */}
           <div className="flex items-center justify-between h-16 px-6 border-b border-pink-400">
             <div className="flex-1 flex items-center justify-center">
-              <img src={asMarasPng} alt="As Maras" className="w-[80px] h-16 object-contain filter invert brightness-0" />
+              <LazyImage 
+                src={logoDecolagemPng} 
+                alt="Decolagem" 
+                className="w-[125px] h-auto max-h-30 object-contain filter invert brightness-0" 
+                width={125}
+                height={120}
+                loading="eager"
+              />
             </div>
             <button
               onClick={() => setSidebarOpen(false)}
@@ -258,7 +267,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             {/* Botão Sair à direita */}
             <div className="flex items-center">
               <div className="flex items-center space-x-3">
-                <img src={gfLogoSvg} alt="Gerando Falcões" className="w-[120px] h-[120px]" />
+                <LazyImage 
+                  src={gfLogoPng} 
+                  alt="Gerando Falcões" 
+                  className="w-auto h-[34px] object-contain" 
+                  width={102}
+                  height={34}
+                  loading="eager"
+                />
                 <button
                   onClick={handleLogout}
                   className="flex items-center space-x-2 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-md"

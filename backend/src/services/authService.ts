@@ -13,8 +13,29 @@ export interface SignUpData {
   metadata?: {
     nome?: string;
     role?: string;
+    tipo?: string;
     regional?: string;
+    funcao?: string;
   };
+}
+
+// Interface específica para usuários retornados pela função listUsers
+export interface ListedUser {
+  id: string;
+  email: string;
+  created_at: string;
+  updated_at?: string;
+  last_sign_in_at?: string | null;
+  role?: string | null;
+  nome?: string | null;
+  regional?: string | null;
+  tipo?: string | null;
+  funcao?: string | null;
+  area?: string | null;
+  status?: string;
+  email_confirmed_at?: string | null;
+  phone_confirmed_at?: string | null;
+  banned_until?: string | null;
 }
 
 export class AuthService {
@@ -63,7 +84,7 @@ export class AuthService {
     }
 
     try {
-      const { data, error } = await supabaseAdmin.auth.admin.createUser({
+      const { data, error } = await supabaseAdmin!.auth.admin.createUser({
         email: userData.email,
         password: userData.password,
         email_confirm: true, // Auto-confirma o email
@@ -112,8 +133,13 @@ export class AuthService {
     funcao?: string;
   }) {
     try {
+      if (!supabaseAdmin) {
+        console.error('supabaseAdmin não configurado');
+        return;
+      }
+
       // Verificar se o usuário já existe na tabela usuarios
-      const { data: existingUser, error: selectError } = await supabaseAdmin
+      const { data: existingUser, error: selectError } = await supabaseAdmin!
         .from('usuarios')
         .select('*')
         .eq('auth_user_id', authUserId)
@@ -142,7 +168,7 @@ export class AuthService {
         if (userData.tipo) updateData.tipo = userData.tipo;
         if (userData.funcao) updateData.funcao = userData.funcao;
 
-        const { error: updateError } = await supabaseAdmin
+        const { error: updateError } = await supabaseAdmin!
           .from('usuarios')
           .update(updateData)
           .eq('auth_user_id', authUserId);
@@ -169,7 +195,12 @@ export class AuthService {
           updated_at: now,
         };
 
-        const { error: insertError } = await supabaseAdmin
+        if (!supabaseAdmin) {
+          console.error('supabaseAdmin não configurado');
+          return;
+        }
+
+        const { error: insertError } = await supabaseAdmin!
           .from('usuarios')
           .insert([insertData]);
 
@@ -233,7 +264,7 @@ export class AuthService {
       // Gera uma senha temporária de 8 caracteres
       const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8).toUpperCase();
       
-      const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+      const { error } = await supabaseAdmin!.auth.admin.updateUserById(userId, {
         password: tempPassword
       });
 
@@ -282,7 +313,7 @@ export class AuthService {
     }
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      const { error } = await supabase!.auth.resetPasswordForEmail(email, {
         redirectTo: `${process.env.FRONTEND_URL}/auth/reset-password`,
       });
 
@@ -305,8 +336,13 @@ export class AuthService {
    */
   static async getMemberData(userId: string) {
     try {
+      if (!supabaseAdmin) {
+        console.error('supabaseAdmin não configurado');
+        return null;
+      }
+
       // Buscar os dados do usuário na tabela usuarios
-      const { data: userData, error: userError } = await supabaseAdmin
+      const { data: userData, error: userError } = await supabaseAdmin!
         .from('usuarios')
         .select('*')
         .eq('auth_user_id', userId)
@@ -316,7 +352,7 @@ export class AuthService {
         console.error('Erro ao buscar usuário na tabela usuarios:', userError);
         
         // Fallback: buscar dados do Auth se não encontrar na tabela usuarios
-        const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.getUserById(userId);
+        const { data: authUser, error: authError } = await supabaseAdmin!.auth.admin.getUserById(userId);
         
         if (authError) {
           console.error('Erro ao buscar usuário no Supabase Auth:', authError);
@@ -362,10 +398,15 @@ export class AuthService {
   /**
    * Lista todos os usuários cadastrados
    */
-  static async listUsers() {
+  static async listUsers(): Promise<{ users: ListedUser[]; error: AuthError | null }> {
     try {
+      if (!supabaseAdmin) {
+        console.error('supabaseAdmin não configurado');
+        return { users: [], error: new AuthError('supabaseAdmin não configurado', 500) };
+      }
+
       // Buscar usuários da tabela usuarios
-      const { data: usuariosData, error: usuariosError } = await supabaseAdmin
+      const { data: usuariosData, error: usuariosError } = await supabaseAdmin!
         .from('usuarios')
         .select('*')
         .order('created_at', { ascending: false });
@@ -374,7 +415,7 @@ export class AuthService {
         console.error('Erro ao buscar usuários na tabela usuarios:', usuariosError);
         
         // Fallback: buscar do Supabase Auth se a tabela usuarios não estiver disponível
-        const { data, error } = await supabaseAdmin.auth.admin.listUsers();
+        const { data, error } = await supabaseAdmin!.auth.admin.listUsers();
         
         if (error) {
           console.error('Erro ao listar usuários do Auth:', error);
@@ -382,9 +423,9 @@ export class AuthService {
         }
 
         // Mapear os usuários do Auth para o formato esperado
-        const users = data.users.map(user => ({
+        const users: ListedUser[] = data.users.map(user => ({
           id: user.id,
-          email: user.email,
+          email: user.email || '',
           created_at: user.created_at,
           last_sign_in_at: user.last_sign_in_at,
           role: user.user_metadata?.role || null,
@@ -394,14 +435,14 @@ export class AuthService {
           funcao: user.user_metadata?.funcao || null,
           email_confirmed_at: user.email_confirmed_at,
           phone_confirmed_at: user.phone_confirmed_at,
-          banned_until: user.banned_until,
+          banned_until: (user as any).banned_until || user.user_metadata?.banned_until || null,
         }));
 
         return { users, error: null };
       }
 
       // Mapear dados da tabela usuarios para o formato esperado
-      const users = usuariosData.map(usuario => ({
+      const users: ListedUser[] = usuariosData.map(usuario => ({
         id: usuario.auth_user_id,
         email: usuario.email,
         created_at: usuario.created_at,
@@ -436,7 +477,7 @@ export class AuthService {
     }
 
     try {
-      const { data, error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+      const { data, error } = await supabaseAdmin!.auth.admin.updateUserById(userId, {
         password: newPassword
       });
 
@@ -455,9 +496,14 @@ export class AuthService {
   /**
    * Atualiza dados de um usuário
    */
-  static async updateUser(userId: string, userData: { email?: string; user_metadata?: any }) {
+  static async updateUser(userId: string, userData: { email?: string; user_metadata?: any }): Promise<{ success: boolean; user?: any; error?: AuthError | any | null }> {
     try {
-      const { data, error } = await supabaseAdmin.auth.admin.updateUserById(userId, userData);
+      if (!supabaseAdmin) {
+        console.error('supabaseAdmin não configurado');
+        return { success: false, error: new AuthError('supabaseAdmin não configurado', 500) };
+      }
+
+      const { data, error } = await supabaseAdmin!.auth.admin.updateUserById(userId, userData);
 
       if (error) {
         console.error('Erro ao atualizar usuário:', error);
@@ -484,8 +530,14 @@ export class AuthService {
    */
   static async blockUser(userId: string, duration?: string) {
     try {
-      const { data, error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-        ban_duration: duration || '24h'
+      if (!supabaseAdmin) {
+        console.error('supabaseAdmin não configurado');
+        return { success: false, error: new AuthError('supabaseAdmin não configurado', 500) };
+      }
+
+      const banned_until = duration ? new Date(Date.now() + (duration === '24h' ? 24 * 60 * 60 * 1000 : 0)).toISOString() : null;
+      const { data, error } = await supabaseAdmin!.auth.admin.updateUserById(userId, {
+        user_metadata: { banned_until }
       });
 
       if (error) {
@@ -505,8 +557,14 @@ export class AuthService {
    */
   static async unblockUser(userId: string) {
     try {
-      const { data, error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-        ban_duration: 'none'
+      if (!supabaseAdmin) {
+        console.error('supabaseAdmin não configurado');
+        return { success: false, error: new AuthError('supabaseAdmin não configurado', 500) };
+      }
+
+      const banned_until = null;
+      const { data, error } = await supabaseAdmin!.auth.admin.updateUserById(userId, {
+        user_metadata: { banned_until }
       });
 
       if (error) {
@@ -543,7 +601,7 @@ export class AuthService {
         }
 
         // Buscar na tabela usuarios para obter o auth_user_id
-        const { data: usuario, error: usuarioErr } = await admin
+        const { data: usuario, error: usuarioErr } = await admin!
           .from('usuarios')
           .select('id, auth_user_id')
           .eq('id', numericId)
@@ -559,7 +617,7 @@ export class AuthService {
 
       // Excluir do Supabase Auth (se tivermos auth_user_id)
       if (targetAuthId) {
-        const { error: deleteAuthErr } = await admin.auth.admin.deleteUser(targetAuthId);
+        const { error: deleteAuthErr } = await admin!.auth.admin.deleteUser(targetAuthId);
         if (deleteAuthErr) {
           console.warn('Falha ao excluir usuário no Auth, prosseguindo com remoção na tabela usuarios:', deleteAuthErr);
           // Não retornar erro aqui; seguimos para remover na tabela usuarios.
@@ -567,7 +625,7 @@ export class AuthService {
       }
 
       // Remover também da tabela usuarios (obrigatório para sucesso)
-      const deleteQuery = admin
+      const deleteQuery = admin!
         .from('usuarios')
         .delete();
 

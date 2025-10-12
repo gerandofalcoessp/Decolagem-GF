@@ -596,7 +596,7 @@ export default function Configuracoes() {
       // Criar descrição com detalhes da meta
       const mesesTexto = newMeta.mes.join(', ');
       const regionaisTexto = newMeta.regionais.join(', ');
-      const unit = newMeta.nome === 'Retenção' ? '%' : ((newMeta.nome === 'Atendidos Indiretos Decolagem' || newMeta.nome === 'Atendidos Diretos Decolagem' || newMeta.nome === 'Pessoas Atendidas') ? ' pessoas' : ' unidades');
+      const unit = newMeta.nome === 'Retenção' ? '%' : ((newMeta.nome === 'Pessoas Atendidas Decolagem' || newMeta.nome === 'Famílias Embarcadas Decolagem' || newMeta.nome === 'Pessoas Atendidas') ? ' pessoas' : (newMeta.nome === 'Diagnósticos Realizados' ? ' diagnósticos' : ' unidades'));
       const description = `Meta: ${targetValue}${unit} | Meses: ${mesesTexto} | Área: ${regionaisTexto}`;
       
       // Calcular deadline baseado no último mês selecionado
@@ -1716,7 +1716,7 @@ export default function Configuracoes() {
                   const targetValue = parseFloat(newMeta.quantidade);
                   const mesesTexto = newMeta.mes.join(', ');
                   const regionaisTexto = newMeta.regionais.join(', ');
-                  const unit = newMeta.nome === 'Retenção' ? '%' : ((newMeta.nome === 'Atendidos Indiretos Decolagem' || newMeta.nome === 'Atendidos Diretos Decolagem' || newMeta.nome === 'Pessoas Atendidas') ? ' pessoas' : ' unidades');
+                  const unit = newMeta.nome === 'Retenção' ? '%' : ((newMeta.nome === 'Pessoas Atendidas Decolagem' || newMeta.nome === 'Famílias Embarcadas Decolagem' || newMeta.nome === 'Pessoas Atendidas') ? ' pessoas' : (newMeta.nome === 'Diagnósticos Realizados' ? ' diagnósticos' : ' unidades'));
                   const description = `Meta: ${targetValue}${unit} | Meses: ${mesesTexto} | Área: ${regionaisTexto}`;
 
                   let ultimoMes: number;

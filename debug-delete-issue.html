@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug - Problema de Exclusão de Atividades</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .button:hover {
+            background: #0056b3;
+        }
+        .button.danger {
+            background: #dc3545;
+        }
+        .button.danger:hover {
+            background: #c82333;
+        }
+        .success {
+            color: #28a745;
+            background: #d4edda;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .error {
+            color: #dc3545;
+            background: #f8d7da;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .info {
+            color: #17a2b8;
+            background: #d1ecf1;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .logs {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            border-radius: 4px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .activity-item {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            background: #f9f9f9;
+        }
+        .activity-actions {
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug - Problema de Exclusão de Atividades</h1>
+    
+    <!-- Verificação de Autenticação -->
+    <div class="container">
+        <h2>🔐 Verificação de Autenticação</h2>
+        <button class="button" onclick="checkAuth()">Verificar Token</button>
+        <button class="button" onclick="testLogin()">Fazer Login de Teste</button>
+        <button class="button danger" onclick="clearAuth()">Limpar Autenticação</button>
+        <div id="auth-status"></div>
+    </div>
+
+    <!-- Lista de Atividades -->
+    <div class="container">
+        <h2>📋 Atividades Regionais</h2>
+        <button class="button" onclick="loadActivities()">Carregar Atividades</button>
+        <div id="activities-list"></div>
+    </div>
+
+    <!-- Teste de API -->
+    <div class="container">
+        <h2>🧪 Teste de API de Exclusão</h2>
+        <input type="text" id="activity-id" placeholder="ID da atividade para testar" style="padding: 8px; margin: 5px;">
+        <button class="button danger" onclick="testDeleteAPI()">Testar Exclusão</button>
+        <div id="api-test-result"></div>
+    </div>
+
+    <!-- Logs -->
+    <div class="container">
+        <h2>📝 Logs</h2>
+        <button class="button" onclick="clearLogs()">Limpar Logs</button>
+        <div id="logs" class="logs"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:4000';
+        
+        function log(message, type = 'info') {
+            const logsDiv = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.className = type;
+            logEntry.innerHTML = `[${timestamp}] ${message}`;
+            logsDiv.appendChild(logEntry);
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+        
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+        }
+        
+        function checkAuth() {
+            const authStatus = document.getElementById('auth-status');
+            const token = localStorage.getItem('auth_token');
+            const refreshToken = localStorage.getItem('refresh_token');
+            
+            log(`Verificando autenticação...`);
+            log(`Token: ${token ? 'Presente' : 'Ausente'}`, token ? 'success' : 'error');
+            log(`Refresh Token: ${refreshToken ? 'Presente' : 'Ausente'}`, refreshToken ? 'success' : 'error');
+            
+            if (token) {
+                log(`Token (primeiros 50 chars): ${token.substring(0, 50)}...`);
+                authStatus.innerHTML = `
+                    <div class="success">
+                        <p>✅ Token encontrado</p>
+                        <p><strong>Token:</strong> ${token.substring(0, 50)}...</p>
+                        <p><strong>Refresh Token:</strong> ${refreshToken ? 'Presente' : 'Ausente'}</p>
+                    </div>
+                `;
+            } else {
+                authStatus.innerHTML = '<div class="error">❌ Nenhum token encontrado</div>';
+            }
+        }
+        
+        async function testLogin() {
+            const authStatus = document.getElementById('auth-status');
+            authStatus.innerHTML = '<div class="info">🔄 Fazendo login...</div>';
+            
+            log('🔐 Iniciando teste de login...');
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: 'superadmin@decolagem.com',
+                        password: 'SuperAdmin123!'
+                    }),
+                });
+                
+                log(`Status da resposta: ${response.status}`);
+                
+                const data = await response.json();
+                log(`Dados recebidos: ${JSON.stringify(data, null, 2)}`);
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Erro no login');
+                }
+                
+                log('✅ Login bem-sucedido!', 'success');
+                
+                // Salvar token
+                if (data.session?.access_token) {
+                    localStorage.setItem('auth_token', data.session.access_token);
+                    localStorage.setItem('refresh_token', data.session.refresh_token);
+                    log('💾 Token salvo no localStorage', 'success');
+                    
+                    authStatus.innerHTML = `
+                        <div class="success">
+                            <p>✅ Login realizado com sucesso!</p>
+                            <p><strong>Token:</strong> ${data.session.access_token.substring(0, 50)}...</p>
+                        </div>
+                    `;
+                } else {
+                    throw new Error('Token não encontrado na resposta');
+                }
+                
+            } catch (error) {
+                log(`❌ Erro no login: ${error.message}`, 'error');
+                authStatus.innerHTML = `<div class="error">❌ Erro no login: ${error.message}</div>`;
+            }
+        }
+        
+        function clearAuth() {
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('refresh_token');
+            localStorage.removeItem('auth-storage');
+            log('🗑️ Autenticação limpa', 'info');
+            document.getElementById('auth-status').innerHTML = '<div class="info">🗑️ Autenticação limpa</div>';
+        }
+        
+        async function loadActivities() {
+            const activitiesList = document.getElementById('activities-list');
+            activitiesList.innerHTML = '<div class="info">🔄 Carregando atividades...</div>';
+            
+            log('📋 Carregando atividades...');
+            
+            try {
+                const token = localStorage.getItem('auth_token');
+                if (!token) {
+                    throw new Error('Token de autenticação não encontrado');
+                }
+                
+                const response = await fetch(`${API_BASE_URL}/api/regional-activities`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    },
+                });
+                
+                log(`Status da resposta: ${response.status}`);
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Erro ao carregar atividades');
+                }
+                
+                const activities = await response.json();
+                log(`✅ ${activities.length} atividades carregadas`, 'success');
+                
+                if (activities.length === 0) {
+                    activitiesList.innerHTML = '<div class="info">📭 Nenhuma atividade encontrada</div>';
+                    return;
+                }
+                
+                let html = '';
+                activities.slice(0, 5).forEach(activity => {
+                    html += `
+                        <div class="activity-item">
+                            <h4>${activity.atividade_label || activity.atividade}</h4>
+                            <p><strong>ID:</strong> ${activity.id}</p>
+                            <p><strong>Responsável:</strong> ${activity.responsavel_nome}</p>
+                            <p><strong>Data:</strong> ${new Date(activity.data_atividade).toLocaleDateString()}</p>
+                            <div class="activity-actions">
+                                <button class="button danger" onclick="testDeleteActivity('${activity.id}')">
+                                    🗑️ Testar Exclusão
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                activitiesList.innerHTML = html;
+                
+            } catch (error) {
+                log(`❌ Erro ao carregar atividades: ${error.message}`, 'error');
+                activitiesList.innerHTML = `<div class="error">❌ Erro: ${error.message}</div>`;
+            }
+        }
+        
+        async function testDeleteAPI() {
+            const activityId = document.getElementById('activity-id').value;
+            if (!activityId) {
+                alert('Por favor, insira um ID de atividade');
+                return;
+            }
+            
+            await testDeleteActivity(activityId);
+        }
+        
+        async function testDeleteActivity(activityId) {
+            const resultDiv = document.getElementById('api-test-result');
+            resultDiv.innerHTML = '<div class="info">🔄 Testando exclusão...</div>';
+            
+            log(`🗑️ Testando exclusão da atividade: ${activityId}`);
+            
+            try {
+                const token = localStorage.getItem('auth_token');
+                if (!token) {
+                    throw new Error('Token de autenticação não encontrado');
+                }
+                
+                const response = await fetch(`${API_BASE_URL}/api/regional-activities/${activityId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    },
+                });
+                
+                log(`Status da resposta DELETE: ${response.status}`);
+                
+                if (!response.ok) {
+                    let errorMessage = 'Erro ao deletar atividade';
+                    try {
+                        const errorData = await response.json();
+                        errorMessage = errorData.error || errorMessage;
+                    } catch (jsonError) {
+                        log('Erro ao fazer parse do JSON de erro', 'error');
+                    }
+                    throw new Error(errorMessage);
+                }
+                
+                // Tentar fazer parse da resposta
+                let result = null;
+                try {
+                    result = await response.json();
+                    log(`✅ Atividade deletada com sucesso: ${JSON.stringify(result)}`, 'success');
+                } catch (jsonError) {
+                    log('✅ Atividade deletada com sucesso (sem JSON de resposta)', 'success');
+                }
+                
+                resultDiv.innerHTML = `
+                    <div class="success">
+                        <p>✅ Atividade ${activityId} deletada com sucesso!</p>
+                        ${result ? `<pre>${JSON.stringify(result, null, 2)}</pre>` : ''}
+                    </div>
+                `;
+                
+                // Recarregar lista de atividades
+                setTimeout(() => loadActivities(), 1000);
+                
+            } catch (error) {
+                log(`❌ Erro ao deletar atividade: ${error.message}`, 'error');
+                resultDiv.innerHTML = `<div class="error">❌ Erro: ${error.message}</div>`;
+            }
+        }
+        
+        // Verificar autenticação ao carregar a página
+        window.onload = function() {
+            checkAuth();
+        };
+    </script>
+</body>
+</html>

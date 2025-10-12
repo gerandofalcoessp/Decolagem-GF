@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import { getSupabaseForToken, getUserFromToken } from '../services/supabaseClient';
 import { logger } from '../utils/logger';
+import { cacheMiddleware, invalidateCacheMiddleware } from '../middlewares/cacheMiddleware';
 
 const router = Router();
 
 // CRUD básico de members sob RLS
-router.get('/', async (req, res) => {
+router.get('/', cacheMiddleware({ ttl: 300 }), async (req, res) => {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
   const s = getSupabaseForToken(token);
@@ -17,7 +18,7 @@ router.get('/', async (req, res) => {
 });
 
 // Retorna o registro do member do usuário autenticado
-router.get('/me', async (req, res) => {
+router.get('/me', cacheMiddleware({ ttl: 180 }), async (req, res) => {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
   const s = getSupabaseForToken(token);
@@ -31,7 +32,7 @@ router.get('/me', async (req, res) => {
   res.json({ data });
 });
 
-router.post('/', async (req, res) => {
+router.post('/', invalidateCacheMiddleware(['members']), async (req, res) => {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
   const s = getSupabaseForToken(token);
@@ -75,9 +76,14 @@ router.post('/', async (req, res) => {
     };
     
     logger.info('Admin creating member for another user', {
-      adminUserId: user.id,
-      adminEmail: user.email,
-      newMemberData: payload
+      userId: user.id,
+      action: 'create_member_admin',
+      resource: 'members',
+      context: {
+        adminUserId: user.id,
+        adminEmail: user.email,
+        newMemberData: payload
+      }
     });
   } else {
     // Usuário não tem member ainda - criar member para ele mesmo
@@ -85,7 +91,11 @@ router.post('/', async (req, res) => {
     
     logger.info('User creating their own member record', {
       userId: user.id,
-      userEmail: user.email
+      action: 'create_member_self',
+      resource: 'members',
+      context: {
+        userEmail: user.email
+      }
     });
   }
 
@@ -110,7 +120,7 @@ router.post('/', async (req, res) => {
   res.status(201).json({ data });
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', invalidateCacheMiddleware(['members']), async (req, res) => {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
   const s = getSupabaseForToken(token);
@@ -132,10 +142,14 @@ router.put('/:id', async (req, res) => {
     .eq('id', id);
 
   if (checkError) {
-    logger.error('Error checking member existence', {
-      memberId: id,
+    logger.error('Error checking existing member', {
       userId: user.id,
-      error: checkError.message
+      action: 'update_member',
+      resource: 'members',
+      error: {
+        name: checkError.name || 'CheckError',
+        message: checkError.message
+      }
     });
     return res.status(400).json({ error: checkError.message });
   }
@@ -146,9 +160,16 @@ router.put('/:id', async (req, res) => {
 
   if (existingMember.length > 1) {
     logger.error('Multiple members found with same ID', {
-      memberId: id,
       userId: user.id,
-      count: existingMember.length
+      action: 'update_member',
+      resource: 'members',
+      context: {
+        count: existingMember.length
+      },
+      error: {
+        name: 'MultipleMembers',
+        message: `Multiple members found with ID: ${id}`
+      }
     });
     return res.status(400).json({ error: 'Múltiplos membros encontrados com o mesmo ID' });
   }
@@ -163,10 +184,16 @@ router.put('/:id', async (req, res) => {
     
   if (error) {
     logger.error('Error updating member', {
-      memberId: id,
       userId: user.id,
-      error: error.message,
-      payload
+      action: 'update_member',
+      resource: 'members',
+      context: {
+        payload
+      },
+      error: {
+        name: error.name || 'UpdateError',
+        message: error.message
+      }
     });
     return res.status(400).json({ error: error.message });
   }
@@ -177,9 +204,16 @@ router.put('/:id', async (req, res) => {
 
   if (data.length > 1) {
     logger.error('Multiple members updated', {
-      memberId: id,
       userId: user.id,
-      count: data.length
+      action: 'update_member',
+      resource: 'members',
+      context: {
+        count: data.length
+      },
+      error: {
+        name: 'MultipleUpdates',
+        message: `Multiple members updated for ID: ${id}`
+      }
     });
     return res.status(400).json({ error: 'Múltiplos membros foram atualizados' });
   }
@@ -195,7 +229,7 @@ router.put('/:id', async (req, res) => {
   res.json({ data: data[0] });
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', invalidateCacheMiddleware(['members']), async (req, res) => {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
   const s = getSupabaseForToken(token);
@@ -228,6 +262,17 @@ router.delete('/:id', async (req, res) => {
   }
 
   // Log de sucesso
+  logger.info('Member deleted successfully', {
+    userId: user.id,
+    action: 'delete_member',
+    resource: 'members',
+    context: {
+      adminUserId: user.id,
+      deletedMemberId: id,
+      userEmail: user.email
+    }
+  });
+
   logger.logMemberAction('delete_member', user.id, {
     deletedMemberId: data.id,
     deletedMemberName: data.name,

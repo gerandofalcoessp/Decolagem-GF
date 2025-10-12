@@ -25,7 +25,7 @@ const upload = multer({
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Tipo de arquivo não permitido'), false);
+      cb(null as any, false);
     }
   }
 });
@@ -73,13 +73,215 @@ router.get('/', async (req, res) => {
       .order('created_at', { ascending: false });
 
     if (error) {
-      logger.error('Error fetching instituicoes', { error: error.message, userId: user.id });
+      logger.error('Error fetching instituicoes', { 
+        userId: user.id,
+        action: 'fetch_instituicoes',
+        resource: 'instituicoes',
+        error: {
+          name: error.name || 'FetchError',
+          message: error.message,
+          stack: error.stack
+        }
+      });
       return res.status(400).json({ error: error.message });
     }
 
     res.json({ data });
-  } catch (err) {
-    logger.error('Unexpected error in GET /instituicoes', { error: err });
+  } catch (err: any) {
+    logger.error('Unexpected error in GET /instituicoes', { 
+      action: 'fetch_instituicoes',
+      resource: 'instituicoes',
+      error: {
+        name: err.name || 'UnexpectedError',
+        message: err.message || 'Unknown error',
+        stack: err.stack
+      }
+    });
+    res.status(500).json({ error: 'internal_server_error' });
+  }
+});
+
+// GET /instituicoes/stats - Estatísticas das instituições
+router.get('/stats', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
+    const s = getSupabaseForToken(token);
+    
+    if (!s) {
+      return res.status(500).json({ error: 'supabase_client_unavailable' });
+    }
+
+    const user = await getUserFromToken(token);
+    if (!user) {
+      return res.status(401).json({ error: 'unauthorized' });
+    }
+
+    // Contagem total de instituições
+    const { count: totalInstituicoes, error: countError } = await s
+      .from('instituicoes')
+      .select('*', { count: 'exact', head: true });
+
+    if (countError) {
+      logger.error('Error fetching total count', { 
+        userId: user.id,
+        action: 'get_stats',
+        resource: 'instituicoes',
+        error: {
+          name: countError.name || 'CountError',
+          message: countError.message,
+          stack: countError.stack
+        }
+      });
+      return res.status(400).json({ error: countError.message });
+    }
+
+    // Contagem por programa
+    const { data: programData, error: programError } = await s
+      .from('instituicoes')
+      .select('programa')
+      .not('programa', 'is', null);
+
+    if (programError) {
+      logger.error('Error fetching programa data', { 
+        userId: user.id,
+        action: 'get_stats',
+        resource: 'instituicoes',
+        error: {
+          name: programError.name || 'ProgramError',
+          message: programError.message,
+          stack: programError.stack
+        }
+      });
+      return res.status(400).json({ error: programError.message });
+    }
+
+    // Contagem por regional (área)
+    const { data: regionalData, error: regionalError } = await s
+      .from('instituicoes')
+      .select('regional')
+      .not('regional', 'is', null);
+
+    if (regionalError) {
+      logger.error('Error fetching regional data', { 
+        userId: user.id,
+        action: 'get_stats',
+        resource: 'instituicoes',
+        error: {
+          name: regionalError.name || 'RegionalError',
+          message: regionalError.message,
+          stack: regionalError.stack
+        }
+      });
+      return res.status(400).json({ error: regionalError.message });
+    }
+
+    // Processar contagens por programa
+    const programCounts = programData.reduce((acc: Record<string, number>, item) => {
+      const programa = item.programa;
+      acc[programa] = (acc[programa] || 0) + 1;
+      return acc;
+    }, {});
+
+    // Processar contagens por regional
+    const regionalCounts = regionalData.reduce((acc: Record<string, number>, item) => {
+      const regional = item.regional;
+      acc[regional] = (acc[regional] || 0) + 1;
+      return acc;
+    }, {});
+
+    // Contagens específicas para ONGs Maras e Decolagem
+    const ongsMaras = programCounts['as_maras'] || 0;
+    const ongsDecolagem = programCounts['decolagem'] || 0;
+    const ongsMicrocredito = programCounts['microcredito'] || 0;
+
+    // Buscar dados de famílias embarcadas das atividades registradas
+    const { data: atividadesFamiliasData, error: atividadesError } = await s
+      .from('regional_activities')
+      .select('quantidade')
+      .eq('atividade_label', 'Famílias Embarcadas Decolagem')
+      .eq('status', 'ativo');
+
+    let familiasEmbarcadas = 0;
+    if (!atividadesError && atividadesFamiliasData) {
+      // Somar todas as quantidades das atividades registradas
+      familiasEmbarcadas = atividadesFamiliasData.reduce((total, atividade) => {
+        const quantidade = parseInt(atividade.quantidade) || 0;
+        return total + quantidade;
+      }, 0);
+    }
+
+    // Buscar dados de diagnósticos realizados das atividades registradas
+    const { data: atividadesDiagnosticosData, error: diagnosticosError } = await s
+      .from('regional_activities')
+      .select('quantidade')
+      .eq('atividade_label', 'Diagnósticos Realizados')
+      .eq('status', 'ativo');
+
+    let diagnosticosRealizados = 0;
+    if (!diagnosticosError && atividadesDiagnosticosData) {
+      // Somar todas as quantidades das atividades registradas
+      diagnosticosRealizados = atividadesDiagnosticosData.reduce((total, atividade) => {
+        const quantidade = parseInt(atividade.quantidade) || 0;
+        return total + quantidade;
+      }, 0);
+    }
+
+    // Buscar dados de Ligas Maras Formadas das atividades registradas
+    const { data: atividadesLigasMarasData, error: ligasMarasError } = await s
+      .from('regional_activities')
+      .select('quantidade')
+      .eq('atividade_label', 'Ligas Maras Formadas')
+      .eq('status', 'ativo');
+
+    let ligasMarasFormadas = 0;
+    if (!ligasMarasError && atividadesLigasMarasData) {
+      // Somar todas as quantidades das atividades registradas
+      ligasMarasFormadas = atividadesLigasMarasData.reduce((total, atividade) => {
+        const quantidade = parseInt(atividade.quantidade) || 0;
+        return total + quantidade;
+      }, 0);
+    }
+
+    const stats = {
+      total: totalInstituicoes || 0,
+      porPrograma: {
+        as_maras: ongsMaras,
+        decolagem: ongsDecolagem,
+        microcredito: ongsMicrocredito
+      },
+      porRegional: regionalCounts,
+      resumo: {
+        ongsMaras,
+        ongsDecolagem,
+        ongsMicrocredito,
+        totalPorArea: Object.keys(regionalCounts).length,
+        familiasEmbarcadas,
+        diagnosticosRealizados,
+        ligasMarasFormadas
+      }
+    };
+
+    logger.info('Institution stats retrieved', {
+      userId: user.id,
+      action: 'get_stats',
+      resource: 'instituicoes',
+      context: {
+        total: stats.total
+      }
+    });
+
+    res.json({ data: stats });
+  } catch (err: any) {
+    logger.error('Unexpected error in GET /instituicoes/stats', { 
+      action: 'get_stats',
+      resource: 'instituicoes',
+      error: {
+        name: err.name || 'UnexpectedError',
+        message: err.message || 'Unknown error',
+        stack: err.stack
+      }
+    });
     res.status(500).json({ error: 'internal_server_error' });
   }
 });
@@ -107,13 +309,33 @@ router.get('/:id', async (req, res) => {
       .single();
 
     if (error) {
-      logger.error('Error fetching instituicao', { error: error.message, userId: user.id, instituicaoId: req.params.id });
+      logger.error('Error fetching instituicao', { 
+        userId: user.id,
+        action: 'fetch_instituicao',
+        resource: 'instituicoes',
+        context: {
+          instituicaoId: req.params.id
+        },
+        error: {
+          name: error.name || 'FetchError',
+          message: error.message,
+          stack: error.stack
+        }
+      });
       return res.status(404).json({ error: 'instituicao_not_found' });
     }
 
     res.json({ data });
-  } catch (err) {
-    logger.error('Unexpected error in GET /instituicoes/:id', { error: err });
+  } catch (err: any) {
+    logger.error('Unexpected error in GET /instituicoes/:id', { 
+      action: 'fetch_instituicao',
+      resource: 'instituicoes',
+      error: {
+        name: err.name || 'UnexpectedError',
+        message: err.message || 'Unknown error',
+        stack: err.stack
+      }
+    });
     res.status(500).json({ error: 'internal_server_error' });
   }
 });
@@ -156,22 +378,41 @@ router.post('/', async (req, res) => {
 
     if (error) {
       logger.error('Error creating instituicao', { 
-        error: error.message, 
-        userId: user.id, 
-        payload 
+        userId: user.id,
+        action: 'create_instituicao',
+        resource: 'instituicoes',
+        context: {
+          payload
+        },
+        error: {
+          name: error.name || 'CreateError',
+          message: error.message,
+          stack: error.stack
+        }
       });
       return res.status(400).json({ error: error.message });
     }
 
-    logger.info('Instituicao created successfully', {
+    logger.info('Instituicao created successfully', { 
       userId: user.id,
-      instituicaoId: data.id,
-      instituicaoNome: data.nome
+      action: 'create_instituicao',
+      resource: 'instituicoes',
+      context: {
+        instituicaoId: data.id
+      }
     });
 
     res.status(201).json({ data });
-  } catch (err) {
-    logger.error('Unexpected error in POST /instituicoes', { error: err });
+  } catch (err: any) {
+    logger.error('Unexpected error in POST /instituicoes', { 
+      action: 'create_instituicao',
+      resource: 'instituicoes',
+      error: {
+        name: err.name || 'UnexpectedError',
+        message: err.message || 'Unknown error',
+        stack: err.stack
+      }
+    });
     res.status(500).json({ error: 'internal_server_error' });
   }
 });
@@ -215,23 +456,42 @@ router.put('/:id', async (req, res) => {
 
     if (error) {
       logger.error('Error updating instituicao', { 
-        error: error.message, 
-        userId: user.id, 
-        instituicaoId,
-        updateData: instituicaoData 
+        userId: user.id,
+        action: 'update_instituicao',
+        resource: 'instituicoes',
+        context: {
+          instituicaoId,
+          updateData: instituicaoData
+        },
+        error: {
+          name: error.name || 'UpdateError',
+          message: error.message,
+          stack: error.stack
+        }
       });
       return res.status(400).json({ error: error.message });
     }
 
-    logger.info('Instituicao updated successfully', {
+    logger.info('Instituicao updated successfully', { 
       userId: user.id,
-      instituicaoId: data.id,
-      instituicaoNome: data.nome
+      action: 'update_instituicao',
+      resource: 'instituicoes',
+      context: {
+        instituicaoId: data.id
+      }
     });
 
     res.json({ data });
-  } catch (err) {
-    logger.error('Unexpected error in PUT /instituicoes/:id', { error: err });
+  } catch (err: any) {
+    logger.error('Unexpected error in PUT /instituicoes/:id', { 
+      action: 'update_instituicao',
+      resource: 'instituicoes',
+      error: {
+        name: err.name || 'UnexpectedError',
+        message: err.message || 'Unknown error',
+        stack: err.stack
+      }
+    });
     res.status(500).json({ error: 'internal_server_error' });
   }
 });
@@ -272,22 +532,41 @@ router.delete('/:id', async (req, res) => {
 
     if (error) {
       logger.error('Error deleting instituicao', { 
-        error: error.message, 
-        userId: user.id, 
-        instituicaoId 
+        userId: user.id,
+        action: 'delete_instituicao',
+        resource: 'instituicoes',
+        context: {
+          instituicaoId
+        },
+        error: {
+          name: error.name || 'DeleteError',
+          message: error.message,
+          stack: error.stack
+        }
       });
       return res.status(400).json({ error: error.message });
     }
 
-    logger.info('Instituicao deleted successfully', {
+    logger.info('Instituicao deleted successfully', { 
       userId: user.id,
-      instituicaoId,
-      instituicaoNome: existingInstituicao.nome
+      action: 'delete_instituicao',
+      resource: 'instituicoes',
+      context: {
+        instituicaoId
+      }
     });
 
     res.json({ message: 'instituicao_deleted_successfully' });
-  } catch (err) {
-    logger.error('Unexpected error in DELETE /instituicoes/:id', { error: err });
+  } catch (err: any) {
+    logger.error('Unexpected error in DELETE /instituicoes/:id', { 
+      action: 'delete_instituicao',
+      resource: 'instituicoes',
+      error: {
+        name: err.name || 'UnexpectedError',
+        message: err.message || 'Unknown error',
+        stack: err.stack
+      }
+    });
     res.status(500).json({ error: 'internal_server_error' });
   }
 });
@@ -329,26 +608,43 @@ router.patch('/:id/evasao', async (req, res) => {
 
     if (error) {
       logger.error('Error registering evasao', { 
-        error: error.message, 
-        userId: user.id, 
-        instituicaoId,
-        motivo,
-        dataEvasao
+        userId: user.id,
+        action: 'register_evasao',
+        resource: 'instituicoes',
+        context: {
+          instituicaoId,
+          motivo,
+          dataEvasao
+        },
+        error: {
+          name: error.name || 'EvasaoError',
+          message: error.message,
+          stack: error.stack
+        }
       });
       return res.status(400).json({ error: error.message });
     }
 
-    logger.info('Evasao registered successfully', {
+    logger.info('Evasao registered successfully', { 
       userId: user.id,
-      instituicaoId: data.id,
-      instituicaoNome: data.nome,
-      motivo,
-      dataEvasao
+      action: 'register_evasao',
+      resource: 'instituicoes',
+      context: {
+        instituicaoId: data.id
+      }
     });
 
     res.json({ data });
-  } catch (err) {
-    logger.error('Unexpected error in PATCH /instituicoes/:id/evasao', { error: err });
+  } catch (err: any) {
+    logger.error('Unexpected error in PATCH /instituicoes/:id/evasao', { 
+      action: 'register_evasao',
+      resource: 'instituicoes',
+      error: {
+        name: err.name || 'UnexpectedError',
+        message: err.message || 'Unknown error',
+        stack: err.stack
+      }
+    });
     res.status(500).json({ error: 'internal_server_error' });
   }
 });
@@ -402,10 +698,17 @@ router.get('/:id/documentos/:filename', async (req, res) => {
     if (storageError) {
       logger.warn('File not found in storage, serving simulated content', {
         userId: user.id,
-        instituicaoId,
-        filename,
-        storagePath,
-        error: storageError.message
+        action: 'get_document',
+        resource: 'instituicao',
+        context: {
+          instituicaoId,
+          filename,
+          storagePath
+        },
+        error: {
+          name: 'StorageError',
+          message: storageError.message
+        }
       });
       
       // Se o arquivo não existe no Storage, retornar conteúdo simulado como fallback
@@ -478,9 +781,12 @@ router.get('/:id/documentos/:filename', async (req, res) => {
     // Se chegou aqui, o arquivo foi encontrado no Storage
     logger.info('File found in storage', {
       userId: user.id,
-      instituicaoId,
-      filename,
-      storagePath
+      action: 'get_document',
+      resource: 'instituicao',
+      context: {
+        instituicaoId,
+        filename
+      }
     });
     
     // Determinar o tipo de conteúdo baseado na extensão do arquivo
@@ -526,14 +832,24 @@ router.get('/:id/documentos/:filename', async (req, res) => {
 
     logger.info('Document served from storage', {
       userId: user.id,
-      instituicaoId,
-      filename,
-      download: download === 'true',
-      size: buffer.length
+      action: 'serve_document',
+      resource: 'instituicao',
+      context: {
+        instituicaoId,
+        filename
+      }
     });
 
-  } catch (err) {
-    logger.error('Unexpected error in GET /instituicoes/:id/documentos/:filename', { error: err });
+  } catch (err: any) {
+    logger.error('Unexpected error in GET /instituicoes/:id/documentos/:filename', { 
+      action: 'serve_document',
+      resource: 'instituicoes',
+      error: {
+        name: err.name || 'UnexpectedError',
+        message: err.message || 'Unknown error',
+        stack: err.stack
+      }
+    });
     res.status(500).json({ error: 'internal_server_error' });
   }
 });
@@ -563,10 +879,13 @@ router.post('/:id/documentos', upload.array('files', 10), async (req, res) => {
     }
     
     logger.info('Multiple documents upload request', {
-      instituicaoId,
-      filesCount: files.length,
-      filenames: files.map(f => f.originalname),
-      userId: user.id
+      userId: user.id,
+      action: 'upload_documents',
+      resource: 'instituicao',
+      context: {
+        instituicaoId,
+        filesCount: files.length
+      }
     });
     
     // Verificar se a instituição existe
@@ -674,21 +993,31 @@ router.post('/:id/documentos', upload.array('files', 10), async (req, res) => {
         }
         
         logger.error('Database update error after multiple uploads', {
-          instituicaoId,
-          uploadedCount: novosDocumentos.length,
-          error: updateError.message,
-          userId: user.id
+          userId: user.id,
+          action: 'update_documents',
+          resource: 'instituicao',
+          context: {
+            instituicaoId,
+            uploadedCount: novosDocumentos.length
+          },
+          error: {
+            name: updateError.name || 'DatabaseError',
+            message: updateError.message,
+            stack: updateError.stack
+          }
         });
         return res.status(500).json({ error: 'Erro ao salvar informações dos documentos' });
       }
     }
     
     logger.info('Multiple documents upload completed', {
-      instituicaoId,
-      totalFiles: files.length,
-      successfulUploads: novosDocumentos.length,
-      errors: uploadErrors.length,
-      userId: user.id
+      userId: user.id,
+      action: 'upload_documents_completed',
+      resource: 'instituicao',
+      context: {
+        instituicaoId,
+        totalFiles: files.length
+      }
     });
     
     // Resposta com resumo dos uploads
@@ -704,106 +1033,17 @@ router.post('/:id/documentos', upload.array('files', 10), async (req, res) => {
     
     res.status(201).json(response);
     
-  } catch (err) {
-    logger.error('Unexpected error in POST /instituicoes/:id/documentos (multiple)', { error: err });
-    res.status(500).json({ error: 'Erro interno do servidor' });
-  }
-});
-
-// GET /instituicoes/stats - Obter estatísticas das instituições
-router.get('/stats', async (req, res) => {
-  try {
-    const authHeader = req.headers.authorization;
-    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
-    const s = getSupabaseForToken(token);
-    
-    if (!s) {
-      return res.status(500).json({ error: 'supabase_client_unavailable' });
-    }
-
-    const user = await getUserFromToken(token);
-    if (!user) {
-      return res.status(401).json({ error: 'unauthorized' });
-    }
-
-    // Contagem total de instituições
-    const { count: totalInstituicoes, error: totalError } = await s
-      .from('instituicoes')
-      .select('*', { count: 'exact', head: true });
-
-    if (totalError) {
-      logger.error('Error counting total instituicoes', { error: totalError.message, userId: user.id });
-      return res.status(400).json({ error: totalError.message });
-    }
-
-    // Contagem por programa
-    const { data: programData, error: programError } = await s
-      .from('instituicoes')
-      .select('programa')
-      .not('programa', 'is', null);
-
-    if (programError) {
-      logger.error('Error fetching programa data', { error: programError.message, userId: user.id });
-      return res.status(400).json({ error: programError.message });
-    }
-
-    // Contagem por regional (área)
-    const { data: regionalData, error: regionalError } = await s
-      .from('instituicoes')
-      .select('regional')
-      .not('regional', 'is', null);
-
-    if (regionalError) {
-      logger.error('Error fetching regional data', { error: regionalError.message, userId: user.id });
-      return res.status(400).json({ error: regionalError.message });
-    }
-
-    // Processar contagens por programa
-    const programCounts = programData.reduce((acc: Record<string, number>, item) => {
-      const programa = item.programa;
-      acc[programa] = (acc[programa] || 0) + 1;
-      return acc;
-    }, {});
-
-    // Processar contagens por regional
-    const regionalCounts = regionalData.reduce((acc: Record<string, number>, item) => {
-      const regional = item.regional;
-      acc[regional] = (acc[regional] || 0) + 1;
-      return acc;
-    }, {});
-
-    // Contagens específicas para ONGs Maras e Decolagem
-    const ongsMaras = programCounts['as_maras'] || 0;
-    const ongsDecolagem = programCounts['decolagem'] || 0;
-    const ongsMicrocredito = programCounts['microcredito'] || 0;
-
-    const stats = {
-      total: totalInstituicoes || 0,
-      porPrograma: {
-        as_maras: ongsMaras,
-        decolagem: ongsDecolagem,
-        microcredito: ongsMicrocredito
-      },
-      porRegional: regionalCounts,
-      resumo: {
-        ongsMaras,
-        ongsDecolagem,
-        ongsMicrocredito,
-        totalPorArea: Object.keys(regionalCounts).length
+  } catch (err: any) {
+    logger.error('Unexpected error in POST /instituicoes/:id/documentos (multiple)', { 
+      action: 'upload_documents',
+      resource: 'instituicoes',
+      error: {
+        name: err.name || 'UnexpectedError',
+        message: err.message || 'Unknown error',
+        stack: err.stack
       }
-    };
-
-    logger.info('Institution stats retrieved', { 
-      total: stats.total, 
-      ongsMaras, 
-      ongsDecolagem, 
-      userId: user.id 
     });
-
-    res.json({ data: stats });
-  } catch (err) {
-    logger.error('Unexpected error in GET /instituicoes/stats', { error: err });
-    res.status(500).json({ error: 'internal_server_error' });
+    res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
 

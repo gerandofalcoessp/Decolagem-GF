@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { getSupabaseForToken, getUserFromToken } from '../services/supabaseClient';
+import { logger } from '../utils/logger';
 
 const router = Router();
 
@@ -9,7 +10,12 @@ router.get('/', async (req, res) => {
   const s = getSupabaseForToken(token);
   if (!s) return res.status(500).json({ error: 'supabase_client_unavailable' });
   const { data, error } = await s.from('files').select('*');
-  if (error) return res.status(400).json({ error: error.message });
+  if (error) {
+    logger.logDatabaseError('Error fetching files', {
+      error: error.message
+    });
+    return res.status(400).json({ error: error.message });
+  }
   res.json({ data });
 });
 
@@ -29,7 +35,22 @@ router.post('/', async (req, res) => {
   const payload = { ...body, member_id: me.id };
 
   const { data, error } = await s.from('files').insert(payload).select('*').single();
-  if (error) return res.status(400).json({ error: error.message });
+  if (error) {
+    logger.logDatabaseError('Error creating file', {
+      error: error.message,
+      userId: user.id,
+      memberId: me.id,
+      payload
+    });
+    return res.status(400).json({ error: error.message });
+  }
+  
+  logger.info('File created successfully', {
+    fileId: data.id,
+    userId: user.id,
+    memberId: me.id
+  });
+  
   res.status(201).json({ data });
 });
 
@@ -39,7 +60,19 @@ router.delete('/:id', async (req, res) => {
   const s = getSupabaseForToken(token);
   if (!s) return res.status(500).json({ error: 'supabase_client_unavailable' });
   const { data, error } = await s.from('files').delete().eq('id', req.params.id).select('*').single();
-  if (error) return res.status(400).json({ error: error.message });
+  if (error) {
+    logger.logDatabaseError('Error deleting file', {
+      error: error.message,
+      fileId: req.params.id
+    });
+    return res.status(400).json({ error: error.message });
+  }
+  
+  logger.info('File deleted successfully', {
+    fileId: req.params.id,
+    deletedData: data
+  });
+  
   res.json({ data });
 });
 

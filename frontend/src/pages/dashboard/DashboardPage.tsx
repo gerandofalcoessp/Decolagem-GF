@@ -137,7 +137,7 @@ export default function DashboardPage() {
 
   const totalMaras = programStats.asMaras.ligasTotal * 6;
   const totalMarasMeta = programStats.asMaras.ligasMeta * 6;
-  // Ajuste de terminologia: Atendidos Indiretos Decolagem (antes: Pessoas Atendidas)
+  // Ajuste de terminologia: Pessoas Atendidas Decolagem (antes: Pessoas Atendidas)
   const pessoasAtendidas = programStats.decolagem.familias * 4;
   const pessoasAtendidasMeta = programStats.decolagem.familiasMeta * 4;
 
@@ -165,7 +165,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats Cards - Primeira linha */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <StatsCard
           title="Total Participantes"
           value="0"
@@ -189,13 +189,6 @@ export default function DashboardPage() {
           trend={stats.metas.percentual >= 70 ? 'up' : 'down'}
           change={stats.metas.percentual}
           color="secondary"
-        />
-        <StatsCard
-          title="Valor Microcrédito"
-          value={`R$ ${programStats.microcredito.valorTotal.toLocaleString()}`}
-          icon={CreditCard}
-          trend="up"
-          color="warning"
         />
       </div>
 
@@ -262,7 +255,7 @@ export default function DashboardPage() {
           color="secondary"
         />
         <StatsCard
-          title="Atendidos Indiretos Decolagem"
+          title="Pessoas Atendidas Decolagem"
           value={pessoasAtendidas.toString()}
           icon={Users}
           trend={calcPercent(pessoasAtendidas, pessoasAtendidasMeta) >= 80 ? 'up' : 'down'}

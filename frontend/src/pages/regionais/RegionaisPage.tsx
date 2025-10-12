@@ -16,6 +16,7 @@ import { useNavigate } from 'react-router-dom';
 import { useUserStats } from '@/hooks/useUserStats';
 import { useRegionalData } from '@/hooks/useRegionalData';
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { RegistrarAtividadeModal } from '@/components/modals/RegistrarAtividadeModal';
 import { NotificationModal } from '@/components/modals/NotificationModal';
 
@@ -188,6 +189,7 @@ const estadosPorRegiao: Record<string, string[]> = {
 
 export default function RegionaisPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data: userStats, loading: statsLoading, error: statsError } = useUserStats();
   const { data: regionaisDataRaw, loading: regionaisLoading, error: regionaisError } = useRegionalData();
   
@@ -300,6 +302,9 @@ export default function RegionaisPage() {
 
       const result = await response.json();
       console.log('Atividade regional salva com sucesso:', result);
+      
+      // Invalidar cache das atividades regionais para atualizar a lista
+      queryClient.invalidateQueries({ queryKey: ['regional-activities'] });
       
       // Fechar o modal após salvar
       setShowRegistrarModal(false);
@@ -543,7 +548,7 @@ export default function RegionaisPage() {
               <Button 
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm py-2"
                 size="sm"
-                onClick={() => navigate('/regionais/gestao-atividades')}
+                onClick={() => navigate(`/regionais/gestao-atividades?regional=${mapRegionalId(regional.id)}`)}
               >
                 <Activity className="h-4 w-4 mr-1" />
                 Todas as Atividades

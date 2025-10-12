@@ -15,6 +15,7 @@ vi.mock('../../services/authService', () => ({
     isAuthenticated: vi.fn(),
     getToken: vi.fn(),
     clearAuthData: vi.fn(),
+    mapToFrontendUser: vi.fn(),
   },
 }));
 
@@ -63,6 +64,7 @@ describe('AuthStore', () => {
       };
 
       mockAuthService.login.mockResolvedValue(mockResponse);
+      mockAuthService.mapToFrontendUser.mockReturnValue(mockUser);
 
       const { result } = renderHook(() => useAuthStore());
 
@@ -75,6 +77,7 @@ describe('AuthStore', () => {
       expect(result.current.isLoading).toBe(false);
       expect(result.current.error).toBeNull();
       expect(mockAuthService.login).toHaveBeenCalledWith('test@example.com', 'password123');
+      expect(mockAuthService.mapToFrontendUser).toHaveBeenCalledWith(mockResponse);
     });
 
     it('deve tratar erro de login', async () => {
@@ -204,10 +207,13 @@ describe('AuthStore', () => {
         role: 'membro' as const,
       };
 
-      mockAuthService.getCurrentUser.mockResolvedValue({
+      const mockResponse = {
         success: true,
         user: mockUser,
-      });
+      };
+
+      mockAuthService.getCurrentUser.mockResolvedValue(mockResponse);
+      mockAuthService.mapToFrontendUser.mockReturnValue(mockUser);
 
       const { result } = renderHook(() => useAuthStore());
 
@@ -218,6 +224,7 @@ describe('AuthStore', () => {
       expect(result.current.user).toEqual(mockUser);
       expect(result.current.isAuthenticated).toBe(true);
       expect(result.current.error).toBeNull();
+      expect(mockAuthService.mapToFrontendUser).toHaveBeenCalledWith(mockResponse);
     });
 
     it('deve tratar usuário não autenticado', async () => {

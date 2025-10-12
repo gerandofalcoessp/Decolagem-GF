@@ -11,6 +11,7 @@ const __dirname = path.dirname(__filename)
 import { authMiddleware } from './middlewares/authMiddleware';
 import { supabaseAdmin, supabaseConfigStatus } from './services/supabaseClient';
 import { supabase } from './services/supabaseClient';
+import { requestLogger } from './middleware/requestLogger';
 
 // Routers
 import authRouter from './routes/auth';
@@ -28,7 +29,7 @@ import regionalsRouter from './routes/regionals';
 import instituicoesRouter from './routes/instituicoes';
 
 const app = express();
-const PORT = process.env.PORT || 4000;
+const PORT = Number(process.env.PORT) || 3002;
 const CORS_ORIGIN = process.env.CORS_ORIGIN ?? 'http://localhost:3001';
 
 // Configuração de CORS mais flexível para desenvolvimento
@@ -51,6 +52,7 @@ const corsOptions = {
 app.use(helmet());
 app.use(cors(corsOptions));
 app.use(express.json());
+app.use(requestLogger); // Adicionar logging estruturado
 app.use(morgan('dev'));
 // Rate limiting mais flexível para desenvolvimento
 const rateLimitConfig = process.env.NODE_ENV === 'production' 

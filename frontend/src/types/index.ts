@@ -48,7 +48,8 @@ export type TipoAtividade =
   | 'familia_atendida'
   // Novos tipos adicionados
   | 'ligas_maras_formadas'
-  | 'atendidos_diretos_decolagem';
+  | 'familias_embarcadas_decolagem'
+  | 'diagnosticos_realizados';
 
 // Interface para ONG
 export interface ONG {

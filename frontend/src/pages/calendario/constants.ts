@@ -31,7 +31,8 @@ export const ATIVIDADE_OPTIONS: { value: TipoAtividade; label: string }[] = [
   { value: 'encontro_lider_maras', label: 'Encontro Líder Maras' },
   // Acrescentados
   { value: 'ligas_maras_formadas', label: 'Ligas Maras Formadas' },
-  { value: 'atendidos_diretos_decolagem', label: 'Atendidos Diretos Decolagem' },
+  { value: 'familias_embarcadas_decolagem', label: 'Famílias Embarcadas Decolagem' },
+  { value: 'diagnosticos_realizados', label: 'Diagnósticos Realizados' },
   // Opção de customização
   { value: 'outros', label: 'OUTRA' },
 ];
@@ -51,7 +52,8 @@ export const TYPE_COLOR_CLASSES: Record<TipoAtividade, string> = {
   familia_atendida: 'bg-emerald-600',
   // Novos tipos
   ligas_maras_formadas: 'bg-fuchsia-600',
-  atendidos_diretos_decolagem: 'bg-sky-600',
+  familias_embarcadas_decolagem: 'bg-sky-600',
+  diagnosticos_realizados: 'bg-orange-600',
 };
 
 export const REGIONAL_COLOR_CLASSES: Record<string, string> = {

@@ -9,6 +9,12 @@ interface LogEntry {
   userId?: string;
   action?: string;
   resource?: string;
+  duration?: string;
+  ip?: string;
+  userAgent?: string;
+  method?: string;
+  url?: string;
+  statusCode?: number;
   error?: {
     name: string;
     message: string;
@@ -45,7 +51,7 @@ class Logger {
   }
 
   private formatLog(entry: LogEntry): string {
-    const { timestamp, level, message, context, userId, action, resource, error } = entry;
+    const { timestamp, level, message, context, userId, action, resource, error, duration, ip, userAgent, method, url, statusCode } = entry;
     
     const logData = {
       timestamp,
@@ -54,6 +60,12 @@ class Logger {
       ...(userId && { userId }),
       ...(action && { action }),
       ...(resource && { resource }),
+      ...(duration && { duration }),
+      ...(ip && { ip }),
+      ...(userAgent && { userAgent }),
+      ...(method && { method }),
+      ...(url && { url }),
+      ...(statusCode && { statusCode }),
       ...(context && { context }),
       ...(error && { error })
     };
@@ -147,6 +159,90 @@ class Logger {
       userId,
       action: 'security_event',
       context
+    });
+  }
+
+  // Novos métodos para logging de requisições HTTP
+  public logHttpRequest(method: string, url: string, statusCode: number, duration: string, userId?: string, ip?: string, userAgent?: string): void {
+    this.info(`HTTP ${method} ${url}`, {
+      method,
+      url,
+      statusCode,
+      duration,
+      userId,
+      ip,
+      userAgent,
+      action: 'http_request'
+    });
+  }
+
+  public logHttpError(method: string, url: string, statusCode: number, error: Error, userId?: string, ip?: string): void {
+    this.error(`HTTP ${method} ${url} failed`, {
+      method,
+      url,
+      statusCode,
+      userId,
+      ip,
+      action: 'http_error',
+      error: {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      }
+    });
+  }
+
+  // Métodos para logging de operações de banco de dados
+  public logDatabaseOperation(operation: string, table: string, duration?: string, userId?: string, context?: Record<string, any>): void {
+    this.debug(`Database ${operation} on ${table}`, {
+      action: 'database_operation',
+      resource: table,
+      duration,
+      userId,
+      context: {
+        operation,
+        ...context
+      }
+    });
+  }
+
+  public logDatabaseError(operation: string, table: string, error: Error, userId?: string): void {
+    this.error(`Database ${operation} on ${table} failed`, {
+      action: 'database_error',
+      resource: table,
+      userId,
+      error: {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      }
+    });
+  }
+
+  // Métodos para logging de autenticação
+  public logAuthEvent(event: 'login' | 'logout' | 'token_refresh' | 'auth_failure', userId?: string, ip?: string, context?: Record<string, any>): void {
+    const level = event === 'auth_failure' ? 'warn' : 'info';
+    this.log(level, `Authentication event: ${event}`, {
+      action: 'auth_event',
+      userId,
+      ip,
+      context: {
+        event,
+        ...context
+      }
+    });
+  }
+
+  // Métodos para logging de cache
+  public logCacheOperation(operation: 'hit' | 'miss' | 'set' | 'invalidate', key: string, duration?: string): void {
+    this.debug(`Cache ${operation}: ${key}`, {
+      action: 'cache_operation',
+      resource: 'cache',
+      duration,
+      context: {
+        operation,
+        key
+      }
     });
   }
 }

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { X, FileDown, FileText, Image as ImageIcon, Users, MapPin, Calendar as CalendarIcon, Edit, Trash2 } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import LazyImage from '@/components/ui/LazyImage';
 import { format } from 'date-fns';
 import { ATIVIDADE_OPTIONS } from '@/pages/calendario/constants';
 import type { Atividade } from '@/types';
@@ -194,7 +195,13 @@ export default function GestaoAtividadesModal({ isOpen, onClose, events, onEdit,
                           {(evt.evidencias ?? []).map((ev) => (
                             <div key={ev.id} className="w-20 h-20 rounded-lg border overflow-hidden bg-gray-100">
                               {ev.url ? (
-                                <img src={ev.url} alt={ev.filename} className="w-full h-full object-cover" />
+                                <LazyImage 
+                                  src={ev.url} 
+                                  alt={ev.filename} 
+                                  className="w-full h-full object-cover" 
+                                  width={80}
+                                  height={80}
+                                />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs">{ev.filename}</div>
                               )}

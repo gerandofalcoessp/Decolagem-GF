@@ -61,6 +61,7 @@ export interface InstituicaoStats {
     ongsDecolagem: number;
     ongsMicrocredito: number;
     totalPorArea: number;
+    familiasEmbarcadas: number;
   };
 }
 

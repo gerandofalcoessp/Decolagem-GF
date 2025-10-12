@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { X, CalendarPlus } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
+import LazyImage from '../../../components/ui/LazyImage';
 import type { TipoAtividade, Programa, Evidencia, EventForm, Regional } from '../../../types';
 import ConflictBanner from './ConflictBanner';
 import { REGIONAL_STATES, STATE_LABELS, PROGRAMA_LABELS } from '../constants';
@@ -476,7 +477,13 @@ export default function EventModal({
               {form.evidencias.slice(0,2).map((ev) => (
                 <div key={ev.id} className="border rounded-xl p-2 flex items-center space-x-2">
                   {ev.url ? (
-                    <img src={ev.url} alt={ev.filename} className="w-16 h-16 object-cover rounded-md" />
+                    <LazyImage 
+                      src={ev.url} 
+                      alt={ev.filename} 
+                      className="w-16 h-16 object-cover rounded-md" 
+                      width={64}
+                      height={64}
+                    />
                   ) : (
                     <div className="w-16 h-16 bg-gray-100 rounded-md" />
                   )}

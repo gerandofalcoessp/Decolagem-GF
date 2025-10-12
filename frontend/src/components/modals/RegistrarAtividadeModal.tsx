@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, Activity, Crown, Shield, UserCheck, Users } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import LazyImage from '@/components/ui/LazyImage';
 import type { TipoAtividade, Programa, Regional, Evidencia } from '@/types';
 import { REGIONAL_LABELS, ATIVIDADE_OPTIONS, PROGRAMA_LABELS, REGIONAL_STATES, STATE_LABELS } from '@/pages/calendario/constants';
 import { useUsersWithMembers } from '@/hooks/useApi';
@@ -67,24 +68,37 @@ export function RegistrarAtividadeModal({
   const { getRegionalAliases } = useRegionalData();
 
   // User filtering logic similar to EventModal
-  const normalize = (str: string) => str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const normalize = (str: string) => str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
   
   const REGIONAL_ALIASES: Record<string, string[]> = {
     nacional: ['nacional'],
-    centroeste: ['centroeste', 'centro-oeste', 'centrooeste'],
+    centroeste: ['centroeste', 'centro-oeste', 'centrooeste', 'r. centro-oeste', 'r.centro-oeste'],
+    centro_oeste: ['centroeste', 'centro-oeste', 'centrooeste', 'r. centro-oeste', 'r.centro-oeste'],
     nordeste: ['nordeste'],
     nordeste_2: ['nordeste2', 'nordeste 2', 'nordeste_2', 'r.nordeste2', 'r. nordeste 2', 'r.nordeste 2'],
     norte: ['norte'],
     rj: ['rj', 'riodejaneiro', 'rio de janeiro', 'r. rio de janeiro', 'r.rio de janeiro'],
-    sp: ['sp', 'saopaulo'],
+    sp: ['sp', 'saopaulo', 'são paulo', 'sao paulo', 'r. sao paulo', 'r.sao paulo', 'r. são paulo', 'r.são paulo'],
     sul: ['sul'],
+    mg_es: ['mg/es', 'mg es', 'mges', 'minas gerais', 'espirito santo', 'r. mg/es', 'r.mg/es'],
   };
 
   const filteredUsers = (usersWithMembers || [])
-    .filter((u: any) => {
+    .filter((user: any) => {
       // Usar tanto area quanto regional do usuário, e também verificar user_metadata
-      const userRegional = u.regional || u.area || u.user_metadata?.regional || '';
-      const aff = normalize(userRegional);
+      const userRegional = user.regional || user.area || user.user_metadata?.regional || '';
+      const normalizedUserRegional = normalize(userRegional);
+      
+      // Debug logs para Centro-Oeste
+      if (form.regional === 'centroeste' || userRegional.toLowerCase().includes('centro')) {
+        console.log('🔍 DEBUG Centro-Oeste:', {
+          formRegional: form.regional,
+          userRegional,
+          normalizedUserRegional,
+          userId: user.id,
+          userName: user.nome || user.email
+        });
+      }
       
       // Mapear a regional do form para as aliases corretas
       let regionalKey = form.regional;
@@ -93,8 +107,22 @@ export function RegistrarAtividadeModal({
       }
       
       const matchers = REGIONAL_ALIASES[regionalKey] || [];
-      const byRegional = matchers.some((m) => aff.includes(m));
-      const isNational = aff === 'nacional';
+      const byRegional = matchers.some((m) => normalizedUserRegional.includes(m));
+      const isNational = normalizedUserRegional === 'nacional';
+      
+      // Debug logs para Centro-Oeste
+      if (form.regional === 'centroeste') {
+        console.log('🔍 DEBUG Centro-Oeste Matching:', {
+          formRegional: form.regional,
+          regionalKey,
+          matchers,
+          byRegional,
+          userRegional,
+          normalizedUserRegional,
+          userId: user.id,
+          userName: user.nome || user.email
+        });
+      }
       
       // Usuários nacionais só aparecem na regional "nacional"
       if (form.regional === 'nacional') {
@@ -107,6 +135,19 @@ export function RegistrarAtividadeModal({
     .sort((a: any, b: any) => (
       (a.nome || a.email || '').localeCompare(b.nome || b.email || '')
     ));
+
+  // Debug log para verificar todos os usuários carregados
+  useEffect(() => {
+    if (form.regional === 'centroeste' && usersWithMembers) {
+      console.log('🔍 DEBUG Todos os usuários carregados:', usersWithMembers.map(u => ({
+        id: u.id,
+        nome: u.nome || u.email,
+        regional: u.regional,
+        area: u.area,
+        user_metadata: u.user_metadata
+      })));
+    }
+  }, [form.regional, usersWithMembers]);
 
   // Reset form when modal opens
   useEffect(() => {
@@ -545,7 +586,13 @@ export function RegistrarAtividadeModal({
                 {form.evidencias.slice(0,5).map((ev) => (
                   <div key={ev.id} className="border rounded-xl p-2 flex items-center space-x-2">
                     {ev.url ? (
-                      <img src={ev.url} alt={ev.filename} className="w-16 h-16 object-cover rounded-md" />
+                      <LazyImage 
+                        src={ev.url} 
+                        alt={ev.filename} 
+                        className="w-16 h-16 object-cover rounded-md" 
+                        width={64}
+                        height={64}
+                      />
                     ) : (
                       <div className="w-16 h-16 bg-gray-100 rounded-md" />
                     )}

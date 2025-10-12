@@ -21,6 +21,7 @@ import {
   Building2,
   Hash
 } from 'lucide-react';
+import LazyImage from '@/components/ui/LazyImage';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import * as XLSX from "xlsx";
@@ -31,6 +32,7 @@ import ConfirmModal from '@/components/modals/ConfirmModal';
 import { useRegionalActivities, useUsersWithMembers } from '@/hooks/useApi';
 import { useAuthStore } from '@/store/authStore';
 import { REGIONAL_LABELS, ATIVIDADE_OPTIONS } from '@/pages/calendario/constants';
+import RegionalActivityService from '@/services/regionalActivityService';
 import type { Atividade } from '@/types';
 
 // Mapeamento de estados por regional
@@ -108,20 +110,24 @@ function EvidenceModal({ isOpen, onClose, evidences, activityTitle }: EvidenceMo
                       selectedIndex === index ? 'border-blue-500' : 'border-gray-200'
                     }`}
                   >
-                    <img
+                    <LazyImage
                       src={evidence.url}
                       alt={evidence.filename}
                       className="w-full h-full object-cover"
+                      width={80}
+                      height={80}
                     />
                   </button>
                 ))}
               </div>
               
               <div className="bg-gray-50 rounded-xl p-4">
-                <img
+                <LazyImage
                   src={evidences[selectedIndex].url}
                   alt={evidences[selectedIndex].filename}
                   className="w-full max-h-96 object-contain rounded-lg"
+                  width={600}
+                  height={384}
                 />
                 <p className="text-sm text-gray-600 mt-2 text-center">
                   {evidences[selectedIndex].filename}
@@ -267,10 +273,15 @@ export default function GestaoAtividadesRegionaisPage() {
       const matchMes = filters.mes === 'todos' || filters.mes === mes;
       const matchAno = filters.ano === 'todos' || filters.ano === ano;
 
+      // Filtro por regional - aplicar apenas se uma regional específica foi selecionada
+      const regionalParam = searchParams.get('regional');
+      const matchRegional = !regionalParam || regionalParam === 'todas' || 
+        activity.regional === regionalParam;
+
       return matchSearch && matchTipo && matchEstado && matchResponsavel && 
-             matchMes && matchAno;
+             matchMes && matchAno && matchRegional;
     });
-  }, [activities, filters]);
+  }, [activities, filters, searchParams]);
 
   // Estatísticas
   const stats = useMemo(() => {
@@ -366,11 +377,16 @@ export default function GestaoAtividadesRegionaisPage() {
     if (!activityToDelete) return;
     
     try {
-      // Implementar lógica de exclusão
-      console.log('Excluir atividade:', activityToDelete);
-      refetch();
+      // Chamar o serviço para deletar a atividade
+      await RegionalActivityService.deleteActivity(activityToDelete);
+      
+      // Atualizar a lista de atividades imediatamente
+      await refetch();
+      
+      console.log('✅ Atividade excluída com sucesso:', activityToDelete);
     } catch (error) {
-      console.error('Erro ao excluir atividade:', error);
+      console.error('❌ Erro ao excluir atividade:', error);
+      // Aqui você pode adicionar uma notificação de erro se necessário
     } finally {
       setShowConfirmModal(false);
       setActivityToDelete(null);

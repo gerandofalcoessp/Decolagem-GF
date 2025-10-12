@@ -2,6 +2,8 @@ import { Router } from 'express';
 import multer from 'multer';
 import { getSupabaseForToken, getUserFromToken, supabaseAdmin } from '../services/supabaseClient';
 import { AuthService } from '../services/authService';
+import { cacheMiddleware, invalidateCacheMiddleware } from '../middlewares/cacheMiddleware';
+import { logger } from '../utils/logger';
 
 const router = Router();
 
@@ -22,13 +24,13 @@ const upload = multer({
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Tipo de arquivo não permitido'), false);
+      cb(new Error('Tipo de arquivo não permitido') as any, false);
     }
   }
 });
 
 // GET - Listar atividades regionais
-router.get('/', async (req, res) => {
+router.get('/', cacheMiddleware({ ttl: 180 }), async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
     const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
@@ -181,13 +183,18 @@ router.get('/', async (req, res) => {
 
     res.json(mappedData);
   } catch (err) {
-    console.error('Erro interno:', err);
+    logger.error('Error fetching regional activities', {
+      error: err instanceof Error ? err.message : 'Unknown error',
+      stack: err instanceof Error ? err.stack : undefined,
+      userRole,
+      userRegional: mappedUserRegional
+    });
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
 
 // POST - Criar nova atividade regional
-router.post('/', upload.array('evidencias', 2), async (req, res) => {
+router.post('/', upload.array('evidencias', 2), invalidateCacheMiddleware(['regional-activities']), async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
     const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
@@ -314,11 +321,33 @@ router.post('/', upload.array('evidencias', 2), async (req, res) => {
           .remove([evidence.storagePath]);
       }
       
+      logger.logDatabaseError('Failed to create regional activity', {
+        error: error.message,
+        userId: user.id,
+        memberId: member.id,
+        payload: { ...payload, evidences: evidences.length }
+      });
+      
       return res.status(400).json({ error: error.message });
     }
 
+    logger.info('Regional activity created successfully', {
+      activityId: data.id,
+      userId: user.id,
+      memberId: member.id,
+      programa: payload.programa,
+      regional: payload.regional,
+      evidencesCount: evidences.length
+    });
+
     res.status(201).json({ data });
   } catch (err) {
+    logger.error('Error creating regional activity', {
+      error: err instanceof Error ? err.message : 'Unknown error',
+      stack: err instanceof Error ? err.stack : undefined,
+      userId: user?.id,
+      memberId: member?.id
+    });
     res.status(500).json({ error: 'internal_server_error' });
   }
 });
@@ -421,7 +450,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // PUT - Atualizar atividade regional com arquivos
-router.put('/:id/with-files', upload.array('evidencias', 2), async (req, res) => {
+router.put('/:id/with-files', upload.array('evidencias', 2), invalidateCacheMiddleware(['regional-activities']), async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
     const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
@@ -432,8 +461,10 @@ router.put('/:id/with-files', upload.array('evidencias', 2), async (req, res) =>
     const body = req.body || {};
     const files = req.files as Express.Multer.File[] || [];
     
-    console.log('🔄 Dados recebidos para atualização com arquivos:', JSON.stringify(body, null, 2));
-    console.log('📁 Arquivos recebidos:', files.length);
+    logger.info('Dados recebidos para atualização com arquivos', {
+      body: JSON.stringify(body, null, 2),
+      filesCount: files.length
+    });
     
     // Processar evidências existentes
     let existingEvidencias: any[] = [];
@@ -441,7 +472,7 @@ router.put('/:id/with-files', upload.array('evidencias', 2), async (req, res) =>
       try {
         existingEvidencias = JSON.parse(body.evidencias);
       } catch (e) {
-        console.warn('Erro ao parsear evidências existentes:', e);
+        logger.warn('Erro ao parsear evidências existentes:', e);
       }
     } else if (Array.isArray(body.evidencias)) {
       existingEvidencias = body.evidencias;
@@ -550,16 +581,23 @@ router.put('/:id/with-files', upload.array('evidencias', 2), async (req, res) =>
       return res.status(400).json({ error: error.message });
     }
     
-    console.log('✅ Atividade atualizada com sucesso (com arquivos):', data);
+    logger.info('Atividade atualizada com sucesso (com arquivos)', {
+      activityId: id,
+      data: data
+    });
     res.json({ data });
   } catch (err) {
-    console.error('❌ Erro interno ao atualizar atividade com arquivos:', err);
+    logger.error('Erro interno ao atualizar atividade com arquivos', {
+      error: err instanceof Error ? err.message : 'Unknown error',
+      stack: err instanceof Error ? err.stack : undefined,
+      activityId: req.params.id
+    });
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
 
 // PUT - Atualizar atividade regional
-router.put('/:id', async (req, res) => {
+router.put('/:id', invalidateCacheMiddleware(['regional-activities']), async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
     const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
@@ -569,7 +607,9 @@ router.put('/:id', async (req, res) => {
     const id = req.params.id;
     const body = req.body || {};
     
-    console.log('🔄 Dados recebidos para atualização:', JSON.stringify(body, null, 2));
+    logger.info('Dados recebidos para atualização', {
+      body: JSON.stringify(body, null, 2)
+    });
     
     // Mapear campos do frontend para o formato do banco
     const payload: any = {};
@@ -628,33 +668,47 @@ router.put('/:id', async (req, res) => {
     delete payload.id;
     delete payload.created_at;
     
-    console.log('💾 Payload final para atualização:', JSON.stringify(payload, null, 2));
+    logger.info('Payload final para atualização', {
+      payload: JSON.stringify(payload, null, 2),
+      activityId: id
+    });
 
     const { data, error } = await s.from('regional_activities').update(payload).eq('id', id).select('*').single();
     
     if (error) {
-      console.error('❌ Erro ao atualizar atividade:', error);
+      logger.logDatabaseError('Erro ao atualizar atividade', {
+        error: error.message,
+        activityId: id,
+        payload
+      });
       return res.status(400).json({ error: error.message });
     }
     
-    console.log('✅ Atividade atualizada com sucesso:', data);
+    logger.info('Atividade atualizada com sucesso', {
+      activityId: id,
+      data: data
+    });
     res.json({ data });
   } catch (err) {
-    console.error('❌ Erro interno ao atualizar atividade:', err);
+    logger.error('Erro interno ao atualizar atividade', {
+      error: err instanceof Error ? err.message : 'Unknown error',
+      stack: err instanceof Error ? err.stack : undefined,
+      activityId: req.params.id
+    });
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
 
 // DELETE - Deletar atividade regional
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', invalidateCacheMiddleware(['regional-activities']), async (req, res) => {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
   const s = getSupabaseForToken(token);
   if (!s) return res.status(500).json({ error: 'supabase_client_unavailable' });
   
-  const { data, error } = await s.from('regional_activities').delete().eq('id', req.params.id).select('*').single();
+  const { data, error } = await s.from('regional_activities').delete().eq('id', req.params.id).select('*');
   if (error) return res.status(400).json({ error: error.message });
-  res.json({ data });
+  res.json({ success: true, data: data || [] });
 });
 
 export default router;
