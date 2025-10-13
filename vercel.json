@@ -1,9 +1,10 @@
 {
+  "functions": {
+    "api/*.js": {
+      "runtime": "@vercel/node"
+    }
+  },
   "rewrites": [
-    {
-      "source": "/health",
-      "destination": "/api/health"
-    },
     {
       "source": "/(.*)",
       "destination": "/frontend/dist/$1"
