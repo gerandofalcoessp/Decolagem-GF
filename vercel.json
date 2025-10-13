@@ -1,14 +1,10 @@
 {
   "version": 2,
   "name": "decolagem-gf",
+  "buildCommand": "cd frontend && npm run build",
+  "outputDirectory": "frontend/dist",
+  "installCommand": "npm install && cd frontend && npm install",
   "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
-    },
     {
       "src": "api/*.js",
       "use": "@vercel/node"
