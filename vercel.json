@@ -11,11 +11,5 @@
       "src": "/(.*)",
       "dest": "/frontend/dist/$1"
     }
-  ],
-  "env": {
-    "NODE_ENV": "production"
-  },
-  "buildCommand": "cd frontend && npm install && npm run build",
-  "outputDirectory": "frontend/dist",
-  "installCommand": "echo 'Skip install - using buildCommand'"
+  ]
 }
