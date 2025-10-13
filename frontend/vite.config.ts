@@ -5,6 +5,7 @@ import path from 'path'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  root: '.', // Definir explicitamente o root
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -36,6 +37,7 @@ export default defineConfig({
       },
     },
     rollupOptions: {
+      input: path.resolve(__dirname, 'index.html'), // Especificar explicitamente o input
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom'],

@@ -1,19 +1,68 @@
-database/
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Development files
+*.log
+*.env.local
+*.env.development
+*.env.test
+
+# Build artifacts
+backend/dist/
+backend/build/
+
+# Testing
+coverage/
+*.test.js
+*.spec.js
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+
+# Documentation
+*.md
+!README.md
+
+# Scripts and utilities
 scripts/
 *.cjs
-*.md
-*.txt
-*.html
+*.mjs
+debug-*.js
+debug-*.html
+test-*.js
+test-*.html
+check-*.js
+fix-*.js
+investigate-*.js
+testar-*.js
+verificar-*.js
+
+# Database files
 *.sql
-test-*
-debug-*
-check-*
-fix-*
-create-*
-apply-*
-analyze-*
-verify-*
-investigate-*
-testar-*
-verificar-*
-diagnostico-*
+*.db
+*.sqlite
+
+# Docker
+Dockerfile
+docker-compose.yml
+
+# Backend source (only deploy compiled functions)
+backend/src/
+backend/tsconfig.json
+backend/jest.config.cjs
+
+# Husky and git hooks
+.husky/
+.git/

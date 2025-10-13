@@ -11,7 +11,7 @@
     "dev:backend": "cd backend && npm run start:dev",
     "dev:frontend": "cd frontend && npm run dev",
     "dev:mobile": "echo 'Mobile não configurado ainda'",
-    "build": "npm run build:backend && npm run build:frontend",
+    "build": "cd frontend && npm run build",
     "build:backend": "cd backend && npm run build",
     "build:frontend": "cd frontend && npm run build",
     "build:mobile": "echo 'Mobile não configurado ainda'",

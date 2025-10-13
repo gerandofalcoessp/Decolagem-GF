@@ -1,56 +1,39 @@
 {
   "version": 2,
+  "name": "decolagem-gf",
   "builds": [
     {
       "src": "frontend/package.json",
       "use": "@vercel/static-build",
       "config": {
-        "distDir": "frontend/dist"
+        "distDir": "dist"
       }
     }
   ],
   "functions": {
-    "api/health.js": {
-      "runtime": "nodejs18.x"
-    },
-    "api/test.js": {
-      "runtime": "nodejs18.x"
-    },
-    "api/index.js": {
-      "runtime": "nodejs18.x"
-    },
-    "api/users.js": {
+    "api/*.js": {
       "runtime": "nodejs18.x"
     }
   },
   "routes": [
     {
-      "src": "/api/health",
-      "dest": "/api/health.js"
-    },
-    {
-      "src": "/api/test",
-      "dest": "/api/test.js"
-    },
-    {
-      "src": "/api/users",
-      "dest": "/api/users.js"
-    },
-    {
-      "src": "/api",
-      "dest": "/api/index.js"
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
     },
     {
       "handle": "filesystem"
     },
     {
       "src": "/(.*)",
-      "dest": "/frontend/dist/$1"
+      "dest": "/index.html"
     }
   ],
   "env": {
     "SUPABASE_URL": "@supabase_url",
-    "SUPABASE_ANON_KEY": "@supabase_anon_key", 
+    "SUPABASE_ANON_KEY": "@supabase_anon_key",
     "SUPABASE_SERVICE_ROLE_KEY": "@supabase_service_role_key"
-  }
+  },
+  "installCommand": "cd frontend && npm install",
+  "buildCommand": "cd frontend && npm run build",
+  "outputDirectory": "frontend/dist"
 }

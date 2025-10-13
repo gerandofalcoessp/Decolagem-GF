@@ -36,6 +36,11 @@ export interface AuthError {
 
 export class AuthService {
   private static getAuthHeaders(): Record<string, string> {
+    // Verificar se estamos no ambiente do navegador para evitar problemas de hidratação
+    if (typeof window === 'undefined') {
+      return {};
+    }
+    
     const token =
       localStorage.getItem('auth_token') ||
       localStorage.getItem('access_token') ||
@@ -82,8 +87,8 @@ export class AuthService {
         throw new Error(data.error || 'Erro no login');
       }
 
-      // Salvar token no localStorage
-      if (data.session?.access_token) {
+      // Salvar token no localStorage (apenas no navegador)
+      if (typeof window !== 'undefined' && data.session?.access_token) {
         localStorage.setItem('auth_token', data.session.access_token);
         localStorage.setItem('refresh_token', data.session.refresh_token);
       }
@@ -99,6 +104,11 @@ export class AuthService {
    */
   static async logout(): Promise<void> {
     try {
+      // Verificar se estamos no navegador
+      if (typeof window === 'undefined') {
+        return;
+      }
+      
       const token = localStorage.getItem('auth_token');
       
       if (token) {
@@ -113,10 +123,12 @@ export class AuthService {
     } catch (error) {
       logger.error('Erro no logout:', error);
     } finally {
-      // Sempre limpar tokens locais
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('refresh_token');
-      localStorage.removeItem('auth-storage');
+      // Sempre limpar tokens locais (apenas no navegador)
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('auth-storage');
+      }
     }
   }
 
@@ -125,6 +137,11 @@ export class AuthService {
    */
   static async getCurrentUser(): Promise<LoginResponse | null> {
     try {
+      // Verificar se estamos no navegador
+      if (typeof window === 'undefined') {
+        return null;
+      }
+      
       logger.debug('🔍 AuthService: Verificando token no localStorage');
       const token = localStorage.getItem('auth_token');
       if (!token) {
@@ -271,6 +288,11 @@ export class AuthService {
    * Obtém o token de autenticação
    */
   static getToken(): string | null {
+    // Verificar se estamos no navegador
+    if (typeof window === 'undefined') {
+      return null;
+    }
+    
     return (
       localStorage.getItem('auth_token') ||
       localStorage.getItem('access_token') ||
@@ -282,6 +304,11 @@ export class AuthService {
    * Limpa dados de autenticação
    */
   static clearAuthData(): void {
+    // Verificar se estamos no navegador
+    if (typeof window === 'undefined') {
+      return;
+    }
+    
     localStorage.removeItem('auth_token');
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('auth-storage');
