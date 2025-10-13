@@ -20,6 +20,14 @@
       "dest": "/backend/src/server.ts"
     },
     {
+      "src": "/me",
+      "dest": "/backend/src/server.ts"
+    },
+    {
+      "src": "/supabase/status",
+      "dest": "/backend/src/server.ts"
+    },
+    {
       "src": "/(.*)",
       "dest": "/frontend/dist/$1"
     }
