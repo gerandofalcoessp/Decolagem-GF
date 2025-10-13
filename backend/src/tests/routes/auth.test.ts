@@ -1,13 +1,13 @@
 import request from 'supertest';
 import express from 'express';
 import cors from 'cors';
-import authRouter from '../../routes/auth';
-import { AuthService } from '../../services/authService';
-import { getUserFromToken } from '../../services/supabaseClient';
+import authRouter from '../../routes/auth.js';
+import { AuthService } from '../../services/authService.js';
+import { getUserFromToken } from '../../services/supabaseClient.js';
 import type { User, Session, AuthError } from '@supabase/supabase-js';
 
 // Mock do supabaseClient
-jest.mock('../../services/supabaseClient', () => ({
+jest.mock('../../services/supabaseClient.js', () => ({
   getUserFromToken: jest.fn(),
 }));
 
@@ -18,15 +18,16 @@ app.use(cors());
 app.use('/auth', authRouter);
 
 // Mock do AuthService
-jest.mock('../../services/authService', () => ({
+jest.mock('../../services/authService.js', () => ({
   AuthService: {
     signIn: jest.fn(),
     signUp: jest.fn(),
     signOut: jest.fn(),
-    getMemberData: jest.fn(),
     updatePassword: jest.fn(),
-    resetPassword: jest.fn(),
-  },
+    updateUser: jest.fn(),
+    getMemberData: jest.fn(),
+    listUsers: jest.fn(),
+  }
 }));
 
 // Helper para criar mock de User

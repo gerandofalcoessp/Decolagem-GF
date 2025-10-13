@@ -1,25 +1,24 @@
 {
   "version": 2,
+  "buildCommand": "npm run vercel-build",
   "builds": [
     {
-      "src": "package.json",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": ["dist/**"]
-      }
+      "src": "api/index.js",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/dist/server.js"
+      "dest": "/api/index.js"
     },
     {
-      "src": "/(.*)",
-      "dest": "/dist/server.js"
+      "src": "/health",
+      "dest": "/api/index.js"
     }
   ],
   "env": {
-    "NODE_ENV": "production"
+    "NODE_ENV": "production",
+    "CORS_ORIGIN": "https://decolagem-gf-frontend.vercel.app"
   }
 }

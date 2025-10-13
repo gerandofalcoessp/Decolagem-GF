@@ -1,6 +1,6 @@
 import 'dotenv/config';
-import { AuthService } from '../services/authService';
-import { supabaseAdmin } from '../services/supabaseClient';
+import { AuthService } from '../services/authService.js'
+import { supabaseAdmin } from '../services/supabaseClient.js'
 
 async function testRegisterValidation() {
   console.log('🔍 Testando validação de super admin na rota de registro...\n');

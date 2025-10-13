@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { supabaseAdmin } from '../services/supabaseClient';
+import { supabaseAdmin } from '../services/supabaseClient.js';
 
 async function createMemberEntriesForSuperAdmins() {
   console.log('🔧 Criando entradas na tabela members para super admins...\n');

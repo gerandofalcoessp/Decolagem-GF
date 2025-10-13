@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { supabaseAdmin } from '../services/supabaseClient';
+import { supabaseAdmin } from '../services/supabaseClient.js';
 import fs from 'fs';
 import path from 'path';
 

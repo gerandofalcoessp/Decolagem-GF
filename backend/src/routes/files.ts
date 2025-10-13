@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { getSupabaseForToken, getUserFromToken } from '../services/supabaseClient';
-import { logger } from '../utils/logger';
+import { getSupabaseForToken, getUserFromToken } from '../services/supabaseClient.js';
+import { logger } from '../utils/logger.js';
 
 const router = Router();
 
@@ -11,9 +11,7 @@ router.get('/', async (req, res) => {
   if (!s) return res.status(500).json({ error: 'supabase_client_unavailable' });
   const { data, error } = await s.from('files').select('*');
   if (error) {
-    logger.logDatabaseError('Error fetching files', {
-      error: error.message
-    });
+    logger.logDatabaseError('select', 'files', new Error(error.message));
     return res.status(400).json({ error: error.message });
   }
   res.json({ data });
@@ -36,19 +34,14 @@ router.post('/', async (req, res) => {
 
   const { data, error } = await s.from('files').insert(payload).select('*').single();
   if (error) {
-    logger.logDatabaseError('Error creating file', {
-      error: error.message,
-      userId: user.id,
-      memberId: me.id,
-      payload
-    });
+    logger.logDatabaseError('insert', 'files', new Error(error.message), user.id);
     return res.status(400).json({ error: error.message });
   }
   
   logger.info('File created successfully', {
-    fileId: data.id,
+    resource: 'files',
     userId: user.id,
-    memberId: me.id
+    context: { fileId: data.id, memberId: me.id }
   });
   
   res.status(201).json({ data });
@@ -61,16 +54,13 @@ router.delete('/:id', async (req, res) => {
   if (!s) return res.status(500).json({ error: 'supabase_client_unavailable' });
   const { data, error } = await s.from('files').delete().eq('id', req.params.id).select('*').single();
   if (error) {
-    logger.logDatabaseError('Error deleting file', {
-      error: error.message,
-      fileId: req.params.id
-    });
+    logger.logDatabaseError('delete', 'files', new Error(error.message));
     return res.status(400).json({ error: error.message });
   }
   
   logger.info('File deleted successfully', {
-    fileId: req.params.id,
-    deletedData: data
+    resource: 'files',
+    context: { fileId: req.params.id, deletedData: data }
   });
   
   res.json({ data });

@@ -1,9 +1,9 @@
-import { AuthService } from '../../services/authService';
-import { supabase, supabaseAdmin } from '../../services/supabaseClient';
+import { AuthService } from '../../services/authService.js';
+import { supabase, supabaseAdmin } from '../../services/supabaseClient.js';
 import type { User, Session, AuthError } from '@supabase/supabase-js';
 
 // Mock do supabase
-jest.mock('../../services/supabaseClient', () => ({
+jest.mock('../../services/supabaseClient.js', () => ({
   supabase: {
     auth: {
       signInWithPassword: jest.fn(),

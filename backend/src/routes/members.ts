@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { getSupabaseForToken, getUserFromToken } from '../services/supabaseClient';
-import { logger } from '../utils/logger';
-import { cacheMiddleware, invalidateCacheMiddleware } from '../middlewares/cacheMiddleware';
+import { getSupabaseForToken, getUserFromToken } from '../services/supabaseClient.js';
+import { logger } from '../utils/logger.js';
+import { cacheMiddleware, invalidateCacheMiddleware } from '../middlewares/cacheMiddleware.js';
 
 const router = Router();
 

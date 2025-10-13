@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getSupabaseForToken, getUserFromToken } from '../services/supabaseClient';
+import { getSupabaseForToken, getUserFromToken } from '../services/supabaseClient.js';
 
 const router = Router();
 

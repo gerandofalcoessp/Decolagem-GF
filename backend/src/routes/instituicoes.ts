@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { getSupabaseForToken, getUserFromToken } from '../services/supabaseClient';
-import { logger } from '../utils/logger';
+import { getSupabaseForToken, getUserFromToken } from '../services/supabaseClient.js';
+import { logger } from '../utils/logger.js';
 
 const router = Router();
 

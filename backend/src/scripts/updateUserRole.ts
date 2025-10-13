@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { supabaseAdmin } from '../services/supabaseClient';
+import { supabaseAdmin } from '../services/supabaseClient.js';
 
 async function updateUserRole(email: string, newRole: string) {
   if (!supabaseAdmin) {
