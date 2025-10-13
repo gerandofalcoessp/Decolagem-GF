@@ -170,9 +170,67 @@ export default function DashboardMetasPage() {
     return atividadeMatch && regionalMatch && equipeMatch && mesMatch && anoMatch;
   }) || [];
 
+  // Verificar se o filtro de mês resultou em dados vazios
+  const mesComDados = useMemo(() => {
+    if (filtroMes === 'todos') return true;
+    
+    console.log('=== DEBUG mesComDados ===');
+    console.log('filtroMes:', filtroMes);
+    console.log('metas:', metas);
+    
+    // Verificar se há metas para o mês selecionado
+    const metasDoMes = metas?.filter(meta => {
+      let mesMatch = false;
+      
+      if (meta.dataInicio) {
+        const date = new Date(meta.dataInicio);
+        if (!isNaN(date.getTime())) {
+          const mes = (date.getMonth() + 1).toString();
+          mesMatch = filtroMes === mes;
+          console.log(`Meta com dataInicio: ${meta.dataInicio}, mes extraído: ${mes}, filtroMes: ${filtroMes}, match: ${mesMatch}`);
+        }
+      } else if (meta.data_inicio) {
+        const date = new Date(meta.data_inicio);
+        if (!isNaN(date.getTime())) {
+          const mes = (date.getMonth() + 1).toString();
+          mesMatch = filtroMes === mes;
+          console.log(`Meta com data_inicio: ${meta.data_inicio}, mes extraído: ${mes}, filtroMes: ${filtroMes}, match: ${mesMatch}`);
+        }
+      } else if (meta.created_at) {
+        const date = new Date(meta.created_at);
+        if (!isNaN(date.getTime())) {
+          const mes = (date.getMonth() + 1).toString();
+          mesMatch = filtroMes === mes;
+          console.log(`Meta com created_at: ${meta.created_at}, mes extraído: ${mes}, filtroMes: ${filtroMes}, match: ${mesMatch}`);
+        }
+      }
+      
+      return mesMatch;
+    }) || [];
+    
+    console.log('metasDoMes encontradas:', metasDoMes);
+    console.log('mesComDados resultado:', metasDoMes.length > 0);
+    console.log('=== FIM DEBUG ===');
+    
+    return metasDoMes.length > 0;
+  }, [metas, filtroMes]);
+
   // Calcular estatísticas das metas filtradas
   const estatisticas = useMemo(() => {
+    console.log('=== DEBUG estatisticas ===');
+    console.log('filtroMes:', filtroMes);
+    console.log('mesComDados:', mesComDados);
+    console.log('metasFiltradas:', metasFiltradas);
+    
     if (!metasFiltradas) return { totalMetas: 0, metasConcluidas: 0, metasEmAndamento: 0, metasPendentes: 0 };
+    
+    // Se o mês selecionado não tem dados, retornar zeros
+    if (filtroMes !== 'todos' && !mesComDados) {
+      console.log('Retornando zeros porque mês não tem dados');
+      return { totalMetas: 0, metasConcluidas: 0, metasEmAndamento: 0, metasPendentes: 0 };
+    }
+    
+    console.log('Calculando estatísticas normais');
     
     // Se há filtro regional específico, usar dados reais do banco
     if (filtroRegional !== 'todos') {
@@ -203,17 +261,53 @@ export default function DashboardMetasPage() {
       };
     }
     
-    return {
+    const result = {
       totalMetas: metasFiltradas.length,
       metasConcluidas: metasFiltradas.filter(meta => meta.status === 'concluida' || meta.status === 'completed').length,
       metasEmAndamento: metasFiltradas.filter(meta => meta.status === 'em_andamento' || meta.status === 'in_progress').length,
       metasPendentes: metasFiltradas.filter(meta => meta.status === 'pendente' || meta.status === 'pending').length,
     };
-  }, [metasFiltradas, filtroRegional]);
+    
+    console.log('Resultado estatísticas:', result);
+    console.log('=== FIM DEBUG estatisticas ===');
+    
+    return result;
+  }, [metasFiltradas, filtroRegional, filtroMes, mesComDados]);
 
   // Calcular estatísticas de instituições filtradas
   const estatisticasInstituicoesFiltradas = useMemo(() => {
-    if (!statsInstituicoes || !atividadesRegionais) return null;
+    console.log('=== DEBUG estatisticasInstituicoesFiltradas ===');
+    console.log('filtroMes:', filtroMes);
+    console.log('mesComDados:', mesComDados);
+    console.log('statsInstituicoes:', statsInstituicoes);
+    console.log('atividadesRegionais:', atividadesRegionais);
+    
+    if (!statsInstituicoes || !atividadesRegionais) {
+      console.log('Retornando null - sem dados básicos');
+      return null;
+    }
+    
+    // Se o mês selecionado não tem dados, retornar zeros
+    if (filtroMes !== 'todos' && !mesComDados) {
+      console.log('Retornando zeros porque mês não tem dados');
+      const zerosResult = {
+        ...statsInstituicoes,
+        total: 0,
+        resumo: {
+          ...statsInstituicoes.resumo,
+          ongsMaras: 0,
+          ongsDecolagem: 0,
+          ongsMicrocredito: 0,
+          totalPorArea: 0,
+          familiasEmbarcadas: 0,
+          diagnosticosRealizados: 0,
+          ligasMarasFormadas: 0
+        }
+      };
+      console.log('Resultado zeros:', zerosResult);
+      console.log('=== FIM DEBUG estatisticasInstituicoesFiltradas ===');
+      return zerosResult;
+    }
     
     // Se não há filtro regional ou é "todos", retornar dados completos
     if (filtroRegional === 'todos') {
@@ -271,11 +365,53 @@ export default function DashboardMetasPage() {
         ligasMarasFormadas
       }
     };
-  }, [statsInstituicoes, filtroRegional, atividadesRegionais, instituicoes]);
+  }, [statsInstituicoes, filtroRegional, atividadesRegionais, instituicoes, filtroMes, mesComDados]);
 
   // Dados agrupados por área - Usar dados reais do banco para todas as regionais
   const dadosPorArea = useMemo(() => {
-    if (!atividadesRegionais) return [];
+    console.log('=== DEBUG dadosPorArea ===');
+    console.log('filtroMes:', filtroMes);
+    console.log('mesComDados:', mesComDados);
+    console.log('atividadesRegionais:', atividadesRegionais);
+    
+    if (!atividadesRegionais) {
+      console.log('Retornando [] - sem atividadesRegionais');
+      return [];
+    }
+    
+    // Se o mês selecionado não tem dados, retornar zeros
+    if (filtroMes !== 'todos' && !mesComDados) {
+      console.log('Retornando zeros porque mês não tem dados');
+      if (filtroRegional !== 'todos') {
+        const label = REGIONAL_LABELS[filtroRegional] || filtroRegional;
+        const zerosResult = [{
+          key: filtroRegional,
+          label,
+          totalMeta: 0,
+          totalAtual: 0,
+          progress: 0,
+          quantidadeMetas: 0,
+          color: REGIONAL_COLOR_CLASSES[filtroRegional] || 'bg-gray-200',
+        }];
+        console.log('Resultado zeros (regional específica):', zerosResult);
+        console.log('=== FIM DEBUG dadosPorArea ===');
+        return zerosResult;
+      } else {
+        // Retornar zeros para todas as regionais
+        const zerosResult = Object.keys(REGIONAL_LABELS).map(key => ({
+          key,
+          label: REGIONAL_LABELS[key],
+          totalMeta: 0,
+          totalAtual: 0,
+          progress: 0,
+          quantidadeMetas: 0,
+          color: REGIONAL_COLOR_CLASSES[key] || 'bg-gray-200',
+        }));
+        console.log('Resultado zeros (todas regionais):', zerosResult);
+        console.log('=== FIM DEBUG dadosPorArea ===');
+        return zerosResult;
+      }
+    }
     
     // Se um filtro regional específico está selecionado
       if (filtroRegional !== 'todos') {
@@ -548,6 +684,17 @@ export default function DashboardMetasPage() {
 
   // Dados agrupados por atividade - Usar dados reais do banco para todas as regionais
   const dadosPorAtividade = useMemo(() => {
+    console.log('=== DEBUG dadosPorAtividade ===');
+    console.log('filtroMes:', filtroMes);
+    console.log('mesComDados:', mesComDados);
+    
+    // Se o mês selecionado não tem dados, retornar array vazio
+    if (filtroMes !== 'todos' && !mesComDados) {
+      console.log('Retornando [] porque mês não tem dados');
+      console.log('=== FIM DEBUG dadosPorAtividade ===');
+      return [];
+    }
+    
     // Se um filtro regional específico está selecionado, mostrar apenas atividades com dados reais
     if (filtroRegional !== 'todos' && atividadesRegionais) {
       const atividadesDaRegional = atividadesRegionais.filter(atividade => {
@@ -707,26 +854,31 @@ export default function DashboardMetasPage() {
 
   // Adicionar useEffect para recarregar dados quando necessário
   useEffect(() => {
-    if (refetch) {
+    // Apenas recarregar se os dados não estão sendo carregados e se os filtros realmente mudaram
+    if (!loading && refetch) {
+      console.log('🔄 Recarregando metas devido a mudança de filtros');
       refetch();
     }
     // Recarregar atividades regionais quando filtros mudarem
-    if (refetchAtividades) {
+    if (!loadingAtividades && refetchAtividades) {
+      console.log('🔄 Recarregando atividades regionais devido a mudança de filtros');
       refetchAtividades();
     }
-  }, [filtroAtividade, filtroRegional, filtroEquipe, filtroMes, filtroAno, refetch, refetchAtividades]);
+  }, [filtroAtividade, filtroRegional, filtroEquipe, filtroMes, filtroAno, refetch, refetchAtividades, loading, loadingAtividades]);
 
-  // Atualização automática a cada 30 segundos para dados em tempo real
+  // Atualização automática a cada 10 minutos para dados em tempo real (reduzido de 5 minutos para evitar recarregamento excessivo)
   useEffect(() => {
     const interval = setInterval(() => {
       if (refetch && !loading) {
+        console.log('🔄 Atualização automática de metas (10 minutos)');
         refetch();
       }
       // Também atualizar atividades regionais
       if (refetchAtividades && !loadingAtividades) {
+        console.log('🔄 Atualização automática de atividades regionais (10 minutos)');
         refetchAtividades();
       }
-    }, 30000); // 30 segundos
+    }, 10 * 60 * 1000); // 10 minutos
 
     return () => clearInterval(interval);
   }, [refetch, loading, refetchAtividades, loadingAtividades]);

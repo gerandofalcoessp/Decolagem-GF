@@ -189,6 +189,9 @@ export const useRegionalActivities = () => {
     queryKey: ['regional-activities'],
     queryFn: fetchRegionalActivities,
     enabled: !!token,
+    staleTime: 5 * 60 * 1000, // 5 minutos - dados considerados frescos
+    gcTime: 10 * 60 * 1000, // 10 minutos de cache
+    refetchOnWindowFocus: false, // Não recarregar automaticamente ao focar na janela
   });
 
   return {
@@ -330,10 +333,10 @@ export function useGoals() {
       const { GoalService } = await import('@/services/goalService');
       return await GoalService.getGoals();
     },
-    staleTime: 0, // Dados sempre considerados obsoletos para atualizações em tempo real
-    gcTime: 1 * 60 * 1000, // 1 minuto de cache (reduzido de 10 minutos)
-    refetchOnWindowFocus: true, // Recarregar quando a janela receber foco
-    refetchOnMount: true, // Sempre recarregar ao montar o componente
+    staleTime: 5 * 60 * 1000, // 5 minutos - dados considerados frescos por mais tempo
+    gcTime: 10 * 60 * 1000, // 10 minutos de cache
+    refetchOnWindowFocus: false, // Não recarregar automaticamente ao focar na janela
+    refetchOnMount: false, // Não recarregar sempre ao montar se há dados em cache
   });
 
   return {

@@ -29,13 +29,13 @@ export function useInstituicoes() {
     fetchInstituicoes();
   }, [fetchInstituicoes]);
 
-  // Atualização automática a cada 30 segundos
+  // Atualização automática a cada 5 minutos (reduzido de 30 segundos)
   useEffect(() => {
     const interval = setInterval(() => {
       if (!loading) {
         fetchInstituicoes();
       }
-    }, 30000); // 30 segundos
+    }, 5 * 60 * 1000); // 5 minutos
 
     return () => clearInterval(interval);
   }, [fetchInstituicoes, loading]);
