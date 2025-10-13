@@ -8,7 +8,7 @@ import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
 
 import { useAuthActions } from '@/store/authStore';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
-import asMarasLogoPng from '@/assets/logos/logo as maras.png';
+import logoDecolagemPng from '@/assets/logos/Logo decolagem.png';
 
 const loginSchema = z.object({
   email: z
@@ -55,12 +55,12 @@ export default function LoginPage() {
     <main className="space-y-6" aria-labelledby="login-title">
       {/* Cabeçalho */}
       <div className="text-center">
-        {/* Logo As Maras */}
+        {/* Logo Decolagem */}
         <div className="mb-6 flex justify-center">
           <img 
-            src={asMarasLogoPng} 
-            alt="As Maras" 
-            className="w-20 h-20 object-contain"
+            src={logoDecolagemPng} 
+            alt="Decolagem" 
+            className="w-56 h-56 object-contain"
             style={{
               filter: 'brightness(0) saturate(100%) invert(18%) sepia(89%) saturate(2476%) hue-rotate(315deg) brightness(95%) contrast(95%)',
               WebkitFilter: 'brightness(0) saturate(100%) invert(18%) sepia(89%) saturate(2476%) hue-rotate(315deg) brightness(95%) contrast(95%)'
@@ -69,7 +69,7 @@ export default function LoginPage() {
         </div>
         
         <h2 id="login-title" className="text-3xl font-bold text-gray-900">
-          Gestão Decolagem / Maras
+          Programa de Superação da Pobreza
         </h2>
         <p className="mt-2 text-gray-600">
           Faça login para acessar o sistema
@@ -89,7 +89,6 @@ export default function LoginPage() {
             Email
           </label>
           <div className="relative">
-            <Mail aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
               {...register('email')}
               type="email"
@@ -99,7 +98,7 @@ export default function LoginPage() {
               spellCheck="false"
               aria-invalid={!!errors.email}
               aria-describedby={errors.email ? 'email-error' : undefined}
-              className={`input pl-10 ${errors.email ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}`}
+              className={`input ${errors.email ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}`}
               placeholder="seu@email.com"
               disabled={isLoading}
             />
@@ -115,7 +114,6 @@ export default function LoginPage() {
             Senha
           </label>
           <div className="relative">
-            <Lock aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
               {...register('password')}
               type={showPassword ? 'text' : 'password'}
@@ -123,7 +121,7 @@ export default function LoginPage() {
               autoComplete="current-password"
               aria-invalid={!!errors.password}
               aria-describedby={errors.password ? 'password-error' : undefined}
-              className={`input pl-10 pr-10 ${errors.password ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}`}
+              className={`input pr-10 ${errors.password ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}`}
               placeholder="Sua senha"
               disabled={isLoading}
             />

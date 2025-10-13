@@ -2,8 +2,8 @@ interface AuthLayoutProps {
   children: React.ReactNode;
 }
 
-// Importar a logo das Maras
-const asMarasLogo = new URL('../../assets/logos/logo as maras.png', import.meta.url).href;
+// Importar a logo Decolagem
+const logoDecolagem = new URL('../../assets/logos/Logo decolagem.png', import.meta.url).href;
 
 export default function AuthLayout({ children }: AuthLayoutProps) {
   return (
@@ -30,21 +30,18 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
             <div className="max-w-md">
               {/* Logo */}
               <div className="mb-8">
-                <div className="w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center mb-4 backdrop-blur-sm">
+                <div className="w-56 h-56 bg-white/20 rounded-2xl flex items-center justify-center mb-4 backdrop-blur-sm">
                   <img 
-                    src={asMarasLogo} 
-                    alt="As Maras" 
-                    className="w-16 h-16 object-contain"
+                    src={logoDecolagem} 
+                    alt="Decolagem" 
+                    className="w-44 h-44 object-contain"
                     style={{
                       filter: 'brightness(0) saturate(100%) invert(100%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(100%) contrast(100%)',
                       WebkitFilter: 'brightness(0) saturate(100%) invert(100%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(100%) contrast(100%)'
                     }}
                   />
                 </div>
-                <h1 className="text-3xl font-bold">Sistema Decolagem</h1>
-                <p className="text-primary-100 mt-2">
-                  Gestão de Programas Sociais
-                </p>
+                <h1 className="text-3xl font-bold">Programa de Superação da Pobreza</h1>
               </div>
 
               {/* Recursos */}
@@ -79,18 +76,17 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
           <div className="mx-auto w-full max-w-md">
             {/* Logo mobile */}
             <div className="lg:hidden text-center mb-8">
-              <div className="w-20 h-20 bg-primary-100 rounded-2xl flex items-center justify-center mx-auto mb-4 relative">
+              <div className="w-56 h-56 bg-primary-100 rounded-2xl flex items-center justify-center mx-auto mb-4 relative">
                 <img 
-                  src={asMarasLogo} 
-                  alt="As Maras" 
-                  className="w-16 h-16 object-contain"
+                  src={logoDecolagem} 
+                  alt="Decolagem" 
+                  className="w-44 h-44 object-contain"
                   style={{
                     filter: 'brightness(0) saturate(100%) invert(14%) sepia(93%) saturate(7151%) hue-rotate(318deg) brightness(92%) contrast(92%)'
                   }}
                 />
               </div>
-              <h1 className="text-2xl font-bold text-gray-900">Sistema Decolagem</h1>
-              <p className="text-gray-600 mt-1">Gestão de Programas Sociais</p>
+              <h1 className="text-2xl font-bold text-gray-900">Programa de Superação da Pobreza</h1>
             </div>
 
             {children}
