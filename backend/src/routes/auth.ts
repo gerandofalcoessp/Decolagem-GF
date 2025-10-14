@@ -1,7 +1,8 @@
 import { Router, Request, Response } from 'express';
-import { AuthService } from '../services/authService';
-import { authMiddleware } from '../middlewares/authMiddleware';
-import { logger } from '../utils/logger';
+import { AuthService } from '../services/authService.js';
+import { authMiddleware } from '../middlewares/authMiddleware.js';
+import { logger } from '../utils/logger.js';
+import { supabaseAdmin } from '../services/supabaseClient.js'
 
 const router = Router();
 
@@ -17,10 +18,10 @@ router.post('/login', async (req: Request, res: Response) => {
     const { password } = req.body;
 
     if (!email || !password) {
-      logger.logAuthEvent('login_failed', {
-        email,
+      logger.logAuthEvent('auth_failure', undefined, req.ip, {
+        stage: 'login',
         reason: 'missing_credentials',
-        ip: req.ip,
+        email,
         userAgent: req.get('User-Agent')
       });
       return res.status(400).json({
@@ -28,22 +29,22 @@ router.post('/login', async (req: Request, res: Response) => {
       });
     }
 
-    logger.logAuthEvent('login_attempt', {
+    logger.logAuthEvent('login', undefined, req.ip, {
+      stage: 'attempt',
       email,
-      ip: req.ip,
       userAgent: req.get('User-Agent')
     });
 
     const result = await AuthService.signIn(email, password);
 
     if (result.error) {
-      logger.logAuthEvent('login_failed', {
-        email,
+      logger.logAuthEvent('auth_failure', undefined, req.ip, {
+        stage: 'login',
         reason: 'invalid_credentials',
-        error: result.error.message,
-        ip: req.ip,
+        error: { name: 'AuthError', message: result.error.message },
         userAgent: req.get('User-Agent'),
-        duration: Date.now() - startTime
+        duration: `${Date.now() - startTime}ms`,
+        email
       });
       return res.status(401).json({
         error: result.error.message,
@@ -51,12 +52,12 @@ router.post('/login', async (req: Request, res: Response) => {
     }
 
     if (!result.user || !result.session) {
-      logger.logAuthEvent('login_failed', {
-        email,
+      logger.logAuthEvent('auth_failure', undefined, req.ip, {
+        stage: 'login',
         reason: 'no_user_or_session',
-        ip: req.ip,
+        email,
         userAgent: req.get('User-Agent'),
-        duration: Date.now() - startTime
+        duration: `${Date.now() - startTime}ms`
       });
       return res.status(401).json({
         error: 'Credenciais inválidas',
@@ -66,13 +67,12 @@ router.post('/login', async (req: Request, res: Response) => {
     // Buscar dados do membro associado
     const memberData = await AuthService.getMemberData(result.user.id);
 
-    logger.logAuthEvent('login_success', {
-      userId: result.user.id,
+    logger.logAuthEvent('login', result.user.id, req.ip, {
+      status: 'success',
       email: result.user.email,
       memberRole: memberData?.role,
-      ip: req.ip,
       userAgent: req.get('User-Agent'),
-      duration: Date.now() - startTime
+      duration: `${Date.now() - startTime}ms`
     });
 
     return res.json({
@@ -89,13 +89,16 @@ router.post('/login', async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    logger.logAuthEvent('login_error', {
+    logger.logAuthEvent('auth_failure', undefined, req.ip, {
+      stage: 'login',
       email,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined,
-      ip: req.ip,
+      error: {
+        name: error instanceof Error ? error.name : 'Error',
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+      },
       userAgent: req.get('User-Agent'),
-      duration: Date.now() - startTime
+      duration: `${Date.now() - startTime}ms`
     });
     return res.status(500).json({
       error: 'Erro interno do servidor',
@@ -116,10 +119,9 @@ router.post('/logout', authMiddleware, async (req: Request, res: Response) => {
     const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : '';
 
     if (!token) {
-      logger.logAuthEvent('logout_failed', {
-        userId: user?.id,
+      logger.logAuthEvent('auth_failure', user?.id, req.ip, {
+        stage: 'logout',
         reason: 'no_token',
-        ip: req.ip,
         userAgent: req.get('User-Agent')
       });
       return res.status(400).json({
@@ -127,46 +129,45 @@ router.post('/logout', authMiddleware, async (req: Request, res: Response) => {
       });
     }
 
-    logger.logAuthEvent('logout_attempt', {
-      userId: user?.id,
-      ip: req.ip,
+    logger.logAuthEvent('logout', user?.id, req.ip, {
+      status: 'attempt',
       userAgent: req.get('User-Agent')
     });
 
     const result = await AuthService.signOut(token);
 
     if (result.error) {
-      logger.logAuthEvent('logout_failed', {
-        userId: user?.id,
+      logger.logAuthEvent('auth_failure', user?.id, req.ip, {
+        stage: 'logout',
         reason: 'service_error',
-        error: result.error.message,
-        ip: req.ip,
+        error: { name: 'AuthError', message: result.error.message },
         userAgent: req.get('User-Agent'),
-        duration: Date.now() - startTime
+        duration: `${Date.now() - startTime}ms`
       });
       return res.status(400).json({
         error: result.error.message,
       });
     }
 
-    logger.logAuthEvent('logout_success', {
-      userId: user?.id,
-      ip: req.ip,
+    logger.logAuthEvent('logout', user?.id, req.ip, {
+      status: 'success',
       userAgent: req.get('User-Agent'),
-      duration: Date.now() - startTime
+      duration: `${Date.now() - startTime}ms`
     });
 
     return res.json({
       message: 'Logout realizado com sucesso',
     });
   } catch (error) {
-    logger.logAuthEvent('logout_error', {
-      userId: user?.id,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined,
-      ip: req.ip,
+    logger.logAuthEvent('auth_failure', user?.id, req.ip, {
+      stage: 'logout',
+      error: {
+        name: error instanceof Error ? error.name : 'Error',
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+      },
       userAgent: req.get('User-Agent'),
-      duration: Date.now() - startTime
+      duration: `${Date.now() - startTime}ms`
     });
     return res.status(500).json({
       error: 'Erro interno do servidor',
@@ -184,9 +185,9 @@ router.get('/me', authMiddleware, async (req: Request, res: Response) => {
   
   try {
     if (!user) {
-      logger.logAuthEvent('get_user_failed', {
+      logger.logAuthEvent('auth_failure', undefined, req.ip, {
+        stage: 'me',
         reason: 'no_user',
-        ip: req.ip,
         userAgent: req.get('User-Agent')
       });
       return res.status(401).json({
@@ -199,9 +200,11 @@ router.get('/me', authMiddleware, async (req: Request, res: Response) => {
 
     logger.info('User data retrieved successfully', {
       userId: user.id,
-      email: user.email,
-      memberRole: memberData?.role,
-      duration: Date.now() - startTime
+      duration: `${Date.now() - startTime}ms`,
+      context: {
+        email: user.email,
+        memberRole: memberData?.role
+      }
     });
 
     return res.json({
@@ -215,11 +218,14 @@ router.get('/me', authMiddleware, async (req: Request, res: Response) => {
   } catch (error) {
     logger.error('Error retrieving user data', {
       userId: user?.id,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined,
       ip: req.ip,
       userAgent: req.get('User-Agent'),
-      duration: Date.now() - startTime
+      duration: `${Date.now() - startTime}ms`,
+      error: {
+        name: error instanceof Error ? error.name : 'Error',
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+      }
     });
     return res.status(500).json({
       error: 'Erro interno do servidor',
@@ -272,7 +278,7 @@ router.post('/register', authMiddleware, async (req: Request, res: Response) => 
     // Criar entrada na tabela usuarios após o registro bem-sucedido
     if (result.user) {
       try {
-        const { supabaseAdmin } = require('../services/supabaseClient');
+        // const { supabaseAdmin } = require('../services/supabaseClient.js');
         
         const usuarioData = {
           auth_user_id: result.user.id,
@@ -404,7 +410,7 @@ router.put('/users/:id', authMiddleware, async (req: Request, res: Response) => 
 
     // Sincronizar com a tabela usuarios
     try {
-      const { supabaseAdmin } = require('../services/supabaseClient');
+      // const { supabaseAdmin } = require('../services/supabaseClient.js');
       
       // Verificar se existe entrada na tabela usuarios
       const { data: existingUsuario, error: selectError } = await supabaseAdmin

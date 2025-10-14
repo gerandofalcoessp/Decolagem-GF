@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { getSupabaseForToken, getUserFromToken, supabaseAdmin } from '../services/supabaseClient';
-import { AuthService } from '../services/authService';
-import { cacheMiddleware, invalidateCacheMiddleware } from '../middlewares/cacheMiddleware';
-import { logger } from '../utils/logger';
+import { getSupabaseForToken, getUserFromToken, supabaseAdmin } from '../services/supabaseClient.js';
+import { AuthService } from '../services/authService.js';
+import { cacheMiddleware, invalidateCacheMiddleware } from '../middlewares/cacheMiddleware.js';
+import { logger } from '../utils/logger.js';
 
 const router = Router();
 
@@ -184,10 +184,12 @@ router.get('/', cacheMiddleware({ ttl: 180 }), async (req, res) => {
     res.json(mappedData);
   } catch (err) {
     logger.error('Error fetching regional activities', {
-      error: err instanceof Error ? err.message : 'Unknown error',
-      stack: err instanceof Error ? err.stack : undefined,
-      userRole,
-      userRegional: mappedUserRegional
+      resource: 'regional_activities',
+      error: {
+        name: err instanceof Error ? err.name : 'Error',
+        message: err instanceof Error ? err.message : 'Unknown error',
+        stack: err instanceof Error ? err.stack : undefined,
+      }
     });
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
@@ -195,6 +197,8 @@ router.get('/', cacheMiddleware({ ttl: 180 }), async (req, res) => {
 
 // POST - Criar nova atividade regional
 router.post('/', upload.array('evidencias', 2), invalidateCacheMiddleware(['regional-activities']), async (req, res) => {
+  let userId: string | undefined;
+  let memberId: string | undefined;
   try {
     const authHeader = req.headers.authorization;
     const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
@@ -208,6 +212,7 @@ router.post('/', upload.array('evidencias', 2), invalidateCacheMiddleware(['regi
     if (!user) {
       return res.status(401).json({ error: 'unauthorized' });
     }
+    userId = user.id;
 
     // Buscar member_id do usuário
     const { data: member, error: memberError } = await s
@@ -217,8 +222,9 @@ router.post('/', upload.array('evidencias', 2), invalidateCacheMiddleware(['regi
       .single();
 
     if (memberError || !member) {
-      return res.status(400).json({ error: 'Member not found for user' });
+      return res.status(404).json({ error: 'member_not_found' });
     }
+    memberId = member.id;
 
     const { 
       responsavel_id, 
@@ -321,32 +327,44 @@ router.post('/', upload.array('evidencias', 2), invalidateCacheMiddleware(['regi
           .remove([evidence.storagePath]);
       }
       
-      logger.logDatabaseError('Failed to create regional activity', {
-        error: error.message,
+      logger.logDatabaseError('insert', 'regional_activities', new Error(error.message), user.id);
+      logger.error('Failed to create regional activity', {
         userId: user.id,
-        memberId: member.id,
-        payload: { ...payload, evidences: evidences.length }
+        resource: 'regional_activities',
+        context: {
+          memberId: member.id,
+          payloadSummary: { ...payload, evidences: evidences.length }
+        }
       });
       
       return res.status(400).json({ error: error.message });
     }
 
     logger.info('Regional activity created successfully', {
-      activityId: data.id,
       userId: user.id,
-      memberId: member.id,
-      programa: payload.programa,
-      regional: payload.regional,
-      evidencesCount: evidences.length
+      resource: 'regional_activities',
+      context: {
+        activityId: data.id,
+        memberId: member.id,
+        programa: payload.programa,
+        regional: payload.regional,
+        evidencesCount: evidences.length
+      }
     });
 
     res.status(201).json({ data });
   } catch (err) {
     logger.error('Error creating regional activity', {
-      error: err instanceof Error ? err.message : 'Unknown error',
-      stack: err instanceof Error ? err.stack : undefined,
-      userId: user?.id,
-      memberId: member?.id
+      userId: userId,
+      resource: 'regional_activities',
+      error: {
+        name: err instanceof Error ? err.name : 'Error',
+        message: err instanceof Error ? err.message : 'Unknown error',
+        stack: err instanceof Error ? err.stack : undefined,
+      },
+      context: {
+        memberId: memberId
+      }
     });
     res.status(500).json({ error: 'internal_server_error' });
   }
@@ -462,8 +480,10 @@ router.put('/:id/with-files', upload.array('evidencias', 2), invalidateCacheMidd
     const files = req.files as Express.Multer.File[] || [];
     
     logger.info('Dados recebidos para atualização com arquivos', {
-      body: JSON.stringify(body, null, 2),
-      filesCount: files.length
+      context: {
+        body: JSON.stringify(body, null, 2),
+        filesCount: files.length
+      }
     });
     
     // Processar evidências existentes
@@ -472,7 +492,9 @@ router.put('/:id/with-files', upload.array('evidencias', 2), invalidateCacheMidd
       try {
         existingEvidencias = JSON.parse(body.evidencias);
       } catch (e) {
-        logger.warn('Erro ao parsear evidências existentes:', e);
+        logger.warn('Erro ao parsear evidências existentes:', {
+          error: e instanceof Error ? { name: e.name, message: e.message, stack: e.stack } : { name: 'Error', message: String(e) },
+        });
       }
     } else if (Array.isArray(body.evidencias)) {
       existingEvidencias = body.evidencias;
@@ -582,15 +604,24 @@ router.put('/:id/with-files', upload.array('evidencias', 2), invalidateCacheMidd
     }
     
     logger.info('Atividade atualizada com sucesso (com arquivos)', {
-      activityId: id,
-      data: data
+      resource: 'regional_activities',
+      context: {
+        activityId: id,
+        data
+      }
     });
     res.json({ data });
   } catch (err) {
     logger.error('Erro interno ao atualizar atividade com arquivos', {
-      error: err instanceof Error ? err.message : 'Unknown error',
-      stack: err instanceof Error ? err.stack : undefined,
-      activityId: req.params.id
+      resource: 'regional_activities',
+      error: {
+        name: err instanceof Error ? err.name : 'Error',
+        message: err instanceof Error ? err.message : 'Unknown error',
+        stack: err instanceof Error ? err.stack : undefined,
+      },
+      context: {
+        activityId: req.params.id
+      }
     });
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
@@ -608,7 +639,9 @@ router.put('/:id', invalidateCacheMiddleware(['regional-activities']), async (re
     const body = req.body || {};
     
     logger.info('Dados recebidos para atualização', {
-      body: JSON.stringify(body, null, 2)
+      context: {
+        body: JSON.stringify(body, null, 2)
+      }
     });
     
     // Mapear campos do frontend para o formato do banco
@@ -669,31 +702,42 @@ router.put('/:id', invalidateCacheMiddleware(['regional-activities']), async (re
     delete payload.created_at;
     
     logger.info('Payload final para atualização', {
-      payload: JSON.stringify(payload, null, 2),
-      activityId: id
+      context: {
+        payload: JSON.stringify(payload, null, 2),
+        activityId: id
+      }
     });
 
     const { data, error } = await s.from('regional_activities').update(payload).eq('id', id).select('*').single();
     
     if (error) {
-      logger.logDatabaseError('Erro ao atualizar atividade', {
-        error: error.message,
-        activityId: id,
-        payload
+      logger.logDatabaseError('update', 'regional_activities', new Error(error.message));
+      logger.error('Erro ao atualizar atividade', {
+        resource: 'regional_activities',
+        context: { activityId: id, payload }
       });
       return res.status(400).json({ error: error.message });
     }
     
     logger.info('Atividade atualizada com sucesso', {
-      activityId: id,
-      data: data
+      resource: 'regional_activities',
+      context: {
+        activityId: id,
+        data: data
+      }
     });
     res.json({ data });
   } catch (err) {
     logger.error('Erro interno ao atualizar atividade', {
-      error: err instanceof Error ? err.message : 'Unknown error',
-      stack: err instanceof Error ? err.stack : undefined,
-      activityId: req.params.id
+      resource: 'regional_activities',
+      error: {
+        name: err instanceof Error ? err.name : 'Error',
+        message: err instanceof Error ? err.message : 'Unknown error',
+        stack: err instanceof Error ? err.stack : undefined,
+      },
+      context: {
+        activityId: req.params.id
+      }
     });
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
@@ -702,7 +746,7 @@ router.put('/:id', invalidateCacheMiddleware(['regional-activities']), async (re
 // DELETE - Deletar atividade regional
 router.delete('/:id', invalidateCacheMiddleware(['regional-activities']), async (req, res) => {
   const authHeader = req.headers.authorization;
-  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
+  const token = req.headers.authorization;
   const s = getSupabaseForToken(token);
   if (!s) return res.status(500).json({ error: 'supabase_client_unavailable' });
   

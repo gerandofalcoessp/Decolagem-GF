@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { getSupabaseForToken, getUserFromToken } from '../services/supabaseClient';
-import { getUserRegionalId, canUserSeeRegionalEvents } from '../services/regionalService';
+import { getSupabaseForToken, getUserFromToken } from '../services/supabaseClient.js';
+import { getUserRegionalId, canUserSeeRegionalEvents } from '../services/regionalService.js';
 
 const router = Router();
 

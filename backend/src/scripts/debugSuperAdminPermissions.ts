@@ -1,6 +1,6 @@
 import 'dotenv/config';
-import { supabaseAdmin } from '../services/supabaseClient';
-import { AuthService } from '../services/authService';
+import { supabaseAdmin } from '../services/supabaseClient.js'
+import { AuthService } from '../services/authService.js'
 
 async function debugSuperAdminPermissions() {
   console.log('🔍 Debugando permissões de super admin...\n');

@@ -8,43 +8,66 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-import { authMiddleware } from './middlewares/authMiddleware';
-import { supabaseAdmin, supabaseConfigStatus } from './services/supabaseClient';
-import { supabase } from './services/supabaseClient';
-import { requestLogger } from './middleware/requestLogger';
+import { authMiddleware } from './middlewares/authMiddleware.js'
+import { supabaseAdmin, supabaseConfigStatus } from './services/supabaseClient.js'
+import { supabase } from './services/supabaseClient.js'
+import { requestLogger } from './middleware/requestLogger.js'
 
 // Routers
-import authRouter from './routes/auth';
-import membersRouter from './routes/members';
-import activitiesRouter from './routes/activities';
-import regionalActivitiesRouter from './routes/regional-activities';
-import calendarEventsRouter from './routes/calendar-events';
-import goalsRouter from './routes/goals';
-import filesRouter from './routes/files';
-import dbRouter from './routes/db';
-import microcreditoRouter from './routes/microcredito';
-import asmarasRouter from './routes/asmaras';
-import decolagemRouter from './routes/decolagem';
-import regionalsRouter from './routes/regionals';
-import instituicoesRouter from './routes/instituicoes';
+import authRouter from './routes/auth.js'
+import membersRouter from './routes/members.js'
+import activitiesRouter from './routes/activities.js'
+import regionalActivitiesRouter from './routes/regional-activities.js'
+import calendarEventsRouter from './routes/calendar-events.js'
+import goalsRouter from './routes/goals.js'
+import filesRouter from './routes/files.js'
+import dbRouter from './routes/db.js'
+import microcreditoRouter from './routes/microcredito.js'
+import asmarasRouter from './routes/asmaras.js'
+import decolagemRouter from './routes/decolagem.js'
+import regionalsRouter from './routes/regionals.js'
+import instituicoesRouter from './routes/instituicoes.js'
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3002;
 const CORS_ORIGIN = process.env.CORS_ORIGIN ?? 'http://localhost:3001';
 
-// Configuração de CORS mais flexível para desenvolvimento
+const isProd = process.env.NODE_ENV === 'production';
+
+const allowedDevOrigins = [
+  'http://localhost:3001',
+  'http://localhost:3002',
+  'http://localhost:3003',
+  'http://localhost:3005',
+  'http://localhost:5173',
+  'http://localhost:8080',
+  'http://localhost:8081',
+];
+
+const allowPreviewFrontend = (origin?: string) => {
+  if (!origin) return true;
+  try {
+    const o = origin.toLowerCase();
+    // Allow stable domain via env
+    if (o === CORS_ORIGIN.toLowerCase()) return true;
+    // Allow any Vercel deployment alias for the frontend project
+    if (o.startsWith('https://decolagem-gf-frontend') && o.endsWith('.vercel.app')) {
+      return true;
+    }
+  } catch {}
+  return false;
+};
+
+// Configuração de CORS (produção suporta domains de Preview/aliases)
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'production' 
-    ? CORS_ORIGIN 
-    : [
-        'http://localhost:3001',
-        'http://localhost:3002', 
-        'http://localhost:3003',
-        'http://localhost:3005',
-        'http://localhost:5173',
-        'http://localhost:8080',
-        'http://localhost:8081'
-      ],
+  origin: (origin: any, callback: any) => {
+    if (!isProd) {
+      const ok = !origin || allowedDevOrigins.includes(origin);
+      return callback(ok ? null : new Error('Not allowed by CORS'), ok);
+    }
+    const ok = allowPreviewFrontend(origin);
+    return callback(ok ? null : new Error('Not allowed by CORS'), ok);
+  },
   credentials: true
 };
 
@@ -63,6 +86,11 @@ app.use(rateLimit(rateLimitConfig));
 
 // Healthcheck
 app.get('/health', (_req, res) => {
+  res.json({ status: 'ok', env: process.env.NODE_ENV ?? 'dev' });
+});
+
+// Also expose health under /api for Vercel
+app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', env: process.env.NODE_ENV ?? 'dev' });
 });
 
@@ -151,9 +179,12 @@ if (process.env.NODE_ENV !== 'production') {
   });
 }
 
-app.listen(PORT, '127.0.0.1', () => {
-  console.log(`Backend rodando em http://localhost:${PORT}`);
-});
+const isVercel = process.env.VERCEL === '1' || process.env.VERCEL === 'true';
+if (!isVercel) {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Backend rodando em http://localhost:${PORT}`);
+  });
+}
 
 // Serve frontend estático na mesma porta (opcional via ENV)
 if (process.env.SERVE_FRONTEND === 'true') {
@@ -168,3 +199,4 @@ if (process.env.SERVE_FRONTEND === 'true') {
     res.sendFile(path.join(frontendDistPath, 'index.html'));
   });
 }
+export default app;

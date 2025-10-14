@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { supabaseAdmin, supabaseConfigStatus } from '../services/supabaseClient';
+import { supabaseAdmin, supabaseConfigStatus } from '../services/supabaseClient.js';
 
 const router = Router();
 

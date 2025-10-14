@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import { getUserFromToken } from '../services/supabaseClient';
-import { AuthService } from '../services/authService';
+import { getUserFromToken } from '../services/supabaseClient.js';
+import { AuthService } from '../services/authService.js';
 
 export async function authMiddleware(req: Request, res: Response, next: NextFunction) {
   console.log('🔍 [AuthMiddleware] Iniciando validação de autenticação');

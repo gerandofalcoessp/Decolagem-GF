@@ -9,7 +9,7 @@ node_modules/
 *.env.test
 
 # Build artifacts
-backend/dist/
+# backend/dist/
 backend/build/
 
 # Testing
