@@ -36,12 +36,8 @@ export default async function handler(req, res) {
         '/var/task/backend/dist'
       ];
       const checks = candidates.map(p => ({ path: p, exists: existsSync(p) }));
-      // listagem básica de diretórios para inspecionar o runtime
-      let ls = {};
-      try { ls['/var/task'] = await (async ()=>{ try { return (await import('node:fs')).readdirSync('/var/task'); } catch { return null; } })(); } catch {}
-      try { ls['/var/task/api'] = await (async ()=>{ try { return (await import('node:fs')).readdirSync('/var/task/api'); } catch { return null; } })(); } catch {}
-      try { ls['/var/task/backend'] = await (async ()=>{ try { return (await import('node:fs')).readdirSync('/var/task/backend'); } catch { return null; } })(); } catch {}
-      return res.status(200).json({ from: 'vercel-function', checks, ls, url, effectivePathParam, moduleDir });
+      // Simplificar diagnóstico: evitar listagem de diretórios para reduzir chance de erro
+      return res.status(200).json({ from: 'vercel-function', checks, url, effectivePathParam, moduleDir });
     }
 
     // Parser robusto de querystring para recuperar ?path=...
@@ -86,11 +82,7 @@ export default async function handler(req, res) {
         '/var/task/backend/dist'
       ];
       const checks = candidates.map(p => ({ path: p, exists: existsSync(p) }));
-      let ls = {};
-      try { ls['/var/task'] = await (async ()=>{ try { return (await import('node:fs')).readdirSync('/var/task'); } catch { return null; } })(); } catch {}
-      try { ls['/var/task/api'] = await (async ()=>{ try { return (await import('node:fs')).readdirSync('/var/task/api'); } catch { return null; } })(); } catch {}
-      try { ls['/var/task/backend'] = await (async ()=>{ try { return (await import('node:fs')).readdirSync('/var/task/backend'); } catch { return null; } })(); } catch {}
-      return res.status(200).json({ from: 'vercel-function', checks, ls, url, rawPath, normalizedPath, moduleDir });
+      return res.status(200).json({ from: 'vercel-function', checks, url, rawPath, normalizedPath, moduleDir });
     }
 
     // Resolve e importa o app Express com múltiplos candidatos (robusto)
