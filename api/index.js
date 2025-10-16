@@ -2,6 +2,7 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { createRequire } from "node:module";
 
 export default async function handler(req, res) {
   try {
@@ -72,6 +73,7 @@ export default async function handler(req, res) {
     const tryOrder = [...relCandidates, ...absCandidates];
     let app;
     let lastErr;
+    const requireFn = createRequire(import.meta.url);
     for (const spec of tryOrder) {
       try {
         const isAbs = spec.startsWith('/');
@@ -80,6 +82,16 @@ export default async function handler(req, res) {
         if (app) break;
       } catch (e) {
         lastErr = e;
+        // Tenta via require (CommonJS) como fallback
+        try {
+          const resolved = spec.startsWith('.') ? path.resolve(cwdDir, spec) : spec;
+          // Para paths absolutos, require aceita string direta
+          const modReq = requireFn(resolved);
+          app = modReq?.default || modReq?.app || modReq?.server || modReq;
+          if (app) break;
+        } catch (e2) {
+          lastErr = e2;
+        }
       }
     }
     if (!app) {
