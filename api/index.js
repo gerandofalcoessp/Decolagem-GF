@@ -41,7 +41,7 @@ export default async function handler(req, res) {
       try { ls['/var/task'] = await (async ()=>{ try { return (await import('node:fs')).readdirSync('/var/task'); } catch { return null; } })(); } catch {}
       try { ls['/var/task/api'] = await (async ()=>{ try { return (await import('node:fs')).readdirSync('/var/task/api'); } catch { return null; } })(); } catch {}
       try { ls['/var/task/backend'] = await (async ()=>{ try { return (await import('node:fs')).readdirSync('/var/task/backend'); } catch { return null; } })(); } catch {}
-      return res.status(200).json({ from: 'vercel-function', checks, ls, url, effectivePathParam });
+      return res.status(200).json({ from: 'vercel-function', checks, ls, url, effectivePathParam, moduleDir });
     }
 
     // Parser robusto de querystring para recuperar ?path=...
@@ -90,7 +90,7 @@ export default async function handler(req, res) {
       try { ls['/var/task'] = await (async ()=>{ try { return (await import('node:fs')).readdirSync('/var/task'); } catch { return null; } })(); } catch {}
       try { ls['/var/task/api'] = await (async ()=>{ try { return (await import('node:fs')).readdirSync('/var/task/api'); } catch { return null; } })(); } catch {}
       try { ls['/var/task/backend'] = await (async ()=>{ try { return (await import('node:fs')).readdirSync('/var/task/backend'); } catch { return null; } })(); } catch {}
-      return res.status(200).json({ from: 'vercel-function', checks, ls });
+      return res.status(200).json({ from: 'vercel-function', checks, ls, url, rawPath, normalizedPath, moduleDir });
     }
 
     // Resolve e importa o app Express com múltiplos candidatos (robusto)
@@ -129,8 +129,16 @@ export default async function handler(req, res) {
       }
     }
     if (!app) {
-      const attempted = tryOrder.map(s => ({ spec: s, exists: existsSync(s.startsWith('.') ? path.resolve(moduleDir, s) : s) }));
+      const attempted = tryOrder.map(s => ({
+        spec: s,
+        resolved: s.startsWith('.') ? path.resolve(moduleDir, s) : s,
+        exists: existsSync(s.startsWith('.') ? path.resolve(moduleDir, s) : s)
+      }));
       const msg = lastErr?.message || 'dynamic_import_failed_all';
+      // Caso debug, retornar 200 com diagnóstico para facilitar análise
+      if (rawPath === 'debug/dist' || rawPath === 'debug/ls' || normalizedPath.startsWith('/api/debug')) {
+        return res.status(200).json({ from: 'vercel-function', error: 'handler_import_failed', message: msg, attempted, moduleDir, url, rawPath, normalizedPath });
+      }
       return res.status(500).json({ error: 'handler_import_failed', message: msg, attempted });
     }
 
