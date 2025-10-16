@@ -24,8 +24,9 @@ export default async function handler(req, res) {
     // Endpoint de debug para verificar existência da build em /backend/dist
     if (normalizedPath === '/api/debug/dist' || rawPath === 'debug/dist') {
       const candidates = [
+        path.resolve(__dirname || '.', './_backend_dist/server.js'),
         path.resolve(__dirname || '.', '../backend/dist/server.js'),
-        path.resolve(__dirname || '.', 'backend/dist/server.js'),
+        '/var/task/api/_backend_dist/server.js',
         '/var/task/backend/dist/server.js'
       ];
       const checks = candidates.map(p => ({ path: p, exists: existsSync(p) }));
@@ -35,7 +36,7 @@ export default async function handler(req, res) {
     // Importa o app Express dinamicamente para evitar falhas de top-level import
     let app;
     try {
-      const mod = await import('../backend/dist/server.js');
+      const mod = await import('./_backend_dist/server.js');
       app = mod?.default;
       if (!app) throw new Error('express_app_not_exported');
     } catch (e) {
