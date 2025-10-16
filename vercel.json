@@ -1,9 +1,12 @@
 {
   "version": 2,
   "buildCommand": "npm --prefix backend run vercel-build",
-  "builds": [
-    { "src": "api/*.js", "use": "@vercel/node", "config": { "includeFiles": ["backend/dist/**"] } }
-  ],
+  "functions": {
+    "api/*.js": {
+      "runtime": "nodejs20.x",
+      "includeFiles": ["backend/dist/**"]
+    }
+  },
   "routes": [
     { "src": "/api/health", "dest": "/api?path=health" },
     { "src": "/health", "dest": "/api?path=health" },
