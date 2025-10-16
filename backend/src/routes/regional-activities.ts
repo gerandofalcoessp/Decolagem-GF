@@ -4,6 +4,8 @@ import { getSupabaseForToken, getUserFromToken, supabaseAdmin } from '../service
 import { AuthService } from '../services/authService.js';
 import { cacheMiddleware, invalidateCacheMiddleware } from '../middlewares/cacheMiddleware.js';
 import { logger } from '../utils/logger.js';
+import { z } from 'zod';
+import { requireRole } from '../middlewares/authMiddleware.js';
 
 const router = Router();
 
@@ -24,7 +26,7 @@ const upload = multer({
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Tipo de arquivo não permitido') as any, false);
+      cb(new Error('file_type_not_allowed') as any, false);
     }
   }
 });
@@ -50,7 +52,7 @@ router.get('/', cacheMiddleware({ ttl: 180 }), async (req, res) => {
     
     if (!memberData) {
       console.error('Erro ao buscar dados do membro');
-      return res.status(400).json({ error: 'Member data not found' });
+      return res.status(404).json({ error: 'member_not_found' });
     }
 
     const userRegional = memberData.regional;
@@ -116,7 +118,7 @@ router.get('/', cacheMiddleware({ ttl: 180 }), async (req, res) => {
 
     if (error) {
       console.error('Erro ao buscar atividades regionais:', error);
-      return res.status(500).json({ error: 'Erro interno do servidor' });
+      return res.status(500).json({ error: 'internal_server_error' });
     }
 
     // Buscar dados de responsáveis e instituições para mapeamento
@@ -200,12 +202,12 @@ router.get('/', cacheMiddleware({ ttl: 180 }), async (req, res) => {
         stack: err instanceof Error ? err.stack : undefined,
       }
     });
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    res.status(500).json({ error: 'internal_server_error' });
   }
 });
 
 // POST - Criar nova atividade regional
-router.post('/', upload.array('evidencias', 2), invalidateCacheMiddleware(['regional-activities']), async (req, res) => {
+router.post('/', requireRole('super_admin'), upload.array('evidencias', 2), invalidateCacheMiddleware(['regional-activities']), async (req, res) => {
   let userId: string | undefined;
   let memberId: string | undefined;
   try {
@@ -235,6 +237,24 @@ router.post('/', upload.array('evidencias', 2), invalidateCacheMiddleware(['regi
     }
     memberId = member.id;
 
+    // Validação de payload com Zod
+    const createSchema = z.object({
+      responsavel_id: z.string().uuid().optional().nullable(),
+      programa: z.string().optional(),
+      estados: z.union([z.array(z.string()), z.string()]).optional(),
+      instituicaoId: z.string().uuid().optional().nullable(),
+      instituicao_id: z.string().uuid().optional().nullable(),
+      quantidade: z.coerce.number().int().nonnegative().optional(),
+      atividadeLabel: z.string().optional(),
+      atividadeCustomLabel: z.string().optional(),
+      regionaisNPS: z.any().optional(),
+    }).strict();
+
+    const parsedBody = createSchema.safeParse(req.body);
+    if (!parsedBody.success) {
+      return res.status(400).json({ error: 'invalid_payload', details: parsedBody.error.flatten() });
+    }
+
     const { 
       responsavel_id, 
       programa,
@@ -245,24 +265,8 @@ router.post('/', upload.array('evidencias', 2), invalidateCacheMiddleware(['regi
       atividadeCustomLabel,
       regionaisNPS,
       ...otherData 
-    } = req.body;
+    } = parsedBody.data as any;
     const files = req.files as Express.Multer.File[];
-
-    // Validar responsavel_id como UUID se fornecido
-    if (responsavel_id) {
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-      if (!uuidRegex.test(responsavel_id)) {
-        return res.status(400).json({ error: 'Invalid responsavel_id format' });
-      }
-    }
-
-    // Validar instituicaoId como UUID se fornecido
-    if (instituicaoId) {
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-      if (!uuidRegex.test(instituicaoId)) {
-        return res.status(400).json({ error: 'Invalid instituicaoId format' });
-      }
-    }
 
     // Processar uploads de evidências se houver arquivos
     const evidences = [];
@@ -409,7 +413,7 @@ router.get('/:id', async (req, res) => {
 
     if (error || !activity) {
       console.error('Erro ao buscar atividade:', error);
-      return res.status(404).json({ error: 'Atividade não encontrada' });
+      return res.status(404).json({ error: 'activity_not_found' });
     }
 
     // Buscar dados do responsável se existir
@@ -475,21 +479,50 @@ router.get('/:id', async (req, res) => {
     res.json(mappedActivity);
   } catch (err) {
     console.error('Erro interno:', err);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    res.status(500).json({ error: 'internal_server_error' });
   }
 });
 
 // PUT - Atualizar atividade regional com arquivos
-router.put('/:id/with-files', upload.array('evidencias', 2), invalidateCacheMiddleware(['regional-activities']), async (req, res) => {
+router.put('/:id/with-files', requireRole('super_admin'), upload.array('evidencias', 10), invalidateCacheMiddleware(['regional-activities']), async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
     const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
     const s = getSupabaseForToken(token);
     if (!s) return res.status(500).json({ error: 'supabase_client_unavailable' });
 
-    const id = req.params.id;
-    const body = req.body || {};
-    const files = req.files as Express.Multer.File[] || [];
+    // Validar id do parâmetro com Zod
+    const idParamsSchema = z.object({ id: z.string().uuid() });
+    const idParse = idParamsSchema.safeParse(req.params);
+    if (!idParse.success) {
+      return res.status(400).json({ error: 'invalid_id', details: idParse.error.flatten() });
+    }
+
+    // Validar payload básico com Zod (aceitando strings para arrays JSON)
+    const updateWithFilesSchema = z.object({
+      responsavel_id: z.string().uuid().optional().nullable(),
+      instituicaoId: z.string().uuid().optional().nullable(),
+      instituicao_id: z.string().uuid().optional().nullable(),
+      quantidade: z.coerce.number().int().nonnegative().optional(),
+      estados: z.union([z.array(z.string()), z.string()]).optional(),
+      evidencias: z.union([z.array(z.any()), z.string()]).optional(),
+      title: z.string().optional(),
+      description: z.string().optional(),
+      type: z.string().optional(),
+      activity_date: z.string().optional(),
+      regional: z.string().optional(),
+      programa: z.string().optional(),
+      status: z.string().optional(),
+    }).strict();
+
+    const bodyParse = updateWithFilesSchema.safeParse(req.body || {});
+    if (!bodyParse.success) {
+      return res.status(400).json({ error: 'invalid_payload', details: bodyParse.error.flatten() });
+    }
+
+    const id = idParse.data.id;
+    const body = bodyParse.data;
+    const files = (req.files as Express.Multer.File[]) || [];
     
     logger.info('Dados recebidos para atualização com arquivos', {
       context: {
@@ -497,7 +530,7 @@ router.put('/:id/with-files', upload.array('evidencias', 2), invalidateCacheMidd
         filesCount: files.length
       }
     });
-    
+
     // Processar evidências existentes
     let existingEvidencias: any[] = [];
     if (body.evidencias && typeof body.evidencias === 'string') {
@@ -546,7 +579,7 @@ router.put('/:id/with-files', upload.array('evidencias', 2), invalidateCacheMidd
         });
       } catch (error) {
         console.error('Erro ao fazer upload do arquivo:', error);
-        return res.status(500).json({ error: 'Erro ao fazer upload dos arquivos' });
+        return res.status(500).json({ error: 'upload_files_failed' });
       }
     }
 
@@ -635,12 +668,12 @@ router.put('/:id/with-files', upload.array('evidencias', 2), invalidateCacheMidd
         activityId: req.params.id
       }
     });
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    res.status(500).json({ error: 'internal_server_error' });
   }
 });
 
 // PUT - Atualizar atividade regional
-router.put('/:id', invalidateCacheMiddleware(['regional-activities']), async (req, res) => {
+router.put('/:id', requireRole('super_admin'), invalidateCacheMiddleware(['regional-activities']), async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
     const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
@@ -751,18 +784,25 @@ router.put('/:id', invalidateCacheMiddleware(['regional-activities']), async (re
         activityId: req.params.id
       }
     });
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    res.status(500).json({ error: 'internal_server_error' });
   }
 });
 
 // DELETE - Deletar atividade regional
-router.delete('/:id', invalidateCacheMiddleware(['regional-activities']), async (req, res) => {
+router.delete('/:id', requireRole('super_admin'), invalidateCacheMiddleware(['regional-activities']), async (req, res) => {
   try {
+    // Validar id do parâmetro com Zod
+    const idParamsSchema = z.object({ id: z.string().uuid() });
+    const idParse = idParamsSchema.safeParse(req.params);
+    if (!idParse.success) {
+      return res.status(400).json({ error: 'invalid_id', details: idParse.error.flatten() });
+    }
+
     const authHeader = req.headers.authorization;
     const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
     
     if (!token) {
-      return res.status(401).json({ error: 'Token de autorização não fornecido' });
+      return res.status(401).json({ error: 'unauthorized' });
     }
     
     const s = getSupabaseForToken(token);
@@ -773,7 +813,7 @@ router.delete('/:id', invalidateCacheMiddleware(['regional-activities']), async 
     // Verificar se o usuário está autenticado
     const user = await getUserFromToken(token);
     if (!user) {
-      return res.status(401).json({ error: 'Token inválido ou expirado' });
+      return res.status(401).json({ error: 'unauthorized' });
     }
 
     console.log(`[DELETE] Tentando deletar atividade ${req.params.id} para usuário ${user.id}`);
@@ -789,7 +829,7 @@ router.delete('/:id', invalidateCacheMiddleware(['regional-activities']), async 
     res.json({ success: true, data: data || [] });
   } catch (error) {
     console.error('[DELETE] Erro interno:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    res.status(500).json({ error: 'internal_server_error' });
   }
 });
 

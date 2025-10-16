@@ -2,6 +2,8 @@ import { Router } from 'express';
 import multer from 'multer';
 import { getSupabaseForToken, getUserFromToken } from '../services/supabaseClient.js';
 import { logger } from '../utils/logger.js';
+import { z } from 'zod';
+import { requireRole } from '../middlewares/authMiddleware.js';
 
 const router = Router();
 
@@ -384,7 +386,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /instituicoes - Criar nova instituição
-router.post('/', async (req, res) => {
+router.post('/', requireRole('super_admin'), async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
     const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
@@ -399,12 +401,33 @@ router.post('/', async (req, res) => {
       return res.status(401).json({ error: 'unauthorized' });
     }
 
-    const instituicaoData: InstituicaoData = req.body;
+    // Validação de payload com Zod
+    const createSchema = z.object({
+      nome: z.string().min(1),
+      cnpj: z.string().optional(),
+      endereco: z.string().optional(),
+      cidade: z.string().optional(),
+      estado: z.string().optional(),
+      cep: z.string().optional(),
+      telefone: z.string().optional(),
+      email: z.string().email().optional(),
+      regional: z.string().optional(),
+      programa: z.string().optional(),
+      observacoes: z.string().optional(),
+      nome_lider: z.string().optional(),
+      status: z.enum(['ativa', 'inativa', 'evadida']).optional(),
+      evasao_motivo: z.string().optional(),
+      evasao_data: z.string().optional(),
+      evasao_registrado_em: z.string().optional(),
+      documentos: z.array(z.any()).optional(),
+    }).strict();
 
-    // Validação básica
-    if (!instituicaoData.nome) {
-      return res.status(400).json({ error: 'nome_required' });
+    const parsed = createSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'invalid_payload', details: parsed.error.flatten() });
     }
+
+    const instituicaoData: InstituicaoData = parsed.data as any;
 
     // Preparar dados para inserção
     const payload = {
@@ -461,7 +484,7 @@ router.post('/', async (req, res) => {
 });
 
 // PUT /instituicoes/:id - Atualizar instituição
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireRole('super_admin'), async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
     const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
@@ -476,8 +499,42 @@ router.put('/:id', async (req, res) => {
       return res.status(401).json({ error: 'unauthorized' });
     }
 
-    const instituicaoData: Partial<InstituicaoData> = req.body;
-    const instituicaoId = req.params.id;
+    // Validar id do parâmetro
+    const idParamsSchema = z.object({ id: z.string().uuid() });
+    const idParse = idParamsSchema.safeParse(req.params);
+    if (!idParse.success) {
+      return res.status(400).json({ error: 'invalid_id', details: idParse.error.flatten() });
+    }
+    const instituicaoId = idParse.data.id;
+
+    // Validar payload de atualização
+    const updateSchema = z.object({
+      nome: z.string().min(1).optional(),
+      cnpj: z.string().optional(),
+      endereco: z.string().optional(),
+      cidade: z.string().optional(),
+      estado: z.string().optional(),
+      cep: z.string().optional(),
+      telefone: z.string().optional(),
+      email: z.string().email().optional(),
+      regional: z.string().optional(),
+      programa: z.string().optional(),
+      observacoes: z.string().optional(),
+      nome_lider: z.string().optional(),
+      status: z.enum(['ativa', 'inativa', 'evadida']).optional(),
+      evasao_motivo: z.string().optional(),
+      evasao_data: z.string().optional(),
+      evasao_registrado_em: z.string().optional(),
+      documentos: z.array(z.any()).optional(),
+      id: z.any().optional(),
+      created_at: z.any().optional(),
+    }).strict();
+    const bodyParse = updateSchema.safeParse(req.body || {});
+    if (!bodyParse.success) {
+      return res.status(400).json({ error: 'invalid_payload', details: bodyParse.error.flatten() });
+    }
+
+    const instituicaoData: Partial<InstituicaoData> = bodyParse.data as any;
 
     // Verificar se a instituição existe
     const { data: existingInstituicao, error: checkError } = await s
@@ -540,7 +597,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE /instituicoes/:id - Deletar instituição
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireRole('super_admin'), async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
     const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
@@ -555,7 +612,13 @@ router.delete('/:id', async (req, res) => {
       return res.status(401).json({ error: 'unauthorized' });
     }
 
-    const instituicaoId = req.params.id;
+    // Validar id do parâmetro
+    const idParamsSchema = z.object({ id: z.string().uuid() });
+    const idParse = idParamsSchema.safeParse(req.params);
+    if (!idParse.success) {
+      return res.status(400).json({ error: 'invalid_id', details: idParse.error.flatten() });
+    }
+    const instituicaoId = idParse.data.id;
 
     // Verificar se a instituição existe antes de deletar
     const { data: existingInstituicao, error: checkError } = await s
@@ -615,7 +678,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 // PATCH /instituicoes/:id/evasao - Registrar evasão
-router.patch('/:id/evasao', async (req, res) => {
+router.patch('/:id/evasao', requireRole('super_admin'), async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
     const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
@@ -630,12 +693,24 @@ router.patch('/:id/evasao', async (req, res) => {
       return res.status(401).json({ error: 'unauthorized' });
     }
 
-    const instituicaoId = req.params.id;
-    const { motivo, data: dataEvasao } = req.body;
-
-    if (!motivo || !dataEvasao) {
-      return res.status(400).json({ error: 'motivo_and_data_required' });
+    // Validar id do parâmetro e payload
+    const idParamsSchema = z.object({ id: z.string().uuid() });
+    const idParse = idParamsSchema.safeParse(req.params);
+    if (!idParse.success) {
+      return res.status(400).json({ error: 'invalid_id', details: idParse.error.flatten() });
     }
+    const instituicaoId = idParse.data.id;
+
+    const evasaoSchema = z.object({
+      motivo: z.string().min(1),
+      data: z.string().min(1),
+    }).strict();
+    const bodyParse = evasaoSchema.safeParse(req.body || {});
+    if (!bodyParse.success) {
+      return res.status(400).json({ error: 'invalid_payload', details: bodyParse.error.flatten() });
+    }
+
+    const { motivo, data: dataEvasao } = bodyParse.data;
 
     const { data, error } = await s
       .from('instituicoes')
@@ -898,10 +973,23 @@ router.get('/:id/documentos/:filename', async (req, res) => {
 });
 
 // Endpoint para upload de documentos (múltiplos arquivos)
-router.post('/:id/documentos', upload.array('files', 10), async (req, res) => {
+router.post('/:id/documentos', requireRole('super_admin'), upload.array('files', 10), async (req, res) => {
   try {
-    const { id: instituicaoId } = req.params;
-    const { tipo } = req.body;
+    // Validar id do parâmetro e payload básico
+    const idParamsSchema = z.object({ id: z.string().uuid() });
+    const idParse = idParamsSchema.safeParse(req.params);
+    if (!idParse.success) {
+      return res.status(400).json({ error: 'invalid_id', details: idParse.error.flatten() });
+    }
+    const { id: instituicaoId } = idParse.data;
+
+    const uploadSchema = z.object({ tipo: z.string().optional() }).strict();
+    const bodyParse = uploadSchema.safeParse(req.body || {});
+    if (!bodyParse.success) {
+      return res.status(400).json({ error: 'invalid_payload', details: bodyParse.error.flatten() });
+    }
+    const { tipo } = bodyParse.data;
+
     const files = req.files as Express.Multer.File[];
     
     const authHeader = req.headers.authorization;
@@ -918,7 +1006,7 @@ router.post('/:id/documentos', upload.array('files', 10), async (req, res) => {
     }
     
     if (!files || files.length === 0) {
-      return res.status(400).json({ error: 'Nenhum arquivo foi enviado' });
+      return res.status(400).json({ error: 'invalid_payload', details: 'no_files' });
     }
     
     logger.info('Multiple documents upload request', {
@@ -939,7 +1027,7 @@ router.post('/:id/documentos', upload.array('files', 10), async (req, res) => {
       .single();
     
     if (instituicaoError || !instituicao) {
-      return res.status(404).json({ error: 'Instituição não encontrada' });
+      return res.status(404).json({ error: 'instituicao_not_found' });
     }
     
     // Validar todos os arquivos antes de fazer upload
@@ -956,14 +1044,16 @@ router.post('/:id/documentos', upload.array('files', 10), async (req, res) => {
     for (const file of files) {
       if (!allowedTypes.includes(file.mimetype)) {
         return res.status(400).json({ 
-          error: `Tipo de arquivo não permitido: ${file.originalname}`,
+          error: 'invalid_payload',
+          details: `invalid_file_type: ${file.originalname}`,
           allowedTypes: ['PDF', 'JPG', 'PNG', 'TXT', 'DOC', 'DOCX']
         });
       }
       
       if (file.size > 10 * 1024 * 1024) {
         return res.status(400).json({ 
-          error: `Arquivo muito grande: ${file.originalname}. Máximo 10MB` 
+          error: 'invalid_payload',
+          details: `file_too_large: ${file.originalname}. max_10mb`
         });
       }
     }
@@ -1049,7 +1139,7 @@ router.post('/:id/documentos', upload.array('files', 10), async (req, res) => {
             stack: updateError.stack
           }
         });
-        return res.status(500).json({ error: 'Erro ao salvar informações dos documentos' });
+        return res.status(500).json({ error: 'save_documents_info_failed' });
       }
     }
     
@@ -1086,7 +1176,7 @@ router.post('/:id/documentos', upload.array('files', 10), async (req, res) => {
         stack: err.stack
       }
     });
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    res.status(500).json({ error: 'internal_server_error' });
   }
 });
 
