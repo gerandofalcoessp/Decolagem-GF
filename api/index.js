@@ -1,20 +1,22 @@
 // Vercel Serverless Function wrapper for the Express app
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { pathToFileURL, fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 
 export default async function handler(req, res) {
   try {
+    // Determina diretório do módulo de forma confiável (ESM)
+    const moduleDir = path.dirname(fileURLToPath(import.meta.url));
+
     // Early debug check usando req.url bruto
     const url = req.url || '';
     if (url.startsWith('/api/debug/dist') || url.startsWith('/debug/dist') || url.startsWith('/api/debug/ls') || url.startsWith('/debug/ls')) {
-      const cwdDir = __dirname || '.';
       const candidates = [
         // candidatos relativos e absolutos para diagnosticar presença no bundle
-        path.resolve(cwdDir, './_backend_dist/server.js'),
-        path.resolve(cwdDir, './_backend_dist'),
-        path.resolve(cwdDir, './server.js'),
+        path.resolve(moduleDir, './_backend_dist/server.js'),
+        path.resolve(moduleDir, './_backend_dist'),
+        path.resolve(moduleDir, './server.js'),
         '/var/task/api/server.js',
         '/var/task/api/_backend_dist/server.js',
         '/var/task/api/_backend_dist',
@@ -58,11 +60,10 @@ export default async function handler(req, res) {
 
     // Debug adicional via normalizedPath e rawPath
     if (normalizedPath === '/api/debug/dist' || rawPath === 'debug/dist' || normalizedPath === '/api/debug/ls' || rawPath === 'debug/ls') {
-      const cwdDir = __dirname || '.';
       const candidates = [
-        path.resolve(cwdDir, './_backend_dist/server.js'),
-        path.resolve(cwdDir, './_backend_dist'),
-        path.resolve(cwdDir, './server.js'),
+        path.resolve(moduleDir, './_backend_dist/server.js'),
+        path.resolve(moduleDir, './_backend_dist'),
+        path.resolve(moduleDir, './server.js'),
         '/var/task/api/server.js',
         '/var/task/api/_backend_dist/server.js',
         '/var/task/api/_backend_dist',
@@ -78,13 +79,13 @@ export default async function handler(req, res) {
     }
 
     // Resolve e importa o app Express com múltiplos candidatos (robusto)
-    const cwdDir = __dirname || '.';
     const relCandidates = [
       './_backend_dist/server.js',
       './server.js'
     ];
     const absCandidates = [
-      path.resolve(cwdDir, './_backend_dist/server.js'),
+      path.resolve(moduleDir, './_backend_dist/server.js'),
+      '/var/task/api/server.js',
       '/var/task/api/_backend_dist/server.js',
       '/var/task/backend/dist/server.js'
     ];
@@ -95,7 +96,7 @@ export default async function handler(req, res) {
     for (const spec of tryOrder) {
       try {
         const isAbs = spec.startsWith('/');
-        const href = isAbs ? pathToFileURL(spec).href : pathToFileURL(path.resolve(cwdDir, spec)).href;
+        const href = isAbs ? pathToFileURL(spec).href : pathToFileURL(path.resolve(moduleDir, spec)).href;
         const mod = await import(href);
         app = mod?.default || mod?.app || mod?.server || mod;
         if (app) break;
@@ -103,7 +104,7 @@ export default async function handler(req, res) {
         lastErr = e;
         // Tenta via require (CommonJS) como fallback
         try {
-          const resolved = spec.startsWith('.') ? path.resolve(cwdDir, spec) : spec;
+          const resolved = spec.startsWith('.') ? path.resolve(moduleDir, spec) : spec;
           const modReq = requireFn(resolved);
           app = modReq?.default || modReq?.app || modReq?.server || modReq;
           if (app) break;
@@ -113,7 +114,7 @@ export default async function handler(req, res) {
       }
     }
     if (!app) {
-      const attempted = tryOrder.map(s => ({ spec: s, exists: existsSync(s.startsWith('.') ? path.resolve(cwdDir, s) : s) }));
+      const attempted = tryOrder.map(s => ({ spec: s, exists: existsSync(s.startsWith('.') ? path.resolve(moduleDir, s) : s) }));
       const msg = lastErr?.message || 'dynamic_import_failed_all';
       return res.status(500).json({ error: 'handler_import_failed', message: msg, attempted });
     }
