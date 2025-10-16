@@ -58,9 +58,9 @@ verificar-*.js
 Dockerfile
 docker-compose.yml
 
-# Backend source (only deploy compiled functions)
-backend/src/
-backend/tsconfig.json
+# Backend source (allow compile on Vercel)
+# backend/src/             # no longer ignored
+# backend/tsconfig.json    # no longer ignored
 backend/jest.config.cjs
 
 # Husky and git hooks
