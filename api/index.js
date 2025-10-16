@@ -1,4 +1,7 @@
 // Vercel Serverless Function wrapper for the Express app
+import { existsSync } from "node:fs";
+import path from "node:path";
+
 export default async function handler(req, res) {
   try {
     // Reconstrói o path original a partir do query param adicionado pela rota
@@ -16,6 +19,17 @@ export default async function handler(req, res) {
     const normalizedPath = originalPath.split('?')[0];
     if (normalizedPath === '/api/health' || normalizedPath === '/health' || rawPath === 'health') {
       return res.status(200).json({ status: 'ok', source: 'vercel-function' });
+    }
+
+    // Endpoint de debug para verificar existência da build em /backend/dist
+    if (normalizedPath === '/api/debug/dist' || rawPath === 'debug/dist') {
+      const candidates = [
+        path.resolve(__dirname || '.', '../backend/dist/server.js'),
+        path.resolve(__dirname || '.', 'backend/dist/server.js'),
+        '/var/task/backend/dist/server.js'
+      ];
+      const checks = candidates.map(p => ({ path: p, exists: existsSync(p) }));
+      return res.status(200).json({ checks });
     }
 
     // Importa o app Express dinamicamente para evitar falhas de top-level import
