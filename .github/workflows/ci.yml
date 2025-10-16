@@ -33,6 +33,11 @@ jobs:
         working-directory: ./backend
         run: npm ci
       
+      - name: Lint do backend (somente relatório - não bloqueia)
+        working-directory: ./backend
+        run: npm run lint
+        continue-on-error: true
+
       - name: Executar testes do backend
         working-directory: ./backend
         run: npm test
@@ -60,6 +65,11 @@ jobs:
         working-directory: ./frontend
         run: npm ci
       
+      - name: Lint do frontend (somente relatório - não bloqueia)
+        working-directory: ./frontend
+        run: npm run lint
+        continue-on-error: true
+
       - name: Executar testes do frontend
         working-directory: ./frontend
         run: npm test

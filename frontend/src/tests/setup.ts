@@ -25,14 +25,16 @@ Object.defineProperty(window, 'localStorage', {
 // Mock do fetch
 global.fetch = vi.fn();
 
-// Mock do console para testes mais limpos
+// Mock do console para testes mais limpos (preservando saída por padrão)
 const originalConsole = console;
+const SILENCE_LOGS = process.env.VITEST_SILENCE_LOGS === 'true';
+
 global.console = {
   ...originalConsole,
-  log: vi.fn(),
-  error: vi.fn(),
-  warn: vi.fn(),
-  info: vi.fn(),
+  log: SILENCE_LOGS ? vi.fn() : vi.fn((...args: any[]) => originalConsole.log(...args)),
+  warn: SILENCE_LOGS ? vi.fn() : vi.fn((...args: any[]) => originalConsole.warn(...args)),
+  info: SILENCE_LOGS ? vi.fn() : vi.fn((...args: any[]) => originalConsole.info(...args)),
+  error: SILENCE_LOGS ? vi.fn() : vi.fn((...args: any[]) => originalConsole.error(...args)),
 };
 
 // Mock do window.matchMedia

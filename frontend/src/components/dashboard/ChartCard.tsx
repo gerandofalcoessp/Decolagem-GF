@@ -89,20 +89,33 @@ export default function ChartCard({
       legend: {
         position: 'bottom' as const,
         labels: {
-          padding: 20,
+          padding: 24,
           usePointStyle: true,
           font: {
-            size: 12,
+            size: 13,
+            weight: '500',
           },
+          color: '#374151',
+          boxWidth: 12,
+          boxHeight: 12,
         },
       },
       tooltip: {
-        backgroundColor: 'rgba(0, 0, 0, 0.8)',
-        titleColor: 'white',
-        bodyColor: 'white',
-        borderColor: '#EC4899',
+        backgroundColor: 'rgba(17, 24, 39, 0.95)',
+        titleColor: '#F9FAFB',
+        bodyColor: '#F9FAFB',
+        borderColor: 'rgba(59, 130, 246, 0.5)',
         borderWidth: 1,
-        cornerRadius: 8,
+        cornerRadius: 12,
+        padding: 12,
+        titleFont: {
+          size: 14,
+          weight: '600',
+        },
+        bodyFont: {
+          size: 13,
+          weight: '500',
+        },
         callbacks: {
           label: function(context: any) {
             const label = context.label || '';
@@ -110,12 +123,17 @@ export default function ChartCard({
             const dataArr = context.chart?.data?.datasets?.[0]?.data || [];
             const total = dataArr.reduce((sum: number, v: number) => sum + v, 0);
             const pct = total ? ((value / total) * 100).toFixed(1) : '0.0';
-            return `${label}: ${value} (${pct}%)`;
+            return `${label}: ${value.toLocaleString()} ONGs (${pct}%)`;
           },
         },
       },
     },
-    cutout: '60%',
+    cutout: '65%',
+    animation: {
+      animateRotate: true,
+      animateScale: true,
+      duration: 1000,
+    },
   };
 
   const getChartData = () => {
@@ -150,10 +168,12 @@ export default function ChartCard({
           {
             data: data.map((item: any) => item.value),
             backgroundColor: data.map((item: any) => item.color),
-            borderWidth: 0,
-            hoverBorderWidth: 2,
+            borderWidth: 3,
+            borderColor: '#ffffff',
+            hoverBorderWidth: 4,
             hoverBorderColor: '#ffffff',
-            hoverOffset: 8,
+            hoverOffset: 12,
+            spacing: 2,
           },
         ],
       };

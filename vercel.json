@@ -10,7 +10,7 @@
       }
     },
     {
-      "src": "backend/api/*.js",
+      "src": "api/*.js",
       "use": "@vercel/node"
     }
   ],
@@ -20,11 +20,11 @@
     },
     {
       "src": "/api/(.*)",
-      "dest": "/backend/api/$1"
+      "dest": "/api/index?path=$1"
     },
     {
       "src": "/health",
-      "dest": "/backend/api/index.js"
+      "dest": "/api/index?path=health"
     },
     {
       "src": "/(.*)",

@@ -21,9 +21,8 @@ router.get('/', async (req, res) => {
       return res.status(400).json({ error: emprestimosError.message });
     }
 
-    res.json({ 
-      emprestimos: emprestimos || []
-    });
+    // Retorna array direto para compatibilidade com o frontend
+    res.json(emprestimos || []);
   } catch (error: any) {
     console.error('Erro ao buscar dados do Microcrédito:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });

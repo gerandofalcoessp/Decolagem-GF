@@ -10,11 +10,13 @@ export function useInstituicaoStats() {
     try {
       setLoading(true);
       setError(null);
+      console.log('Fetching institution stats...');
       const stats = await InstituicaoService.getStats();
+      console.log('Institution stats received:', stats);
       setData(stats);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao carregar estatísticas');
       console.error('Error fetching institution stats:', err);
+      setError(err instanceof Error ? err.message : 'Erro ao carregar estatísticas');
     } finally {
       setLoading(false);
     }

@@ -215,6 +215,9 @@ export class InstituicaoService {
    */
   static async getStats(): Promise<InstituicaoStats> {
     try {
+      console.log('Making request to:', `${API_BASE_URL}/api/instituicoes/stats`);
+      console.log('Auth headers:', this.getAuthHeaders());
+      
       const response = await fetch(`${API_BASE_URL}/api/instituicoes/stats`, {
         method: 'GET',
         headers: {
@@ -223,12 +226,17 @@ export class InstituicaoService {
         },
       });
 
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        console.error('Error response:', errorData);
         throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
       }
 
       const result = await response.json();
+      console.log('Stats result:', result);
       return result.data;
     } catch (error) {
       console.error('Error fetching institution stats:', error);

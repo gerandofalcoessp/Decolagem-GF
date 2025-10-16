@@ -1,13 +1,13 @@
 import request from 'supertest';
 import express from 'express';
 import cors from 'cors';
-import authRouter from '../../routes/auth.js';
-import { AuthService } from '../../services/authService.js';
-import { getUserFromToken } from '../../services/supabaseClient.js';
+import authRouter from '../../routes/auth';
+import { AuthService } from '../../services/authService';
+import { getUserFromToken } from '../../services/supabaseClient';
 import type { User, Session, AuthError } from '@supabase/supabase-js';
 
 // Mock do supabaseClient
-jest.mock('../../services/supabaseClient.js', () => ({
+jest.mock('../../services/supabaseClient', () => ({
   getUserFromToken: jest.fn(),
 }));
 
@@ -18,7 +18,7 @@ app.use(cors());
 app.use('/auth', authRouter);
 
 // Mock do AuthService
-jest.mock('../../services/authService.js', () => ({
+jest.mock('../../services/authService', () => ({
   AuthService: {
     signIn: jest.fn(),
     signUp: jest.fn(),
@@ -27,6 +27,7 @@ jest.mock('../../services/authService.js', () => ({
     updateUser: jest.fn(),
     getMemberData: jest.fn(),
     listUsers: jest.fn(),
+    resetPassword: jest.fn(),
   }
 }));
 

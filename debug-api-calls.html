@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug API Calls - Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .warning { background-color: #fff3cd; color: #856404; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .log {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .metric {
+            display: inline-block;
+            margin: 10px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            border-left: 4px solid #007bff;
+        }
+        .metric strong {
+            display: block;
+            font-size: 1.2em;
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Debug API Calls - Dashboard Decolagem</h1>
+        
+        <!-- Status da Autenticação -->
+        <div class="section">
+            <h3>🔐 Status da Autenticação</h3>
+            <div id="auth-status" class="status info">Verificando...</div>
+            <button onclick="checkAuth()">Verificar Autenticação</button>
+            <button onclick="clearAuth()">Limpar Autenticação</button>
+            <div id="auth-details" class="log"></div>
+        </div>
+
+        <!-- Teste de Conectividade -->
+        <div class="section">
+            <h3>🌐 Teste de Conectividade</h3>
+            <div id="connectivity-status" class="status info">Aguardando teste...</div>
+            <button onclick="testConnectivity()">Testar Conectividade</button>
+            <div id="connectivity-log" class="log"></div>
+        </div>
+
+        <!-- Teste das APIs -->
+        <div class="section">
+            <h3>📡 Teste das APIs</h3>
+            <div id="api-status" class="status info">Aguardando testes...</div>
+            <button onclick="testAllAPIs()">Testar Todas as APIs</button>
+            <button onclick="testRegionalActivities()">Testar Regional Activities</button>
+            <button onclick="testGoals()">Testar Goals</button>
+            <button onclick="testAuthMe()">Testar Auth/Me</button>
+            <div id="api-log" class="log"></div>
+        </div>
+
+        <!-- Cálculo dos Dados do Dashboard -->
+        <div class="section">
+            <h3>📊 Cálculo dos Dados do Dashboard</h3>
+            <div id="dashboard-status" class="status info">Aguardando cálculo...</div>
+            <button onclick="calculateDashboardData()">Calcular Dados do Dashboard</button>
+            <div id="dashboard-metrics"></div>
+            <div id="dashboard-log" class="log"></div>
+        </div>
+
+        <!-- Console de Erros -->
+        <div class="section">
+            <h3>🚨 Console de Erros</h3>
+            <div id="error-log" class="log"></div>
+        </div>
+    </div>
+
+    <script>
+        // Interceptar erros do console
+        const originalConsoleError = console.error;
+        const originalConsoleWarn = console.warn;
+        const errorLog = document.getElementById('error-log');
+
+        console.error = function(...args) {
+            originalConsoleError.apply(console, args);
+            errorLog.textContent += `[ERROR] ${new Date().toLocaleTimeString()}: ${args.join(' ')}\n`;
+        };
+
+        console.warn = function(...args) {
+            originalConsoleWarn.apply(console, args);
+            errorLog.textContent += `[WARN] ${new Date().toLocaleTimeString()}: ${args.join(' ')}\n`;
+        };
+
+        // Interceptar erros não capturados
+        window.addEventListener('error', function(e) {
+            errorLog.textContent += `[UNCAUGHT ERROR] ${new Date().toLocaleTimeString()}: ${e.message} at ${e.filename}:${e.lineno}\n`;
+        });
+
+        // Interceptar promises rejeitadas
+        window.addEventListener('unhandledrejection', function(e) {
+            errorLog.textContent += `[UNHANDLED PROMISE REJECTION] ${new Date().toLocaleTimeString()}: ${e.reason}\n`;
+        });
+
+        // Configurações da API
+        const API_BASE_URL = 'http://localhost:3002';
+        
+        // Função para fazer requisições com logs detalhados
+        async function makeRequest(url, options = {}) {
+            const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
+            
+            console.log(`🔄 Fazendo requisição para: ${fullUrl}`);
+            console.log(`📋 Opções:`, options);
+            
+            try {
+                const response = await fetch(fullUrl, {
+                    ...options,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    }
+                });
+                
+                console.log(`📊 Status da resposta: ${response.status} ${response.statusText}`);
+                console.log(`📋 Headers da resposta:`, Object.fromEntries(response.headers.entries()));
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error(`❌ Erro na resposta: ${errorText}`);
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                }
+                
+                const data = await response.json();
+                console.log(`✅ Dados recebidos:`, data);
+                return data;
+            } catch (error) {
+                console.error(`❌ Erro na requisição para ${fullUrl}:`, error);
+                throw error;
+            }
+        }
+
+        // Verificar autenticação
+        function checkAuth() {
+            const authStatus = document.getElementById('auth-status');
+            const authDetails = document.getElementById('auth-details');
+            
+            authStatus.textContent = 'Verificando autenticação...';
+            authStatus.className = 'status info';
+            
+            const token = localStorage.getItem('token');
+            const user = localStorage.getItem('user');
+            
+            let details = `Token no localStorage: ${token ? 'Presente' : 'Ausente'}\n`;
+            details += `User no localStorage: ${user ? 'Presente' : 'Ausente'}\n`;
+            
+            if (token) {
+                details += `Token: ${token.substring(0, 50)}...\n`;
+            }
+            
+            if (user) {
+                try {
+                    const userData = JSON.parse(user);
+                    details += `Dados do usuário: ${JSON.stringify(userData, null, 2)}\n`;
+                } catch (e) {
+                    details += `Erro ao parsear dados do usuário: ${e.message}\n`;
+                }
+            }
+            
+            authDetails.textContent = details;
+            
+            if (token && user) {
+                authStatus.textContent = '✅ Autenticação encontrada no localStorage';
+                authStatus.className = 'status success';
+            } else {
+                authStatus.textContent = '❌ Dados de autenticação não encontrados';
+                authStatus.className = 'status error';
+            }
+        }
+
+        // Limpar autenticação
+        function clearAuth() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            document.getElementById('auth-status').textContent = '🗑️ Dados de autenticação removidos';
+            document.getElementById('auth-status').className = 'status warning';
+            document.getElementById('auth-details').textContent = '';
+        }
+
+        // Testar conectividade
+        async function testConnectivity() {
+            const status = document.getElementById('connectivity-status');
+            const log = document.getElementById('connectivity-log');
+            
+            status.textContent = 'Testando conectividade...';
+            status.className = 'status info';
+            log.textContent = '';
+            
+            try {
+                // Testar se o backend está rodando
+                const response = await fetch(`${API_BASE_URL}/health`, { method: 'GET' });
+                
+                if (response.ok) {
+                    status.textContent = '✅ Backend está acessível';
+                    status.className = 'status success';
+                    log.textContent = `Conectividade OK - Status: ${response.status}`;
+                } else {
+                    status.textContent = `⚠️ Backend respondeu com status ${response.status}`;
+                    status.className = 'status warning';
+                    log.textContent = `Status: ${response.status} ${response.statusText}`;
+                }
+            } catch (error) {
+                status.textContent = '❌ Erro de conectividade com o backend';
+                status.className = 'status error';
+                log.textContent = `Erro: ${error.message}`;
+            }
+        }
+
+        // Testar API de atividades regionais
+        async function testRegionalActivities() {
+            const log = document.getElementById('api-log');
+            log.textContent += `\n=== TESTE: Regional Activities ===\n`;
+            
+            const token = localStorage.getItem('token');
+            if (!token) {
+                log.textContent += `❌ Token não encontrado. Faça login primeiro.\n`;
+                return;
+            }
+            
+            try {
+                const data = await makeRequest('/regional-activities', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                log.textContent += `✅ Regional Activities: ${data.length} atividades recebidas\n`;
+                log.textContent += `📋 Primeira atividade: ${JSON.stringify(data[0], null, 2)}\n`;
+                
+                return data;
+            } catch (error) {
+                log.textContent += `❌ Erro ao buscar atividades regionais: ${error.message}\n`;
+                return null;
+            }
+        }
+
+        // Testar API de metas
+        async function testGoals() {
+            const log = document.getElementById('api-log');
+            log.textContent += `\n=== TESTE: Goals ===\n`;
+            
+            const token = localStorage.getItem('token');
+            if (!token) {
+                log.textContent += `❌ Token não encontrado. Faça login primeiro.\n`;
+                return;
+            }
+            
+            try {
+                const data = await makeRequest('/goals', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                log.textContent += `✅ Goals: ${data.length} metas recebidas\n`;
+                log.textContent += `📋 Primeira meta: ${JSON.stringify(data[0], null, 2)}\n`;
+                
+                return data;
+            } catch (error) {
+                log.textContent += `❌ Erro ao buscar metas: ${error.message}\n`;
+                return null;
+            }
+        }
+
+        // Testar API de autenticação
+        async function testAuthMe() {
+            const log = document.getElementById('api-log');
+            log.textContent += `\n=== TESTE: Auth/Me ===\n`;
+            
+            const token = localStorage.getItem('token');
+            if (!token) {
+                log.textContent += `❌ Token não encontrado. Faça login primeiro.\n`;
+                return;
+            }
+            
+            try {
+                const data = await makeRequest('/auth/me', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                log.textContent += `✅ Auth/Me: Usuário autenticado\n`;
+                log.textContent += `📋 Dados do usuário: ${JSON.stringify(data, null, 2)}\n`;
+                
+                return data;
+            } catch (error) {
+                log.textContent += `❌ Erro na verificação de autenticação: ${error.message}\n`;
+                return null;
+            }
+        }
+
+        // Testar todas as APIs
+        async function testAllAPIs() {
+            const status = document.getElementById('api-status');
+            const log = document.getElementById('api-log');
+            
+            status.textContent = 'Testando todas as APIs...';
+            status.className = 'status info';
+            log.textContent = 'Iniciando testes das APIs...\n';
+            
+            const results = {
+                auth: await testAuthMe(),
+                activities: await testRegionalActivities(),
+                goals: await testGoals()
+            };
+            
+            const successCount = Object.values(results).filter(r => r !== null).length;
+            
+            if (successCount === 3) {
+                status.textContent = '✅ Todas as APIs estão funcionando';
+                status.className = 'status success';
+            } else if (successCount > 0) {
+                status.textContent = `⚠️ ${successCount}/3 APIs funcionando`;
+                status.className = 'status warning';
+            } else {
+                status.textContent = '❌ Nenhuma API está funcionando';
+                status.className = 'status error';
+            }
+            
+            return results;
+        }
+
+        // Funções de cálculo do dashboard (copiadas do código original)
+        function normalize(str) {
+            if (!str || typeof str !== 'string') return '';
+            return str.toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .trim();
+        }
+
+        function canonicalizeTokens(str) {
+            const normalized = normalize(str);
+            return normalized.split(/\s+/).filter(token => token.length > 0);
+        }
+
+        function isStringMatch(str1, str2) {
+            if (!str1 || !str2) return false;
+            const tokens1 = canonicalizeTokens(str1);
+            const tokens2 = canonicalizeTokens(str2);
+            return tokens1.every(token => tokens2.some(t => t.includes(token) || token.includes(t)));
+        }
+
+        function doesActivityMatch(activity, labels) {
+            if (!activity || !labels || labels.length === 0) return false;
+            
+            const fieldsToCheck = [
+                activity.titulo,
+                activity.tipo,
+                activity.atividade_label,
+                activity.categoria
+            ];
+            
+            return labels.some(label => 
+                fieldsToCheck.some(field => isStringMatch(field, label))
+            );
+        }
+
+        function sumActivitiesByLabels(activities, labels) {
+            if (!activities || !Array.isArray(activities)) return 0;
+            
+            let totalSum = 0;
+            let matchCount = 0;
+            
+            for (const activity of activities) {
+                if (doesActivityMatch(activity, labels)) {
+                    matchCount++;
+                    const qRaw = activity.quantidade;
+                    const numQ = parseFloat(String(qRaw));
+                    
+                    if (!isNaN(numQ)) {
+                        totalSum += numQ;
+                    }
+                }
+            }
+            
+            console.log(`Matched ${matchCount} activities for labels:`, labels);
+            console.log(`Total sum: ${totalSum}`);
+            
+            return totalSum;
+        }
+
+        // Calcular dados do dashboard
+        async function calculateDashboardData() {
+            const status = document.getElementById('dashboard-status');
+            const metrics = document.getElementById('dashboard-metrics');
+            const log = document.getElementById('dashboard-log');
+            
+            status.textContent = 'Calculando dados do dashboard...';
+            status.className = 'status info';
+            log.textContent = 'Iniciando cálculos...\n';
+            metrics.innerHTML = '';
+            
+            try {
+                // Buscar dados das APIs
+                const results = await testAllAPIs();
+                
+                if (!results.activities) {
+                    throw new Error('Não foi possível obter dados das atividades');
+                }
+                
+                const activities = results.activities;
+                log.textContent += `📊 Total de atividades recebidas: ${activities.length}\n`;
+                
+                // Calcular métricas específicas
+                const familiasEmbarcadas = sumActivitiesByLabels(activities, [
+                    'Famílias Embarcadas Decolagem',
+                    'familias_embarcadas_decolagem'
+                ]);
+                
+                const diagnosticosRealizados = sumActivitiesByLabels(activities, [
+                    'Diagnósticos Realizados',
+                    'diagnosticos_realizados'
+                ]);
+                
+                const ongsDecolagem = sumActivitiesByLabels(activities, [
+                    'ONGs Decolagem',
+                    'ongs_decolagem'
+                ]);
+                
+                const ongsMaras = sumActivitiesByLabels(activities, [
+                    'ONGs Maras',
+                    'ongs_maras'
+                ]);
+                
+                // Exibir métricas
+                metrics.innerHTML = `
+                    <div class="metric">
+                        <strong>${familiasEmbarcadas}</strong>
+                        Famílias Embarcadas Decolagem
+                    </div>
+                    <div class="metric">
+                        <strong>${diagnosticosRealizados}</strong>
+                        Diagnósticos Realizados
+                    </div>
+                    <div class="metric">
+                        <strong>${ongsDecolagem}</strong>
+                        ONGs Decolagem
+                    </div>
+                    <div class="metric">
+                        <strong>${ongsMaras}</strong>
+                        ONGs Maras
+                    </div>
+                `;
+                
+                log.textContent += `✅ Cálculos concluídos:\n`;
+                log.textContent += `- Famílias Embarcadas: ${familiasEmbarcadas}\n`;
+                log.textContent += `- Diagnósticos Realizados: ${diagnosticosRealizados}\n`;
+                log.textContent += `- ONGs Decolagem: ${ongsDecolagem}\n`;
+                log.textContent += `- ONGs Maras: ${ongsMaras}\n`;
+                
+                status.textContent = '✅ Dados do dashboard calculados com sucesso';
+                status.className = 'status success';
+                
+            } catch (error) {
+                status.textContent = '❌ Erro ao calcular dados do dashboard';
+                status.className = 'status error';
+                log.textContent += `❌ Erro: ${error.message}\n`;
+            }
+        }
+
+        // Inicializar página
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAuth();
+            console.log('🚀 Página de debug carregada');
+        });
+    </script>
+</body>
+</html>

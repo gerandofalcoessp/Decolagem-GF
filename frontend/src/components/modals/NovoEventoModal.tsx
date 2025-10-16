@@ -55,16 +55,27 @@ export default function NovoEventoModal({
     return dateStr;
   };
 
-  // Update refs when form changes (from parent)
+  // Update refs when form changes (from parent) - memoized to prevent unnecessary updates
   useEffect(() => {
     if (isOpen) {
-      if (atividadeRef.current) atividadeRef.current.value = form.atividade;
-      if (responsavelRef.current) responsavelRef.current.value = form.responsavel;
-      if (descricaoRef.current) descricaoRef.current.value = form.descricao;
-      if (dataRef.current) dataRef.current.value = formatDateForInput(form.data);
-      if (horaRef.current) horaRef.current.value = form.hora;
+      if (atividadeRef.current && atividadeRef.current.value !== form.atividade) {
+        atividadeRef.current.value = form.atividade;
+      }
+      if (responsavelRef.current && responsavelRef.current.value !== form.responsavel) {
+        responsavelRef.current.value = form.responsavel;
+      }
+      if (descricaoRef.current && descricaoRef.current.value !== form.descricao) {
+        descricaoRef.current.value = form.descricao;
+      }
+      const formattedDate = formatDateForInput(form.data);
+      if (dataRef.current && dataRef.current.value !== formattedDate) {
+        dataRef.current.value = formattedDate;
+      }
+      if (horaRef.current && horaRef.current.value !== form.hora) {
+        horaRef.current.value = form.hora;
+      }
     }
-  }, [isOpen, form]);
+  }, [isOpen, form.atividade, form.responsavel, form.descricao, form.data, form.hora]);
 
   // Sync form state from refs
   const syncFormFromRefs = () => {

@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Dashboard Frontend</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .debug-section {
+            margin-bottom: 30px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .debug-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .log-area {
+            background: #000;
+            color: #0f0;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        .button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .button:hover {
+            background: #0056b3;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Debug Dashboard Frontend</h1>
+        
+        <div class="debug-section">
+            <h3>1. Status da Autenticação</h3>
+            <div id="auth-status"></div>
+            <button class="button" onclick="checkAuth()">Verificar Autenticação</button>
+            <button class="button" onclick="doLogin()">Fazer Login</button>
+        </div>
+
+        <div class="debug-section">
+            <h3>2. Teste de APIs</h3>
+            <button class="button" onclick="testRegionalActivities()">Testar /api/regional-activities</button>
+            <button class="button" onclick="testGoals()">Testar /api/goals</button>
+            <button class="button" onclick="testAuth()">Testar /api/auth/me</button>
+        </div>
+
+        <div class="debug-section">
+            <h3>3. Dados do Dashboard</h3>
+            <div id="dashboard-data"></div>
+            <button class="button" onclick="calculateDashboardData()">Calcular Dados do Dashboard</button>
+        </div>
+
+        <div class="debug-section">
+            <h3>4. Log de Atividades</h3>
+            <div id="log" class="log-area"></div>
+            <button class="button" onclick="clearLog()">Limpar Log</button>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:4000';
+        
+        function log(message, type = 'info') {
+            const logArea = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : type === 'warning' ? '⚠️' : 'ℹ️';
+            logArea.textContent += `[${timestamp}] ${prefix} ${message}\n`;
+            logArea.scrollTop = logArea.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('log').textContent = '';
+        }
+
+        function getToken() {
+            return localStorage.getItem('access_token') || 
+                   localStorage.getItem('auth_token') || 
+                   localStorage.getItem('token');
+        }
+
+        async function checkAuth() {
+            log('Verificando autenticação...');
+            const token = getToken();
+            
+            const authStatus = document.getElementById('auth-status');
+            
+            if (!token) {
+                authStatus.innerHTML = '<div class="status error">❌ Nenhum token encontrado no localStorage</div>';
+                log('Nenhum token encontrado', 'error');
+                return false;
+            }
+
+            authStatus.innerHTML = '<div class="status success">✅ Token encontrado: ' + token.substring(0, 20) + '...</div>';
+            log('Token encontrado: ' + token.substring(0, 20) + '...', 'success');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/me`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const user = await response.json();
+                    authStatus.innerHTML += '<div class="status success">✅ Usuário autenticado: ' + user.email + '</div>';
+                    log('Usuário autenticado: ' + user.email, 'success');
+                    return true;
+                } else {
+                    authStatus.innerHTML += '<div class="status error">❌ Token inválido (Status: ' + response.status + ')</div>';
+                    log('Token inválido (Status: ' + response.status + ')', 'error');
+                    return false;
+                }
+            } catch (error) {
+                authStatus.innerHTML += '<div class="status error">❌ Erro ao verificar token: ' + error.message + '</div>';
+                log('Erro ao verificar token: ' + error.message, 'error');
+                return false;
+            }
+        }
+
+        async function doLogin() {
+            log('Fazendo login...');
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: 'flavio.almeida@gerandofalcoes.com',
+                        password: '123456'
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const token = data.session?.access_token || data.access_token || data.token;
+                    
+                    if (token) {
+                        localStorage.setItem('access_token', token);
+                        log('Login realizado com sucesso', 'success');
+                        checkAuth();
+                    } else {
+                        log('Login realizado mas token não encontrado na resposta', 'error');
+                    }
+                } else {
+                    const errorData = await response.json();
+                    log('Erro no login: ' + (errorData.message || response.statusText), 'error');
+                }
+            } catch (error) {
+                log('Erro ao fazer login: ' + error.message, 'error');
+            }
+        }
+
+        async function testRegionalActivities() {
+            log('Testando /api/regional-activities...');
+            const token = getToken();
+            
+            if (!token) {
+                log('Token não encontrado. Faça login primeiro.', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/regional-activities`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const activities = await response.json();
+                    log(`✅ ${activities.length} atividades carregadas`, 'success');
+                    
+                    // Contar famílias embarcadas
+                    const familiasEmbarcadas = activities.filter(a => 
+                        a.titulo === 'Famílias Embarcadas Decolagem'
+                    );
+                    
+                    const total = familiasEmbarcadas.reduce((sum, a) => {
+                        const qty = parseFloat(a.quantidade) || 0;
+                        return sum + qty;
+                    }, 0);
+                    
+                    log(`📊 Famílias Embarcadas encontradas: ${familiasEmbarcadas.length} atividades, total: ${total}`, 'success');
+                } else {
+                    log('Erro ao carregar atividades: ' + response.status + ' ' + response.statusText, 'error');
+                }
+            } catch (error) {
+                log('Erro na requisição: ' + error.message, 'error');
+            }
+        }
+
+        async function testGoals() {
+            log('Testando /api/goals...');
+            const token = getToken();
+            
+            if (!token) {
+                log('Token não encontrado. Faça login primeiro.', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/goals`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const goals = await response.json();
+                    log(`✅ ${goals.length} metas carregadas`, 'success');
+                } else {
+                    log('Erro ao carregar metas: ' + response.status + ' ' + response.statusText, 'error');
+                }
+            } catch (error) {
+                log('Erro na requisição: ' + error.message, 'error');
+            }
+        }
+
+        async function testAuth() {
+            log('Testando /api/auth/me...');
+            const token = getToken();
+            
+            if (!token) {
+                log('Token não encontrado. Faça login primeiro.', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/me`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const user = await response.json();
+                    log(`✅ Usuário: ${user.email}`, 'success');
+                } else {
+                    log('Erro ao verificar usuário: ' + response.status + ' ' + response.statusText, 'error');
+                }
+            } catch (error) {
+                log('Erro na requisição: ' + error.message, 'error');
+            }
+        }
+
+        async function calculateDashboardData() {
+            log('Calculando dados do dashboard...');
+            const token = getToken();
+            
+            if (!token) {
+                log('Token não encontrado. Faça login primeiro.', 'error');
+                return;
+            }
+
+            try {
+                // Carregar atividades
+                const activitiesResponse = await fetch(`${API_BASE}/api/regional-activities`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!activitiesResponse.ok) {
+                    log('Erro ao carregar atividades: ' + activitiesResponse.status, 'error');
+                    return;
+                }
+
+                const activities = await activitiesResponse.json();
+                log(`📊 ${activities.length} atividades carregadas`, 'success');
+
+                // Implementar lógica do dashboard
+                const normalize = (str) => {
+                    if (!str || typeof str !== 'string') return '';
+                    return str.toLowerCase()
+                        .normalize('NFD')
+                        .replace(/[\u0300-\u036f]/g, '')
+                        .replace(/[^a-z0-9\s]/g, ' ')
+                        .replace(/\s+/g, ' ')
+                        .trim();
+                };
+
+                const canonicalizeTokens = (str) => {
+                    const tokens = normalize(str).split(' ').filter(Boolean);
+                    const map = {
+                        'familias': 'familia',
+                        'embarcadas': 'embarcada',
+                        'decolagem': 'decolagem',
+                        'maras': 'mara'
+                    };
+                    return tokens.map(tok => map[tok] || tok);
+                };
+
+                const isStringMatch = (a, b) => {
+                    const ta = canonicalizeTokens(a);
+                    const tb = canonicalizeTokens(b);
+                    if (ta.length === 0 || tb.length === 0) return false;
+                    const setA = new Set(ta);
+                    const inter = tb.filter(x => setA.has(x));
+                    const requireProgramToken = tb.includes('decolagem') || tb.includes('maras');
+                    const hasProgramToken = inter.includes('decolagem') || inter.includes('maras');
+                    const requiredOverlap = Math.min(tb.length, 2);
+                    if (requireProgramToken) {
+                        return hasProgramToken && inter.length >= requiredOverlap;
+                    }
+                    return inter.length >= requiredOverlap;
+                };
+
+                const doesActivityMatch = (activity, label) => {
+                    const fields = [
+                        activity.atividade_label,
+                        activity.titulo,
+                        activity.tipo,
+                        activity.categoria
+                    ].filter(Boolean);
+                    return fields.some(f => isStringMatch(f, label));
+                };
+
+                const sumActivitiesByLabels = (labels) => {
+                    return activities.reduce((acc, a) => {
+                        const match = labels.some(l => doesActivityMatch(a, l));
+                        if (!match) return acc;
+                        const qRaw = a.quantidade ?? a.qtd ?? 1;
+                        const numQ = typeof qRaw === 'number' ? qRaw : parseFloat(String(qRaw));
+                        return acc + (isNaN(numQ) ? 1 : numQ);
+                    }, 0);
+                };
+
+                // Calcular métricas
+                const familiasEmbarcadas = sumActivitiesByLabels(['Famílias Embarcadas Decolagem', 'familias_embarcadas_decolagem']);
+                const diagnosticos = sumActivitiesByLabels(['Diagnósticos Realizados', 'diagnosticos_realizados']);
+                const ongsDecolagem = sumActivitiesByLabels(['ONGs Decolagem', 'ongs_decolagem']);
+                const ongsMaras = sumActivitiesByLabels(['ONGs Maras', 'ongs_maras']);
+
+                const dashboardData = document.getElementById('dashboard-data');
+                dashboardData.innerHTML = `
+                    <div class="status success">
+                        <h4>📊 Dados Calculados:</h4>
+                        <p><strong>Famílias Embarcadas:</strong> ${familiasEmbarcadas}</p>
+                        <p><strong>Diagnósticos Realizados:</strong> ${diagnosticos}</p>
+                        <p><strong>ONGs Decolagem:</strong> ${ongsDecolagem}</p>
+                        <p><strong>ONGs Maras:</strong> ${ongsMaras}</p>
+                    </div>
+                `;
+
+                log(`✅ Dados calculados - Famílias: ${familiasEmbarcadas}, Diagnósticos: ${diagnosticos}`, 'success');
+
+            } catch (error) {
+                log('Erro ao calcular dados: ' + error.message, 'error');
+            }
+        }
+
+        // Inicializar
+        log('🚀 Debug Dashboard Frontend iniciado');
+        log('Clique nos botões para testar as funcionalidades');
+    </script>
+</body>
+</html>

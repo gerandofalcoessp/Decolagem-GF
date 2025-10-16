@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug - Gráfico Distribuição por Programa</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .warning { background-color: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        .info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background-color: #0056b3; }
+        .log-area {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug - Gráfico Distribuição por Programa</h1>
+    
+    <div class="container">
+        <h2>1. Status de Autenticação</h2>
+        <button onclick="checkAuth()">Verificar Autenticação</button>
+        <button onclick="clearStorage()">Limpar Storage</button>
+        <div id="auth-status"></div>
+    </div>
+
+    <div class="container">
+        <h2>2. Login de Teste</h2>
+        <button onclick="testLogin()">Fazer Login de Teste</button>
+        <div id="login-result"></div>
+    </div>
+
+    <div class="container">
+        <h2>3. Testar API de Estatísticas</h2>
+        <button onclick="testStatsAPI()">Testar /api/instituicoes/stats</button>
+        <div id="stats-result"></div>
+    </div>
+
+    <div class="container">
+        <h2>4. Logs de Debug</h2>
+        <button onclick="clearLog()">Limpar Logs</button>
+        <div id="log" class="log-area"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:4000';
+        
+        function log(message, type = 'info') {
+            const logArea = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : type === 'warning' ? '⚠️' : 'ℹ️';
+            logArea.textContent += `[${timestamp}] ${prefix} ${message}\n`;
+            logArea.scrollTop = logArea.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('log').textContent = '';
+        }
+
+        function getToken() {
+            return localStorage.getItem('auth_token') || 
+                   localStorage.getItem('access_token') || 
+                   localStorage.getItem('token');
+        }
+
+        async function checkAuth() {
+            log('🔐 Verificando autenticação...');
+            const token = getToken();
+            
+            const authStatus = document.getElementById('auth-status');
+            
+            if (!token) {
+                authStatus.innerHTML = '<div class="status error">❌ Nenhum token encontrado no localStorage</div>';
+                log('Nenhum token encontrado', 'error');
+                
+                // Verificar todas as chaves do localStorage
+                const keys = Object.keys(localStorage);
+                log(`Chaves no localStorage: ${keys.join(', ')}`);
+                return false;
+            }
+
+            authStatus.innerHTML = '<div class="status success">✅ Token encontrado: ' + token.substring(0, 20) + '...</div>';
+            log('Token encontrado: ' + token.substring(0, 20) + '...', 'success');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/me`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                log(`Status da resposta /auth/me: ${response.status}`);
+
+                if (!response.ok) {
+                    authStatus.innerHTML += '<div class="status error">❌ Token inválido ou expirado</div>';
+                    log('Token inválido ou expirado', 'error');
+                    return false;
+                }
+
+                const userData = await response.json();
+                authStatus.innerHTML += '<div class="status success">✅ Usuário autenticado: ' + (userData.member?.nome || userData.user?.nome || 'Nome não encontrado') + '</div>';
+                log('Usuário autenticado com sucesso', 'success');
+                return true;
+
+            } catch (error) {
+                authStatus.innerHTML += '<div class="status error">❌ Erro ao verificar autenticação: ' + error.message + '</div>';
+                log('Erro ao verificar autenticação: ' + error.message, 'error');
+                return false;
+            }
+        }
+
+        function clearStorage() {
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('token');
+            localStorage.removeItem('auth_user');
+            log('Storage limpo', 'info');
+            checkAuth();
+        }
+
+        async function testLogin() {
+            const result = document.getElementById('login-result');
+            result.innerHTML = '<p>Fazendo login...</p>';
+            
+            log('🔐 Iniciando teste de login...');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: 'flavio.almeida@gerandofalcoes.com',
+                        password: '123456'
+                    }),
+                });
+                
+                log(`Status da resposta: ${response.status}`);
+                
+                const loginData = await response.json();
+                log(`Dados recebidos: ${JSON.stringify(loginData, null, 2)}`);
+                
+                if (!response.ok) {
+                    throw new Error(loginData.error || 'Erro no login');
+                }
+                
+                log('✅ Login bem-sucedido!', 'success');
+                
+                // Verificar estrutura do token
+                let tokenSaved = false;
+                
+                if (loginData.session && loginData.session.access_token) {
+                    localStorage.setItem('auth_token', loginData.session.access_token);
+                    if (loginData.session.refresh_token) {
+                        localStorage.setItem('refresh_token', loginData.session.refresh_token);
+                    }
+                    log('💾 Token salvo de session.access_token', 'success');
+                    tokenSaved = true;
+                } else if (loginData.data && loginData.data.token) {
+                    localStorage.setItem('auth_token', loginData.data.token);
+                    log('💾 Token salvo de data.token', 'success');
+                    tokenSaved = true;
+                } else if (loginData.token) {
+                    localStorage.setItem('auth_token', loginData.token);
+                    log('💾 Token salvo diretamente', 'success');
+                    tokenSaved = true;
+                }
+                
+                // Salvar dados do usuário se disponível
+                if (loginData.member) {
+                    localStorage.setItem('auth_user', JSON.stringify(loginData.member));
+                    log('💾 Dados do usuário salvos', 'success');
+                }
+                
+                result.innerHTML = `<div class="status success">
+                    <p>✅ Login realizado com sucesso!</p>
+                    <p>Token salvo: ${tokenSaved ? 'Sim' : 'Não'}</p>
+                    <pre>${JSON.stringify(loginData, null, 2)}</pre>
+                </div>`;
+                
+            } catch (error) {
+                log(`❌ Erro no login: ${error.message}`, 'error');
+                result.innerHTML = `<div class="status error">
+                    <p>❌ Erro no login: ${error.message}</p>
+                </div>`;
+            }
+        }
+
+        async function testStatsAPI() {
+            const result = document.getElementById('stats-result');
+            result.innerHTML = '<p>Testando API de estatísticas...</p>';
+            
+            log('📊 Testando API /api/instituicoes/stats...');
+            
+            const token = getToken();
+            if (!token) {
+                result.innerHTML = '<div class="status error">❌ Nenhum token encontrado. Faça login primeiro.</div>';
+                log('Nenhum token encontrado para testar API', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/instituicoes/stats`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                log(`Status da resposta /api/instituicoes/stats: ${response.status}`);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                }
+                
+                const statsData = await response.json();
+                log('✅ Dados de estatísticas recebidos com sucesso!', 'success');
+                log(`Dados: ${JSON.stringify(statsData, null, 2)}`);
+                
+                // Verificar especificamente os dados do gráfico
+                const ongsDecolagem = statsData?.resumo?.ongsDecolagem;
+                const ongsMaras = statsData?.resumo?.ongsMaras;
+                
+                log(`ONGs Decolagem: ${ongsDecolagem}`);
+                log(`ONGs Maras: ${ongsMaras}`);
+                
+                result.innerHTML = `<div class="status success">
+                    <p>✅ API funcionando corretamente!</p>
+                    <p><strong>ONGs Decolagem:</strong> ${ongsDecolagem || 'N/A'}</p>
+                    <p><strong>ONGs Maras:</strong> ${ongsMaras || 'N/A'}</p>
+                    <details>
+                        <summary>Ver dados completos</summary>
+                        <pre>${JSON.stringify(statsData, null, 2)}</pre>
+                    </details>
+                </div>`;
+                
+                // Se os dados estão zerados, isso pode explicar por que o gráfico não aparece
+                if (!ongsDecolagem && !ongsMaras) {
+                    log('⚠️ ATENÇÃO: Ambos os valores estão zerados ou undefined!', 'warning');
+                    result.innerHTML += '<div class="status warning">⚠️ Os dados estão zerados - isso pode explicar por que o gráfico não aparece!</div>';
+                }
+                
+            } catch (error) {
+                log(`❌ Erro na API: ${error.message}`, 'error');
+                result.innerHTML = `<div class="status error">
+                    <p>❌ Erro na API: ${error.message}</p>
+                </div>`;
+            }
+        }
+
+        // Executar verificação inicial
+        window.onload = function() {
+            log('🚀 Iniciando debug do gráfico...');
+            checkAuth();
+        };
+    </script>
+</body>
+</html>

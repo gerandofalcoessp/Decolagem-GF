@@ -21,9 +21,8 @@ router.get('/', async (req, res) => {
       return res.status(400).json({ error: participantesError.message });
     }
 
-    res.json({ 
-      participantes: participantes || []
-    });
+    // Retorna array direto para compatibilidade com o frontend
+    res.json(participantes || []);
   } catch (error: any) {
     console.error('Erro ao buscar dados do As Maras:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });

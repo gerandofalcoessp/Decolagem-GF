@@ -136,10 +136,11 @@ router.get('/stats', async (req, res) => {
       return res.status(400).json({ error: countError.message });
     }
 
-    // Contagem por programa
+    // Contagem por programa - APENAS INSTITUIÇÕES ATIVAS
     const { data: programData, error: programError } = await s
       .from('instituicoes')
       .select('programa')
+      .eq('status', 'ativa')
       .not('programa', 'is', null);
 
     if (programError) {
@@ -156,10 +157,32 @@ router.get('/stats', async (req, res) => {
       return res.status(400).json({ error: programError.message });
     }
 
-    // Contagem por regional (área)
+    // Contagem por programa - INSTITUIÇÕES EVADIDAS
+    const { data: programEvasaoData, error: programEvasaoError } = await s
+      .from('instituicoes')
+      .select('programa')
+      .eq('status', 'evadida')
+      .not('programa', 'is', null);
+
+    if (programEvasaoError) {
+      logger.error('Error fetching program evasion data', { 
+        userId: user.id,
+        action: 'get_stats',
+        resource: 'instituicoes',
+        error: {
+          name: programEvasaoError.name || 'ProgramEvasaoError',
+          message: programEvasaoError.message,
+          stack: programEvasaoError.stack
+        }
+      });
+      return res.status(400).json({ error: programEvasaoError.message });
+    }
+
+    // Contagem por regional (área) - APENAS INSTITUIÇÕES ATIVAS
     const { data: regionalData, error: regionalError } = await s
       .from('instituicoes')
       .select('regional')
+      .eq('status', 'ativa')
       .not('regional', 'is', null);
 
     if (regionalError) {
@@ -176,8 +199,15 @@ router.get('/stats', async (req, res) => {
       return res.status(400).json({ error: regionalError.message });
     }
 
-    // Processar contagens por programa
+    // Processar contagens por programa (ativas)
     const programCounts = programData.reduce((acc: Record<string, number>, item) => {
+      const programa = item.programa;
+      acc[programa] = (acc[programa] || 0) + 1;
+      return acc;
+    }, {});
+
+    // Processar contagens por programa (evadidas)
+    const programEvasaoCounts = programEvasaoData.reduce((acc: Record<string, number>, item) => {
       const programa = item.programa;
       acc[programa] = (acc[programa] || 0) + 1;
       return acc;
@@ -190,10 +220,15 @@ router.get('/stats', async (req, res) => {
       return acc;
     }, {});
 
-    // Contagens específicas para ONGs Maras e Decolagem
+    // Contagens específicas para ONGs Maras e Decolagem (ativas)
     const ongsMaras = programCounts['as_maras'] || 0;
     const ongsDecolagem = programCounts['decolagem'] || 0;
     const ongsMicrocredito = programCounts['microcredito'] || 0;
+
+    // Contagens específicas para ONGs Maras e Decolagem (evadidas)
+    const ongsMarasEvadidas = programEvasaoCounts['as_maras'] || 0;
+    const ongsDecolagemEvadidas = programEvasaoCounts['decolagem'] || 0;
+    const ongsMicrocreditoEvadidas = programEvasaoCounts['microcredito'] || 0;
 
     // Buscar dados de famílias embarcadas das atividades registradas
     const { data: atividadesFamiliasData, error: atividadesError } = await s
@@ -250,11 +285,19 @@ router.get('/stats', async (req, res) => {
         decolagem: ongsDecolagem,
         microcredito: ongsMicrocredito
       },
+      evasaoPorPrograma: {
+        as_maras: ongsMarasEvadidas,
+        decolagem: ongsDecolagemEvadidas,
+        microcredito: ongsMicrocreditoEvadidas
+      },
       porRegional: regionalCounts,
       resumo: {
         ongsMaras,
         ongsDecolagem,
         ongsMicrocredito,
+        ongsMarasEvadidas,
+        ongsDecolagemEvadidas,
+        ongsMicrocreditoEvadidas,
         totalPorArea: Object.keys(regionalCounts).length,
         familiasEmbarcadas,
         diagnosticosRealizados,

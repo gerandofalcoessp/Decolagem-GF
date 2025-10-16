@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/authStore';
+import { supabase, isSupabaseConfigured } from '@/services/supabaseClient';
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '');
 
@@ -38,14 +39,33 @@ export function useApi<T>(endpoint: string, options: UseApiOptions = { immediate
         },
       });
 
-      if (!response.ok) {
-        if (response.status === 429) {
-          throw new Error('Muitas requisições. Aguarde um momento e tente novamente.');
+      const contentType = response.headers.get('content-type') || '';
+      let result: any = null;
+      let rawText: string | null = null;
+
+      if (contentType.includes('application/json')) {
+        try {
+          result = await response.json();
+        } catch (e) {
+          rawText = await response.text().catch(() => '');
         }
-        throw new Error(`Erro ${response.status}: ${response.statusText}`);
+      } else {
+        rawText = await response.text().catch(() => '');
       }
 
-      const result = await response.json();
+      if (!response.ok) {
+        const msg = (result && result.error) ? result.error : (rawText ? rawText : `Erro ${response.status}: ${response.statusText}`);
+        throw new Error(msg);
+      }
+
+      if (!result) {
+        try {
+          result = rawText ? JSON.parse(rawText) : {};
+        } catch {
+          throw new Error('Resposta do servidor inválida: conteúdo não JSON');
+        }
+      }
+
       console.log(`📦 Dados recebidos de ${endpoint}:`, result);
       
       // Verificar se a resposta segue o padrão ApiResponse
@@ -85,20 +105,40 @@ export function useApi<T>(endpoint: string, options: UseApiOptions = { immediate
         body: JSON.stringify(body),
       });
 
-      if (!response.ok) {
-        if (response.status === 429) {
-          throw new Error('Muitas requisições. Aguarde um momento e tente novamente.');
+      const contentType = response.headers.get('content-type') || '';
+      let result: any = null;
+      let rawText: string | null = null;
+
+      if (contentType.includes('application/json')) {
+        try {
+          result = await response.json();
+        } catch (e) {
+          rawText = await response.text().catch(() => '');
         }
-        throw new Error(`Erro ${response.status}: ${response.statusText}`);
+      } else {
+        rawText = await response.text().catch(() => '');
       }
 
-      const result: ApiResponse<T> = await response.json();
-      
+      if (!response.ok) {
+        const msg = (result && result.error) ? result.error : (rawText ? rawText : `Erro ${response.status}: ${response.statusText}`);
+        throw new Error(msg);
+      }
+
+      if (!result) {
+        try {
+          result = rawText ? JSON.parse(rawText) : {};
+        } catch {
+          throw new Error('Resposta do servidor inválida: conteúdo não JSON');
+        }
+      }
+
+      // Suporta tanto { data: ... } quanto resposta direta
       if (result.error) {
         throw new Error(result.error);
       }
 
-      return result.data;
+      const dataOut = result.data !== undefined ? result.data : result;
+      return dataOut as T;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro desconhecido');
       return null;
@@ -132,7 +172,7 @@ export const useActivities = () => {
       throw new Error('Usuário não autenticado');
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/atividades`, {
+    const response = await fetch(`${API_BASE_URL}/api/regional-activities`, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -164,6 +204,7 @@ export const useActivities = () => {
 // Hook para atividades regionais
 export const useRegionalActivities = () => {
   const token = localStorage.getItem('auth_token');
+  const queryClient = useQueryClient();
   
   const fetchRegionalActivities = async () => {
     if (!token) {
@@ -189,10 +230,28 @@ export const useRegionalActivities = () => {
     queryKey: ['regional-activities'],
     queryFn: fetchRegionalActivities,
     enabled: !!token,
-    staleTime: 5 * 60 * 1000, // 5 minutos - dados considerados frescos
-    gcTime: 10 * 60 * 1000, // 10 minutos de cache
-    refetchOnWindowFocus: false, // Não recarregar automaticamente ao focar na janela
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchInterval: isSupabaseConfigured() ? false : 10000,
   });
+
+  // Assinatura em tempo real via Supabase para invalidar cache quando houver mudanças
+  useEffect(() => {
+    if (!isSupabaseConfigured() || !supabase) return;
+
+    const channel = supabase
+      .channel('regional_activities_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'regional_activities' }, (_payload) => {
+        // Invalida e faz refetch das atividades regionais
+        queryClient.invalidateQueries({ queryKey: ['regional-activities'] });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   return {
     data,
@@ -301,9 +360,9 @@ export const useCalendarEvents = (isGlobal = false) => {
     queryKey: ['calendar-events', user?.regional || 'no-regional'],
     queryFn: fetchCalendarEvents,
     enabled: !!token,
-    staleTime: 0, // Sempre considerar dados como obsoletos
-    gcTime: 0, // React Query v4: Não manter cache (era cacheTime)
-    refetchOnMount: 'always', // Sempre refetch ao montar
+    staleTime: 5 * 60 * 1000, // 5 minutos - dados considerados frescos
+    gcTime: 15 * 60 * 1000, // 15 minutos de cache em memória
+    refetchOnMount: false, // Usar cache se disponível
     refetchOnWindowFocus: false, // Não refetch no foco da janela
     refetchOnReconnect: true, // Refetch ao reconectar
   });

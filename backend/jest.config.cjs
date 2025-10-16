@@ -19,6 +19,9 @@ const config = {
   setupFilesAfterEnv: ['<rootDir>/src/tests/setup.ts'],
   moduleFileExtensions: ['ts', 'js', 'json'],
   testTimeout: 10000,
+  moduleNameMapping: {
+    '^(\\.{1,2}/.*)\\.js$': '$1',
+  },
 };
 
 module.exports = config;
