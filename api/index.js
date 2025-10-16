@@ -8,16 +8,26 @@ export default async function handler(req, res) {
   try {
     // Early debug check usando req.url bruto
     const url = req.url || '';
-    if (url.startsWith('/api/debug/dist') || url.startsWith('/debug/dist')) {
+    if (url.startsWith('/api/debug/dist') || url.startsWith('/debug/dist') || url.startsWith('/api/debug/ls') || url.startsWith('/debug/ls')) {
       const cwdDir = __dirname || '.';
       const candidates = [
+        // candidatos relativos e absolutos para diagnosticar presença no bundle
         path.resolve(cwdDir, './_backend_dist/server.js'),
         path.resolve(cwdDir, './_backend_dist'),
+        path.resolve(cwdDir, './server.js'),
+        '/var/task/api/server.js',
         '/var/task/api/_backend_dist/server.js',
-        '/var/task/api/_backend_dist'
+        '/var/task/api/_backend_dist',
+        '/var/task/backend/dist/server.js',
+        '/var/task/backend/dist'
       ];
       const checks = candidates.map(p => ({ path: p, exists: existsSync(p) }));
-      return res.status(200).json({ from: 'vercel-function', checks });
+      // listagem básica de diretórios para inspecionar o runtime
+      let ls = {};
+      try { ls['/var/task'] = await (async ()=>{ try { return (await import('node:fs')).readdirSync('/var/task'); } catch { return null; } })(); } catch {}
+      try { ls['/var/task/api'] = await (async ()=>{ try { return (await import('node:fs')).readdirSync('/var/task/api'); } catch { return null; } })(); } catch {}
+      try { ls['/var/task/backend'] = await (async ()=>{ try { return (await import('node:fs')).readdirSync('/var/task/backend'); } catch { return null; } })(); } catch {}
+      return res.status(200).json({ from: 'vercel-function', checks, ls });
     }
 
     // Parser robusto de querystring para recuperar ?path=...
@@ -46,17 +56,25 @@ export default async function handler(req, res) {
       return res.status(200).json({ status: 'ok', source: 'vercel-function' });
     }
 
-    // Redundante: também permitir debug via normalizedPath e rawPath
-    if (normalizedPath === '/api/debug/dist' || rawPath === 'debug/dist') {
+    // Debug adicional via normalizedPath e rawPath
+    if (normalizedPath === '/api/debug/dist' || rawPath === 'debug/dist' || normalizedPath === '/api/debug/ls' || rawPath === 'debug/ls') {
       const cwdDir = __dirname || '.';
       const candidates = [
         path.resolve(cwdDir, './_backend_dist/server.js'),
         path.resolve(cwdDir, './_backend_dist'),
+        path.resolve(cwdDir, './server.js'),
+        '/var/task/api/server.js',
         '/var/task/api/_backend_dist/server.js',
-        '/var/task/api/_backend_dist'
+        '/var/task/api/_backend_dist',
+        '/var/task/backend/dist/server.js',
+        '/var/task/backend/dist'
       ];
       const checks = candidates.map(p => ({ path: p, exists: existsSync(p) }));
-      return res.status(200).json({ from: 'vercel-function', checks });
+      let ls = {};
+      try { ls['/var/task'] = await (async ()=>{ try { return (await import('node:fs')).readdirSync('/var/task'); } catch { return null; } })(); } catch {}
+      try { ls['/var/task/api'] = await (async ()=>{ try { return (await import('node:fs')).readdirSync('/var/task/api'); } catch { return null; } })(); } catch {}
+      try { ls['/var/task/backend'] = await (async ()=>{ try { return (await import('node:fs')).readdirSync('/var/task/backend'); } catch { return null; } })(); } catch {}
+      return res.status(200).json({ from: 'vercel-function', checks, ls });
     }
 
     // Resolve e importa o app Express com múltiplos candidatos (robusto)
@@ -77,15 +95,15 @@ export default async function handler(req, res) {
     for (const spec of tryOrder) {
       try {
         const isAbs = spec.startsWith('/');
-        const mod = isAbs ? await import(pathToFileURL(spec).href) : await import(spec);
-        app = mod?.default || mod?.app || mod?.server;
+        const href = isAbs ? pathToFileURL(spec).href : pathToFileURL(path.resolve(cwdDir, spec)).href;
+        const mod = await import(href);
+        app = mod?.default || mod?.app || mod?.server || mod;
         if (app) break;
       } catch (e) {
         lastErr = e;
         // Tenta via require (CommonJS) como fallback
         try {
           const resolved = spec.startsWith('.') ? path.resolve(cwdDir, spec) : spec;
-          // Para paths absolutos, require aceita string direta
           const modReq = requireFn(resolved);
           app = modReq?.default || modReq?.app || modReq?.server || modReq;
           if (app) break;
@@ -95,8 +113,8 @@ export default async function handler(req, res) {
       }
     }
     if (!app) {
+      const attempted = tryOrder.map(s => ({ spec: s, exists: existsSync(s.startsWith('.') ? path.resolve(cwdDir, s) : s) }));
       const msg = lastErr?.message || 'dynamic_import_failed_all';
-      const attempted = tryOrder.map(s => ({ spec: s, exists: existsSync(s) }));
       return res.status(500).json({ error: 'handler_import_failed', message: msg, attempted });
     }
 
