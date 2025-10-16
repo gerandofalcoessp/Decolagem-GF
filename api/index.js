@@ -9,9 +9,15 @@ export default async function handler(req, res) {
     // Determina diretório do módulo de forma confiável (ESM)
     const moduleDir = path.dirname(fileURLToPath(import.meta.url));
 
-    // Early debug check usando req.url bruto
+    // Early debug check usando req.url bruto e req.query.path
     const url = req.url || '';
-    if (url.startsWith('/api/debug/dist') || url.startsWith('/debug/dist') || url.startsWith('/api/debug/ls') || url.startsWith('/debug/ls')) {
+    const qp = (req && typeof req.query === 'object') ? req.query : {};
+    const qpPath = typeof qp.path === 'string' ? qp.path : '';
+    if (
+      url.startsWith('/api/debug/dist') || url.startsWith('/debug/dist') ||
+      url.startsWith('/api/debug/ls') || url.startsWith('/debug/ls') ||
+      qpPath === 'debug/dist' || qpPath === 'debug/ls'
+    ) {
       const candidates = [
         // candidatos relativos e absolutos para diagnosticar presença no bundle
         path.resolve(moduleDir, './_backend_dist/server.js'),
@@ -33,13 +39,16 @@ export default async function handler(req, res) {
     }
 
     // Parser robusto de querystring para recuperar ?path=...
-    // Usa URL para extrair searchParams, com fallback para req.query
+    // Usa URL para extrair searchParams e mescla com req.query do Vercel/Express
     let queryParams = {};
     try {
       const parsed = new URL(req.url || '', 'http://localhost');
       queryParams = Object.fromEntries(parsed.searchParams.entries());
     } catch (_) {
-      queryParams = req.query || {};
+      queryParams = {};
+    }
+    if (req && typeof req.query === 'object' && Object.keys(req.query).length > 0) {
+      queryParams = { ...queryParams, ...req.query };
     }
 
     // Reconstrói o path original a partir do query param adicionado pela rota
