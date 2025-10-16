@@ -5,7 +5,8 @@
     "api/*.js": {
       "runtime": "nodejs20.x",
       "includeFiles": [
-        "backend/dist/**"
+        "backend/dist/**",
+        "api/_backend_dist/**"
       ]
     }
   },

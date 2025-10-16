@@ -4,7 +4,7 @@ import path from "node:path";
 
 export default async function handler(req, res) {
   try {
-    // Early debug check using raw req.url to avoid any mismatch with routing params
+    // Early debug check usando req.url bruto
     const url = req.url || '';
     if (url.startsWith('/api/debug/dist') || url.startsWith('/debug/dist')) {
       const cwdDir = __dirname || '.';
@@ -18,9 +18,18 @@ export default async function handler(req, res) {
       return res.status(200).json({ from: 'vercel-function', checks });
     }
 
+    // Parser robusto de querystring para recuperar ?path=...
+    // Usa URL para extrair searchParams, com fallback para req.query
+    let queryParams = {};
+    try {
+      const parsed = new URL(req.url || '', 'http://localhost');
+      queryParams = Object.fromEntries(parsed.searchParams.entries());
+    } catch (_) {
+      queryParams = req.query || {};
+    }
+
     // Reconstrói o path original a partir do query param adicionado pela rota
-    const qp = req.query || {};
-    const rawPath = typeof qp.path === 'string' ? qp.path : '';
+    const rawPath = typeof queryParams.path === 'string' ? queryParams.path : '';
     // Garantir que Express receba o prefixo "/api/" para resolver corretamente os routers montados
     const originalPath = rawPath
       ? (rawPath.startsWith('api/') ? `/${rawPath}` : `/api/${rawPath}`)
@@ -49,8 +58,7 @@ export default async function handler(req, res) {
     }
 
     // Importa o app Express dinamicamente a partir de api/_backend_dist somente
-    const cwdDir = __dirname || '.';
-    const primaryPath = ['./', '_backend_dist', 'server.js'].join('');
+    const primaryPath = './_backend_dist/server.js';
     let app;
     try {
       const modPrimary = await import(primaryPath);
