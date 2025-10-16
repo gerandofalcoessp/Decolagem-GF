@@ -32,21 +32,23 @@ export const requestLogger = (req: RequestWithStartTime, res: Response, next: Ne
     action: 'request_start'
   });
 
-  // Interceptar a resposta para logar quando ela for enviada
-  const originalSend = res.send;
-  res.send = function(body) {
-    const duration = req.startTime ? `${Date.now() - req.startTime}ms` : 'unknown';
+  // Logar quando a resposta for finalizada (não intercepta res.send/res.json)
+  res.on('finish', () => {
+    const duration = req.startTime ? `${Date.now() - (req.startTime as number)}ms` : 'unknown';
     const statusCode = res.statusCode;
 
-    // Log da resposta
-    if (statusCode >= 400) {
-      logger.logHttpError(method, originalUrl, statusCode, new Error(`HTTP ${statusCode}`), userId, ip);
-    } else {
-      logger.logHttpRequest(method, originalUrl, statusCode, duration, userId, ip, userAgent);
+    try {
+      if (statusCode >= 400) {
+        logger.logHttpError(method, originalUrl, statusCode, new Error(`HTTP ${statusCode}`), userId, ip);
+      } else {
+        logger.logHttpRequest(method, originalUrl, statusCode, duration, userId, ip, userAgent as string);
+      }
+    } catch (logErr) {
+      // Nunca permitir que erros de logging quebrem a resposta
+      const msg = logErr instanceof Error ? logErr.message : String(logErr);
+      console.error('[requestLogger] Failed to log response:', msg);
     }
-
-    return originalSend.call(this, body);
-  };
+  });
 
   next();
 };

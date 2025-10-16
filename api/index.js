@@ -11,14 +11,32 @@ export default async function handler(req, res) {
     // Preserva querystring original se houver
     const qsIndex = (req.url || '').indexOf('?');
     const originalQS = qsIndex >= 0 ? (req.url || '').slice(qsIndex) : '';
+
+    // Endpoint de health direto pela função (bypass Express) para diagnosticar erro 500
+    const normalizedPath = originalPath.split('?')[0];
+    if (normalizedPath === '/api/health' || normalizedPath === '/health' || rawPath === 'health') {
+      return res.status(200).json({ status: 'ok', source: 'vercel-function' });
+    }
+
+    // Importa o app Express dinamicamente para evitar falhas de top-level import
+    let app;
+    try {
+      const mod = await import('../backend/dist/server.js');
+      app = mod?.default;
+      if (!app) throw new Error('express_app_not_exported');
+    } catch (e) {
+      console.error('[vercel-api] Dynamic import failed:', e);
+      const message = (e && e.message) ? e.message : 'dynamic_import_failed';
+      return res.status(500).json({ error: 'handler_import_failed', message });
+    }
+
     // Atualiza req.url para o Express enxergar a rota correta
     req.url = originalPath + (originalQS && !originalPath.includes('?') ? originalQS : '');
 
-    // Importa o app Express compilado (server.js) do backend
-    const { default: app } = await import('../backend/dist/server.js');
+    // Usa app Express importado dinamicamente
     return app(req, res);
   } catch (err) {
-    console.error('[vercel-api] Failed to initialize app:', err);
+    console.error('[vercel-api] Failed to handle request:', err);
     const message = (err && err.message) ? err.message : 'unknown_error';
     res.status(500).json({ error: 'handler_init_failed', message });
   }
