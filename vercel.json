@@ -1,12 +1,6 @@
 {
   "version": 2,
   "buildCommand": "npm --prefix backend run vercel-build && rm -rf api/_backend_dist && mkdir -p api/_backend_dist && cp -R backend/dist/* api/_backend_dist/ && cp backend/dist/server.js api/server.js",
-  "functions": {
-    "api/*.js": {
-      "runtime": "nodejs20.x",
-      "includeFiles": "{backend/dist/**,api/_backend_dist/**,api/server.js}"
-    }
-  },
   "routes": [
     { "src": "/api/health", "dest": "/api?path=health" },
     { "src": "/health", "dest": "/api?path=health" },
