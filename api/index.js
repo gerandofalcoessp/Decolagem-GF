@@ -9,14 +9,20 @@ export default async function handler(req, res) {
     // Determina diretório do módulo de forma confiável (ESM)
     const moduleDir = path.dirname(fileURLToPath(import.meta.url));
 
-    // Early debug check usando req.url bruto e req.query.path
+    // Early debug check usando req.url bruto, querystring parseado e req.query.path
     const url = req.url || '';
+    let urlPathParam = '';
+    try {
+      const parsedEarly = new URL(url, 'http://localhost');
+      urlPathParam = parsedEarly.searchParams.get('path') || '';
+    } catch {}
     const qp = (req && typeof req.query === 'object') ? req.query : {};
     const qpPath = typeof qp.path === 'string' ? qp.path : '';
+    const effectivePathParam = qpPath || urlPathParam;
     if (
       url.startsWith('/api/debug/dist') || url.startsWith('/debug/dist') ||
       url.startsWith('/api/debug/ls') || url.startsWith('/debug/ls') ||
-      qpPath === 'debug/dist' || qpPath === 'debug/ls'
+      effectivePathParam === 'debug/dist' || effectivePathParam === 'debug/ls'
     ) {
       const candidates = [
         // candidatos relativos e absolutos para diagnosticar presença no bundle
@@ -35,7 +41,7 @@ export default async function handler(req, res) {
       try { ls['/var/task'] = await (async ()=>{ try { return (await import('node:fs')).readdirSync('/var/task'); } catch { return null; } })(); } catch {}
       try { ls['/var/task/api'] = await (async ()=>{ try { return (await import('node:fs')).readdirSync('/var/task/api'); } catch { return null; } })(); } catch {}
       try { ls['/var/task/backend'] = await (async ()=>{ try { return (await import('node:fs')).readdirSync('/var/task/backend'); } catch { return null; } })(); } catch {}
-      return res.status(200).json({ from: 'vercel-function', checks, ls });
+      return res.status(200).json({ from: 'vercel-function', checks, ls, url, effectivePathParam });
     }
 
     // Parser robusto de querystring para recuperar ?path=...
