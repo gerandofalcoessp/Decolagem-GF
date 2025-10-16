@@ -10,11 +10,9 @@ export default async function handler(req, res) {
       const cwdDir = __dirname || '.';
       const candidates = [
         path.resolve(cwdDir, './_backend_dist/server.js'),
-        path.resolve(cwdDir, '../backend/dist/server.js'),
-        '/var/task/api/_backend_dist/server.js',
-        '/var/task/backend/dist/server.js',
         path.resolve(cwdDir, './_backend_dist'),
-        path.resolve(cwdDir, '../backend/dist')
+        '/var/task/api/_backend_dist/server.js',
+        '/var/task/api/_backend_dist'
       ];
       const checks = candidates.map(p => ({ path: p, exists: existsSync(p) }));
       return res.status(200).json({ from: 'vercel-function', checks });
@@ -42,35 +40,26 @@ export default async function handler(req, res) {
       const cwdDir = __dirname || '.';
       const candidates = [
         path.resolve(cwdDir, './_backend_dist/server.js'),
-        path.resolve(cwdDir, '../backend/dist/server.js'),
-        '/var/task/api/_backend_dist/server.js',
-        '/var/task/backend/dist/server.js',
         path.resolve(cwdDir, './_backend_dist'),
-        path.resolve(cwdDir, '../backend/dist')
+        '/var/task/api/_backend_dist/server.js',
+        '/var/task/api/_backend_dist'
       ];
       const checks = candidates.map(p => ({ path: p, exists: existsSync(p) }));
       return res.status(200).json({ from: 'vercel-function', checks });
     }
 
-    // Importa o app Express dinamicamente para evitar falhas de top-level import
+    // Importa o app Express dinamicamente a partir de api/_backend_dist somente
+    const cwdDir = __dirname || '.';
+    const primaryPath = ['./', '_backend_dist', 'server.js'].join('');
     let app;
     try {
-      // Primeira tentativa: pasta replicada para dentro de api
-      const modPrimary = await import('./_backend_dist/server.js');
+      const modPrimary = await import(primaryPath);
       app = modPrimary?.default;
       if (!app) throw new Error('express_app_not_exported');
     } catch (ePrimary) {
-      try {
-        // Fallback: importar da pasta original backend/dist se estiver incluída no bundle
-        const modFallback = await import('../backend/dist/server.js');
-        app = modFallback?.default;
-        if (!app) throw new Error('express_app_not_exported');
-      } catch (eFallback) {
-        console.error('[vercel-api] Dynamic import failed (primary and fallback):', ePrimary, eFallback);
-        const msgPrimary = (ePrimary && ePrimary.message) ? ePrimary.message : 'dynamic_import_failed_primary';
-        const msgFallback = (eFallback && eFallback.message) ? eFallback.message : 'dynamic_import_failed_fallback';
-        return res.status(500).json({ error: 'handler_import_failed', message: `${msgPrimary} ; ${msgFallback}` });
-      }
+      console.error('[vercel-api] Dynamic import failed (primary only):', ePrimary);
+      const msgPrimary = (ePrimary && ePrimary.message) ? ePrimary.message : 'dynamic_import_failed_primary';
+      return res.status(500).json({ error: 'handler_import_failed', message: msgPrimary });
     }
 
     // Atualiza req.url para o Express enxergar a rota correta
