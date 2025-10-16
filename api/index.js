@@ -1,6 +1,7 @@
 // Vercel Serverless Function wrapper for the Express app
 import { existsSync } from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 export default async function handler(req, res) {
   try {
@@ -57,17 +58,34 @@ export default async function handler(req, res) {
       return res.status(200).json({ from: 'vercel-function', checks });
     }
 
-    // Importa o app Express dinamicamente a partir de api/_backend_dist somente
-    const primaryPath = './_backend_dist/server.js';
+    // Resolve e importa o app Express com múltiplos candidatos (robusto)
+    const cwdDir = __dirname || '.';
+    const relCandidates = [
+      './_backend_dist/server.js',
+      './server.js'
+    ];
+    const absCandidates = [
+      path.resolve(cwdDir, './_backend_dist/server.js'),
+      '/var/task/api/_backend_dist/server.js',
+      '/var/task/backend/dist/server.js'
+    ];
+    const tryOrder = [...relCandidates, ...absCandidates];
     let app;
-    try {
-      const modPrimary = await import(primaryPath);
-      app = modPrimary?.default;
-      if (!app) throw new Error('express_app_not_exported');
-    } catch (ePrimary) {
-      console.error('[vercel-api] Dynamic import failed (primary only):', ePrimary);
-      const msgPrimary = (ePrimary && ePrimary.message) ? ePrimary.message : 'dynamic_import_failed_primary';
-      return res.status(500).json({ error: 'handler_import_failed', message: msgPrimary });
+    let lastErr;
+    for (const spec of tryOrder) {
+      try {
+        const isAbs = spec.startsWith('/');
+        const mod = isAbs ? await import(pathToFileURL(spec).href) : await import(spec);
+        app = mod?.default || mod?.app || mod?.server;
+        if (app) break;
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+    if (!app) {
+      const msg = lastErr?.message || 'dynamic_import_failed_all';
+      const attempted = tryOrder.map(s => ({ spec: s, exists: existsSync(s) }));
+      return res.status(500).json({ error: 'handler_import_failed', message: msg, attempted });
     }
 
     // Atualiza req.url para o Express enxergar a rota correta
