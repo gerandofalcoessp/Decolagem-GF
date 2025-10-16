@@ -4,11 +4,7 @@
   "functions": {
     "api/*.js": {
       "runtime": "nodejs20.x",
-      "includeFiles": [
-        "backend/dist/**",
-        "api/_backend_dist/**",
-        "api/server.js"
-      ]
+      "includeFiles": "{backend/dist/**,api/_backend_dist/**,api/server.js}"
     }
   },
   "routes": [
