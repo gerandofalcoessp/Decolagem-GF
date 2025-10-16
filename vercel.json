@@ -1,15 +1,11 @@
 {
   "version": 2,
-  "buildCommand": "npm --prefix backend run vercel-build",
+  "buildCommand": "npm --prefix backend run vercel-build && rm -rf api/_backend_dist && mkdir -p api/_backend_dist && cp -R backend/dist/* api/_backend_dist/",
   "functions": {
     "api/*.js": {
       "runtime": "nodejs20.x",
       "includeFiles": [
-        "backend/dist/**",
-        {
-          "source": "backend/dist/**",
-          "destination": "api/_backend_dist"
-        }
+        "backend/dist/**"
       ]
     }
   },
