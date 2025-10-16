@@ -21,9 +21,8 @@ router.get('/', async (req, res) => {
       return res.status(400).json({ error: familiasError.message });
     }
 
-    res.json({ 
-      familias: familias || []
-    });
+    // Retorna array direto para compatibilidade com o frontend
+    res.json(familias || []);
   } catch (error: any) {
     console.error('Erro ao buscar dados do Decolagem:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });

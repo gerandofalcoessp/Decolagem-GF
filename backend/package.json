@@ -32,8 +32,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "lint": "echo 'ESLint não configurado ainda'",
-    "format": "echo 'Prettier não configurado ainda'",
+    "lint": "eslint --ext .ts src",
+    "format": "prettier --write \"src/**/*.ts\"",
     "type-check": "tsc --noEmit",
     "clean": "rm -rf dist",
     "dev:serve-frontend": "cross-env PORT=3001 SERVE_FRONTEND=true tsx watch src/server.ts"
@@ -49,6 +49,7 @@
     "morgan": "^1.10.0",
     "multer": "^2.0.2",
     "node-fetch": "^3.3.2",
+    "pg": "^8.16.3",
     "zod": "^3.22.4"
   },
   "devDependencies": {
@@ -58,8 +59,14 @@
     "@types/morgan": "^1.9.5",
     "@types/node": "^20.11.30",
     "@types/supertest": "^6.0.2",
+    "@typescript-eslint/eslint-plugin": "^8.46.1",
+    "@typescript-eslint/parser": "^8.46.1",
     "cross-env": "^7.0.3",
+    "eslint": "^8.54.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
     "jest": "^29.7.0",
+    "prettier": "^3.6.2",
     "supertest": "^6.3.4",
     "ts-jest": "^29.1.2",
     "tsx": "^4.7.0",

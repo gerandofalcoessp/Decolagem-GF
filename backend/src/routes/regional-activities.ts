@@ -177,7 +177,16 @@ router.get('/', cacheMiddleware({ ttl: 180 }), async (req, res) => {
       participantes_confirmados: 0,
       quantidade: activity.quantidade,
       status: activity.status || 'ativo',
-      evidencias: activity.evidences || [],
+      evidencias: (() => {
+        // Garantir que evidencias seja sempre um array
+        if (!activity.evidences) return [];
+        if (Array.isArray(activity.evidences)) return activity.evidences;
+        // Se for um objeto, tentar extrair o array
+        if (typeof activity.evidences === 'object' && activity.evidences.evidences) {
+          return Array.isArray(activity.evidences.evidences) ? activity.evidences.evidences : [];
+        }
+        return [];
+      })(),
       created_at: activity.created_at
     })) || [];
 
@@ -234,6 +243,7 @@ router.post('/', upload.array('evidencias', 2), invalidateCacheMiddleware(['regi
       quantidade,
       atividadeLabel,
       atividadeCustomLabel,
+      regionaisNPS,
       ...otherData 
     } = req.body;
     const files = req.files as Express.Multer.File[];
@@ -310,6 +320,8 @@ router.post('/', upload.array('evidencias', 2), invalidateCacheMiddleware(['regi
       quantidade: quantidade ? parseInt(quantidade) : null,
       atividade_label: atividadeLabel || null,
       atividade_custom_label: atividadeCustomLabel || null,
+      // Para atividades NPS, armazenar as regionais selecionadas
+      regionais_nps: regionaisNPS ? JSON.stringify(regionaisNPS) : null,
       ...(responsavel_id && { responsavel_id })
     };
 
@@ -745,14 +757,40 @@ router.put('/:id', invalidateCacheMiddleware(['regional-activities']), async (re
 
 // DELETE - Deletar atividade regional
 router.delete('/:id', invalidateCacheMiddleware(['regional-activities']), async (req, res) => {
-  const authHeader = req.headers.authorization;
-  const token = req.headers.authorization;
-  const s = getSupabaseForToken(token);
-  if (!s) return res.status(500).json({ error: 'supabase_client_unavailable' });
-  
-  const { data, error } = await s.from('regional_activities').delete().eq('id', req.params.id).select('*');
-  if (error) return res.status(400).json({ error: error.message });
-  res.json({ success: true, data: data || [] });
+  try {
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
+    
+    if (!token) {
+      return res.status(401).json({ error: 'Token de autorização não fornecido' });
+    }
+    
+    const s = getSupabaseForToken(token);
+    if (!s) {
+      return res.status(500).json({ error: 'supabase_client_unavailable' });
+    }
+
+    // Verificar se o usuário está autenticado
+    const user = await getUserFromToken(token);
+    if (!user) {
+      return res.status(401).json({ error: 'Token inválido ou expirado' });
+    }
+
+    console.log(`[DELETE] Tentando deletar atividade ${req.params.id} para usuário ${user.id}`);
+    
+    const { data, error } = await s.from('regional_activities').delete().eq('id', req.params.id).select('*');
+    
+    if (error) {
+      console.error(`[DELETE] Erro ao deletar atividade ${req.params.id}:`, error);
+      return res.status(400).json({ error: error.message });
+    }
+    
+    console.log(`[DELETE] Atividade ${req.params.id} deletada com sucesso`);
+    res.json({ success: true, data: data || [] });
+  } catch (error) {
+    console.error('[DELETE] Erro interno:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
 });
 
 export default router;

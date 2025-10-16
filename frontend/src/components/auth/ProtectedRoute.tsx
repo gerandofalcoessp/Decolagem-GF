@@ -2,6 +2,7 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/store/authStore';
 import { hasPermission } from '@/store/authStore';
 import type { UserRole } from '@/types';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -14,7 +15,16 @@ export default function ProtectedRoute({
   requiredRole,
   redirectTo = '/login' 
 }: ProtectedRouteProps) {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
+
+  // Enquanto verifica autenticação, mostrar loading
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
 
   // Se não estiver autenticado, redireciona para login
   if (!isAuthenticated || !user) {

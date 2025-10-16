@@ -16,16 +16,38 @@ export default function MonthSelector({ selectedMonths, setSelectedMonths, meses
   const handleToggle = (value: string, checked: boolean) => {
     if (value === 'todo-ano') {
       if (checked) {
-        setSelectedMonths(['todo-ano']);
+        // Quando "Todo o ano" é selecionado, marcar todos os meses individuais também
+        const todosMeses = mesesDisponiveis
+          .filter(mes => mes.value !== 'todo-ano')
+          .map(mes => mes.value);
+        setSelectedMonths(['todo-ano', ...todosMeses]);
       } else {
         setSelectedMonths([]);
       }
     } else {
       if (checked) {
         const novosMeses = selectedMonths.filter(m => m !== 'todo-ano');
-        setSelectedMonths([...novosMeses, value]);
+        const mesesAtualizados = [...novosMeses, value];
+        
+        // Verificar se todos os meses individuais estão selecionados
+        const todosMesesIndividuais = mesesDisponiveis
+          .filter(mes => mes.value !== 'todo-ano')
+          .map(mes => mes.value);
+        
+        const todosIndividuaisSelecionados = todosMesesIndividuais.every(mes => 
+          mesesAtualizados.includes(mes)
+        );
+        
+        // Se todos os meses individuais estão selecionados, adicionar "todo-ano" também
+        if (todosIndividuaisSelecionados) {
+          setSelectedMonths(['todo-ano', ...mesesAtualizados]);
+        } else {
+          setSelectedMonths(mesesAtualizados);
+        }
       } else {
-        setSelectedMonths(selectedMonths.filter(m => m !== value));
+        // Ao desmarcar um mês individual, remover "todo-ano" se estiver selecionado
+        const mesesAtualizados = selectedMonths.filter(m => m !== value && m !== 'todo-ano');
+        setSelectedMonths(mesesAtualizados);
       }
     }
   };

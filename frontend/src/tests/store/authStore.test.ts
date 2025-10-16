@@ -81,12 +81,7 @@ describe('AuthStore', () => {
     });
 
     it('deve tratar erro de login', async () => {
-      const mockResponse = {
-        success: false,
-        error: 'Invalid credentials',
-      };
-
-      mockAuthService.login.mockResolvedValue(mockResponse);
+      mockAuthService.login.mockRejectedValue(new Error('Invalid credentials'));
 
       const { result } = renderHook(() => useAuthStore());
 
@@ -228,10 +223,7 @@ describe('AuthStore', () => {
     });
 
     it('deve tratar usuário não autenticado', async () => {
-      mockAuthService.getCurrentUser.mockResolvedValue({
-        success: false,
-        error: 'Token não encontrado',
-      });
+      mockAuthService.getCurrentUser.mockResolvedValue(null);
 
       const { result } = renderHook(() => useAuthStore());
 
@@ -278,10 +270,7 @@ describe('AuthStore', () => {
     });
 
     it('deve tratar erro de registro', async () => {
-      mockAuthService.register.mockResolvedValue({
-        success: false,
-        error: 'Email já existe',
-      });
+      mockAuthService.register.mockRejectedValue(new Error('Email já existe'));
 
       const { result } = renderHook(() => useAuthStore());
 
@@ -319,10 +308,7 @@ describe('AuthStore', () => {
     });
 
     it('deve tratar erro de reset de senha', async () => {
-      mockAuthService.resetPassword.mockResolvedValue({
-        success: false,
-        error: 'Email não encontrado',
-      });
+      mockAuthService.resetPassword.mockRejectedValue(new Error('Email não encontrado'));
 
       const { result } = renderHook(() => useAuthStore());
 
@@ -352,10 +338,7 @@ describe('AuthStore', () => {
     });
 
     it('deve tratar erro de atualização de senha', async () => {
-      mockAuthService.updatePassword.mockResolvedValue({
-        success: false,
-        error: 'Senha muito fraca',
-      });
+      mockAuthService.updatePassword.mockRejectedValue(new Error('Senha muito fraca'));
 
       const { result } = renderHook(() => useAuthStore());
 

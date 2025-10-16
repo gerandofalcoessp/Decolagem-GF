@@ -74,6 +74,8 @@ const corsOptions = {
 // Middlewares básicos
 app.use(helmet());
 app.use(cors(corsOptions));
+// Suporte explícito à preflight (OPTIONS) para todas as rotas
+app.options('*', cors(corsOptions));
 app.use(express.json());
 app.use(requestLogger); // Adicionar logging estruturado
 app.use(morgan('dev'));

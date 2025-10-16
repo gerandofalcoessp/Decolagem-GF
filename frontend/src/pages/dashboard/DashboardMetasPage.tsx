@@ -137,33 +137,42 @@ export default function DashboardMetasPage() {
       meta.responsavel?.toLowerCase().trim() === filtroEquipe.toLowerCase().trim() ||
       meta.criado_por?.toLowerCase().trim() === filtroEquipe.toLowerCase().trim();
     
-    // Filtros de data - verificar se há data válida
+    // Filtros de data - tratar metas anuais corretamente e normalizar meses
     let mesMatch = true;
     let anoMatch = true;
     
-    if (meta.dataInicio) {
-      const date = new Date(meta.dataInicio);
-      if (!isNaN(date.getTime())) {
-        const mes = (date.getMonth() + 1).toString();
-        const ano = date.getFullYear().toString();
-        mesMatch = filtroMes === 'todos' || filtroMes === mes;
-        anoMatch = filtroAno === 'todos' || filtroAno === ano;
+    const filtroMesStr = String(filtroMes).trim();
+    const filtroAnoStr = String(filtroAno).trim();
+    const mesFiltroNorm = filtroMesStr === 'todos' ? null : filtroMesStr.padStart(2, '0');
+
+    // Determinar ano da meta (preferir meta.ano)
+    let anoMeta: string | null = null;
+    if (meta.ano) {
+      anoMeta = String(meta.ano).trim();
+    } else if (meta.dataInicio || meta.data_inicio || meta.created_at) {
+      const d = new Date(meta.dataInicio ?? meta.data_inicio ?? meta.created_at);
+      if (!isNaN(d.getTime())) anoMeta = String(d.getFullYear());
+    }
+
+    if (filtroAnoStr !== 'todos' && anoMeta) {
+      anoMatch = filtroAnoStr === anoMeta;
+    }
+
+    // Determinar meses da meta
+    if (mesFiltroNorm === null) {
+      mesMatch = true;
+    } else if (Array.isArray(meta.mes) && meta.mes.length > 0) {
+      const mesesNorm = meta.mes.map((m: string) => String(m).trim().toLowerCase());
+      if (mesesNorm.includes('todo-ano')) {
+        mesMatch = true; // válida para todos os meses
+      } else {
+        mesMatch = mesesNorm.map(m => m.padStart(2, '0')).includes(mesFiltroNorm);
       }
-    } else if (meta.data_inicio) {
-      const date = new Date(meta.data_inicio);
-      if (!isNaN(date.getTime())) {
-        const mes = (date.getMonth() + 1).toString();
-        const ano = date.getFullYear().toString();
-        mesMatch = filtroMes === 'todos' || filtroMes === mes;
-        anoMatch = filtroAno === 'todos' || filtroAno === ano;
-      }
-    } else if (meta.created_at) {
-      const date = new Date(meta.created_at);
-      if (!isNaN(date.getTime())) {
-        const mes = (date.getMonth() + 1).toString();
-        const ano = date.getFullYear().toString();
-        mesMatch = filtroMes === 'todos' || filtroMes === mes;
-        anoMatch = filtroAno === 'todos' || filtroAno === ano;
+    } else if (meta.dataInicio || meta.data_inicio || meta.created_at) {
+      const d = new Date(meta.dataInicio ?? meta.data_inicio ?? meta.created_at);
+      if (!isNaN(d.getTime())) {
+        const mesMeta = String(d.getMonth() + 1).padStart(2, '0');
+        mesMatch = mesMeta === mesFiltroNorm;
       }
     }
     
@@ -173,47 +182,105 @@ export default function DashboardMetasPage() {
   // Verificar se o filtro de mês resultou em dados vazios
   const mesComDados = useMemo(() => {
     if (filtroMes === 'todos') return true;
-    
-    console.log('=== DEBUG mesComDados ===');
-    console.log('filtroMes:', filtroMes);
-    console.log('metas:', metas);
-    
-    // Verificar se há metas para o mês selecionado
+
+    // Normalizar filtros de mês/ano
+    const filtroMesStr = String(filtroMes).trim();
+    const filtroMesNorm = filtroMesStr.padStart(2, '0');
+    const filtroAnoStr = String(filtroAno).trim();
+
+    // Verificar se há metas que se aplicam ao mês/ano selecionados
     const metasDoMes = metas?.filter(meta => {
-      let mesMatch = false;
-      
-      if (meta.dataInicio) {
-        const date = new Date(meta.dataInicio);
-        if (!isNaN(date.getTime())) {
-          const mes = (date.getMonth() + 1).toString();
-          mesMatch = filtroMes === mes;
-          console.log(`Meta com dataInicio: ${meta.dataInicio}, mes extraído: ${mes}, filtroMes: ${filtroMes}, match: ${mesMatch}`);
-        }
-      } else if (meta.data_inicio) {
-        const date = new Date(meta.data_inicio);
-        if (!isNaN(date.getTime())) {
-          const mes = (date.getMonth() + 1).toString();
-          mesMatch = filtroMes === mes;
-          console.log(`Meta com data_inicio: ${meta.data_inicio}, mes extraído: ${mes}, filtroMes: ${filtroMes}, match: ${mesMatch}`);
-        }
-      } else if (meta.created_at) {
-        const date = new Date(meta.created_at);
-        if (!isNaN(date.getTime())) {
-          const mes = (date.getMonth() + 1).toString();
-          mesMatch = filtroMes === mes;
-          console.log(`Meta com created_at: ${meta.created_at}, mes extraído: ${mes}, filtroMes: ${filtroMes}, match: ${mesMatch}`);
+      // Filtro regional
+      let regionalMatch = true;
+      if (filtroRegional !== 'todos') {
+        regionalMatch = meta.regional === filtroRegional ||
+          meta.regional?.includes(filtroRegional) ||
+          (meta.regionais && Array.isArray(meta.regionais) && meta.regionais.includes(filtroRegional));
+      }
+
+      // Determinar ano da meta (preferir meta.ano)
+      let anoMeta: string | null = null;
+      if (meta.ano) {
+        anoMeta = String(meta.ano).trim();
+      } else if (meta.dataInicio || meta.data_inicio || meta.created_at) {
+        const d = new Date(meta.dataInicio ?? meta.data_inicio ?? meta.created_at);
+        if (!isNaN(d.getTime())) anoMeta = String(d.getFullYear());
+      }
+
+      let anoMatch = true;
+      if (filtroAnoStr !== 'todos') {
+        if (anoMeta) {
+          anoMatch = filtroAnoStr === anoMeta;
+        } else {
+          // Sem informação de ano, não considerar match quando um ano específico é exigido
+          anoMatch = false;
         }
       }
-      
-      return mesMatch;
+
+      // Determinar se meta se aplica ao mês
+      let mesMatch = true;
+      if (filtroMesStr !== 'todos') {
+        if (Array.isArray(meta.mes) && meta.mes.length > 0) {
+          const mesesNorm = meta.mes.map((m: string) => String(m).trim().toLowerCase());
+          if (mesesNorm.includes('todo-ano')) {
+            mesMatch = true; // válida para qualquer mês do ano
+          } else {
+            mesMatch = mesesNorm.map(m => m.padStart(2, '0')).includes(filtroMesNorm);
+          }
+        } else if (meta.dataInicio || meta.data_inicio || meta.created_at) {
+          const d = new Date(meta.dataInicio ?? meta.data_inicio ?? meta.created_at);
+          if (!isNaN(d.getTime())) {
+            const mesMeta = String(d.getMonth() + 1).padStart(2, '0');
+            mesMatch = mesMeta === filtroMesNorm;
+          } else {
+            mesMatch = true; // considerar válido se data inválida
+          }
+        } else {
+          mesMatch = true; // sem mês definido => tratar como anual
+        }
+      }
+
+      return mesMatch && anoMatch && regionalMatch;
     }) || [];
-    
-    console.log('metasDoMes encontradas:', metasDoMes);
-    console.log('mesComDados resultado:', metasDoMes.length > 0);
-    console.log('=== FIM DEBUG ===');
-    
-    return metasDoMes.length > 0;
-  }, [metas, filtroMes]);
+
+    // Verificar se há atividades regionais para o mês/ano selecionados
+    const atividadesDoMes = atividadesRegionais?.filter(atividade => {
+      let mesMatch = false;
+      let anoMatch = true; // aceitar qualquer ano por padrão
+
+      const checarData = (dt?: string) => {
+        if (!dt) return false;
+        const date = new Date(dt);
+        if (isNaN(date.getTime())) return false;
+        const mes = String(date.getMonth() + 1).padStart(2, '0');
+        const ano = String(date.getFullYear());
+        const mOk = mes === filtroMesNorm;
+        let aOk = true;
+        if (filtroAnoStr !== 'todos') {
+          aOk = filtroAnoStr === ano;
+        }
+        mesMatch = mesMatch || mOk;
+        anoMatch = anoMatch && aOk;
+        return mOk && aOk;
+      };
+
+      const algumaDataConfere = checarData(atividade.activity_date) || checarData(atividade.data_inicio) || checarData(atividade.created_at);
+
+      // Filtro regional e status
+      let regionalMatch = true;
+      if (filtroRegional !== 'todos') {
+        regionalMatch = atividade.regional === filtroRegional && atividade.status === 'ativo';
+      } else {
+        regionalMatch = atividade.status === 'ativo';
+      }
+
+      return (algumaDataConfere || mesMatch) && anoMatch && regionalMatch;
+    }) || [];
+
+    // Considerar que o mês tem dados se há metas OU atividades regionais
+    const temDados = metasDoMes.length > 0 || atividadesDoMes.length > 0;
+    return temDados;
+  }, [metas, filtroMes, filtroAno, atividadesRegionais, filtroRegional]);
 
   // Calcular estatísticas das metas filtradas
   const estatisticas = useMemo(() => {
@@ -309,48 +376,98 @@ export default function DashboardMetasPage() {
       return zerosResult;
     }
     
-    // Se não há filtro regional ou é "todos", retornar dados completos
+    // Visão geral (todas as regionais): aplicar filtros de mês/ano e equipe nos cards de atividades
     if (filtroRegional === 'todos') {
-      return statsInstituicoes;
+      const atividadesFiltradas = atividadesRegionais.filter(atividade => {
+        const statusMatch = atividade.status === 'ativo';
+        let equipeMatch = true;
+        if (filtroEquipe !== 'todos') {
+          const responsavel = usuarios?.find(u => u.id === atividade.responsavel_id);
+          equipeMatch = isStringMatch(responsavel?.nome || '', filtroEquipe) ||
+                        isStringMatch(responsavel?.email || '', filtroEquipe) ||
+                        isStringMatch(atividade.responsavel?.nome || '', filtroEquipe) ||
+                        isStringMatch(atividade.responsavel?.email || '', filtroEquipe);
+        }
+        let mesMatch = true;
+        let anoMatch = true;
+        if (filtroMes !== 'todos') {
+          const refDate = atividade.activity_date || atividade.data_inicio || atividade.created_at;
+          if (refDate) {
+            const date = new Date(refDate);
+            if (!isNaN(date.getTime())) {
+              const mesNum = date.getMonth() + 1;
+              const anoNum = date.getFullYear();
+              mesMatch = Number(filtroMes) === mesNum;
+              if (filtroAno !== 'todos') {
+                anoMatch = Number(filtroAno) === anoNum;
+              }
+            }
+          }
+        }
+        return statusMatch && equipeMatch && mesMatch && anoMatch;
+      });
+      const atividadesPorTipo = atividadesFiltradas.reduce((acc, atividade) => {
+        const tipo = atividade.atividade_label || atividade.titulo || 'Outros';
+        if (!acc[tipo]) acc[tipo] = 0;
+        acc[tipo] += parseInt(atividade.quantidade) || 0;
+        return acc;
+      }, {} as Record<string, number>);
+      const ligasMarasFormadas = atividadesPorTipo['Ligas Maras Formadas'] || 0;
+      const familiasEmbarcadas = atividadesPorTipo['Famílias Embarcadas Decolagem'] || 0;
+      const diagnosticosRealizados = atividadesPorTipo['Diagnósticos Realizados'] || 0;
+      return {
+        ...statsInstituicoes,
+        resumo: {
+          ...statsInstituicoes.resumo,
+          familiasEmbarcadas,
+          diagnosticosRealizados,
+          ligasMarasFormadas
+        }
+      };
     }
     
-    // Filtrar atividades por regional selecionado
-    const atividadesDaRegional = atividadesRegionais.filter(atividade => 
-      atividade.regional === filtroRegional && atividade.status === 'ativo'
-    );
-    
-    // Agrupar atividades por tipo
+    // Filtrar atividades por regional selecionado (com mês/ano/equipe)
+    const atividadesDaRegional = atividadesRegionais.filter(atividade => {
+      const regionalMatch = atividade.regional === filtroRegional && atividade.status === 'ativo';
+      let equipeMatch = true;
+      if (filtroEquipe !== 'todos') {
+        const responsavel = usuarios?.find(u => u.id === atividade.responsavel_id);
+        equipeMatch = isStringMatch(responsavel?.nome || '', filtroEquipe) ||
+                      isStringMatch(responsavel?.email || '', filtroEquipe) ||
+                      isStringMatch(atividade.responsavel?.nome || '', filtroEquipe) ||
+                      isStringMatch(atividade.responsavel?.email || '', filtroEquipe);
+      }
+      let mesMatch = true;
+      let anoMatch = true;
+      if (filtroMes !== 'todos') {
+        const refDate = atividade.activity_date || atividade.data_inicio || atividade.created_at;
+        if (refDate) {
+          const date = new Date(refDate);
+          if (!isNaN(date.getTime())) {
+            const mesNum = date.getMonth() + 1;
+            const anoNum = date.getFullYear();
+            mesMatch = Number(filtroMes) === mesNum;
+            if (filtroAno !== 'todos') {
+              anoMatch = Number(filtroAno) === anoNum;
+            }
+          }
+        }
+      }
+      return regionalMatch && equipeMatch && mesMatch && anoMatch;
+    });
     const atividadesPorTipo = atividadesDaRegional.reduce((acc, atividade) => {
       const tipo = atividade.atividade_label || atividade.titulo || 'Outros';
-      if (!acc[tipo]) {
-        acc[tipo] = 0;
-      }
+      if (!acc[tipo]) acc[tipo] = 0;
       acc[tipo] += parseInt(atividade.quantidade) || 0;
       return acc;
     }, {} as Record<string, number>);
-    
-    // Calcular totais baseados nos dados reais
     const ligasMarasFormadas = atividadesPorTipo['Ligas Maras Formadas'] || 0;
     const familiasEmbarcadas = atividadesPorTipo['Famílias Embarcadas Decolagem'] || 0;
     const diagnosticosRealizados = atividadesPorTipo['Diagnósticos Realizados'] || 0;
-    
-    // Calcular ONGs baseado nas instituições reais da regional
-    const instituicoesDaRegional = instituicoes?.filter(inst => 
-      inst.regional?.toLowerCase() === filtroRegional.toLowerCase()
-    ) || [];
-    
-    const ongsMaras = instituicoesDaRegional.filter(inst => 
-      inst.tipo_programa?.toLowerCase().includes('maras') || 
-      inst.programa?.toLowerCase().includes('maras')
-    ).length;
-    
-    const ongsDecolagem = instituicoesDaRegional.filter(inst => 
-      inst.tipo_programa?.toLowerCase().includes('decolagem') || 
-      inst.programa?.toLowerCase().includes('decolagem')
-    ).length;
-    
+    const instituicoesDaRegional = instituicoes?.filter(inst => inst.regional?.toLowerCase() === filtroRegional.toLowerCase()) || [];
+    const ongsMaras = instituicoesDaRegional.filter(inst => inst.tipo_programa?.toLowerCase().includes('maras') || inst.programa?.toLowerCase().includes('maras')).length;
+    const ongsDecolagem = instituicoesDaRegional.filter(inst => inst.tipo_programa?.toLowerCase().includes('decolagem') || inst.programa?.toLowerCase().includes('decolagem')).length;
     const totalInstituicoes = instituicoesDaRegional.length;
-    
     return {
       ...statsInstituicoes,
       total: totalInstituicoes,
@@ -365,7 +482,7 @@ export default function DashboardMetasPage() {
         ligasMarasFormadas
       }
     };
-  }, [statsInstituicoes, filtroRegional, atividadesRegionais, instituicoes, filtroMes, mesComDados]);
+  }, [statsInstituicoes, filtroRegional, atividadesRegionais, instituicoes, filtroMes, mesComDados, filtroAno, filtroEquipe, usuarios]);
 
   // Dados agrupados por área - Usar dados reais do banco para todas as regionais
   const dadosPorArea = useMemo(() => {
@@ -429,8 +546,26 @@ export default function DashboardMetasPage() {
                          isStringMatch(atividade.responsavel?.nome || '', filtroEquipe) ||
                          isStringMatch(atividade.responsavel?.email || '', filtroEquipe);
           }
+
+          // Filtro por mês e ano para realizado mensal
+          let mesMatch = true;
+          let anoMatch = true;
+          if (filtroMes !== 'todos') {
+            const refDate = atividade.activity_date || atividade.data_inicio || atividade.created_at;
+            if (refDate) {
+              const date = new Date(refDate);
+              if (!isNaN(date.getTime())) {
+                const mesNum = date.getMonth() + 1;
+                const anoNum = date.getFullYear();
+                mesMatch = Number(filtroMes) === mesNum;
+                if (filtroAno !== 'todos') {
+                  anoMatch = Number(filtroAno) === anoNum;
+                }
+              }
+            }
+          }
           
-          return regionalMatch && equipeMatch;
+          return regionalMatch && equipeMatch && mesMatch && anoMatch;
         });
         
         // Agrupar por tipo de atividade para calcular o realizado
@@ -570,8 +705,26 @@ export default function DashboardMetasPage() {
                          atividade.responsavel?.nome?.toLowerCase().trim() === filtroEquipe.toLowerCase().trim() ||
                          atividade.responsavel?.email?.toLowerCase().trim() === filtroEquipe.toLowerCase().trim();
           }
+
+          // Filtro por mês/ano
+          let mesMatch = true;
+          let anoMatch = true;
+          if (filtroMes !== 'todos') {
+            const refDate = atividade.activity_date || atividade.data_inicio || atividade.created_at;
+            if (refDate) {
+              const date = new Date(refDate);
+              if (!isNaN(date.getTime())) {
+                const mesNum = date.getMonth() + 1;
+                const anoNum = date.getFullYear();
+                mesMatch = Number(filtroMes) === mesNum;
+                if (filtroAno !== 'todos') {
+                  anoMatch = Number(filtroAno) === anoNum;
+                }
+              }
+            }
+          }
           
-          return statusMatch && equipeMatch;
+          return statusMatch && equipeMatch && mesMatch && anoMatch;
         })
         .reduce((acc, atividade) => {
           if (!acc[atividade.regional]) {
@@ -688,11 +841,10 @@ export default function DashboardMetasPage() {
     console.log('filtroMes:', filtroMes);
     console.log('mesComDados:', mesComDados);
     
-    // Se o mês selecionado não tem dados, retornar array vazio
+    // Se o mês selecionado não tem dados, manter cards e exibir realizado=0
     if (filtroMes !== 'todos' && !mesComDados) {
-      console.log('Retornando [] porque mês não tem dados');
-      console.log('=== FIM DEBUG dadosPorAtividade ===');
-      return [];
+      console.log('Mês sem dados: mantendo atividades com realizado=0');
+      // Não retornar vazio; o cálculo abaixo garantirá totalAtual=0
     }
     
     // Se um filtro regional específico está selecionado, mostrar apenas atividades com dados reais
@@ -712,7 +864,25 @@ export default function DashboardMetasPage() {
                        isStringMatch(atividade.responsavel?.email || '', filtroEquipe);
         }
         
-        return regionalMatch && equipeMatch;
+        // Filtro por mês e ano - realizado mensal
+        let mesMatch = true;
+        let anoMatch = true;
+        if (filtroMes !== 'todos') {
+          const refDate = atividade.activity_date || atividade.data_inicio || atividade.created_at;
+          if (refDate) {
+            const date = new Date(refDate);
+            if (!isNaN(date.getTime())) {
+              const mesNum = date.getMonth() + 1;
+              const anoNum = date.getFullYear();
+              mesMatch = Number(filtroMes) === mesNum;
+              if (filtroAno !== 'todos') {
+                anoMatch = Number(filtroAno) === anoNum;
+              }
+            }
+          }
+        }
+        
+        return regionalMatch && equipeMatch && mesMatch && anoMatch;
       });
       
       // Agrupar por tipo de atividade para calcular o realizado
@@ -761,7 +931,10 @@ export default function DashboardMetasPage() {
         }) || [];
         
         const totalMetasReais = metasDaAtividade.reduce((sum, meta) => sum + (meta.valorMeta || meta.valor_meta || 0), 0);
-        const totalAtual = dados.quantidade;
+        // Para NPS, calcular a média ao invés da soma
+        const totalAtual = label.toLowerCase().includes('nps') && dados.atividades.length > 0 
+          ? dados.quantidade / dados.atividades.length 
+          : dados.quantidade;
         const percentualRealizado = totalMetasReais > 0 ? Math.min((totalAtual / totalMetasReais) * 100, 100) : 0;
         
         return {
@@ -778,6 +951,87 @@ export default function DashboardMetasPage() {
       // Remover filtro que ocultava atividades sem metas - agora mostra todas
       .sort((a, b) => {
         // Priorizar atividades com metas, depois por quantidade realizada
+        if (a.totalMeta > 0 && b.totalMeta === 0) return -1;
+        if (a.totalMeta === 0 && b.totalMeta > 0) return 1;
+        return b.totalAtual - a.totalAtual;
+      });
+    }
+
+    // NOVO: Visão geral (todos) com filtros de mês/ano/equipe/atividade -> usar dados reais das atividades
+    if (filtroRegional === 'todos' && atividadesRegionais && (filtroMes !== 'todos' || filtroAno !== 'todos' || filtroEquipe !== 'todos' || filtroAtividade !== '')) {
+      const atividadesFiltradas = atividadesRegionais.filter(atividade => {
+        const statusMatch = atividade.status === 'ativo';
+
+        // Filtro por equipe
+        let equipeMatch = true;
+        if (filtroEquipe !== 'todos') {
+          const responsavel = usuarios?.find(u => u.id === atividade.responsavel_id);
+          equipeMatch = isStringMatch(responsavel?.nome || '', filtroEquipe) || 
+                        isStringMatch(responsavel?.email || '', filtroEquipe) ||
+                        isStringMatch(atividade.responsavel?.nome || '', filtroEquipe) ||
+                        isStringMatch(atividade.responsavel?.email || '', filtroEquipe);
+        }
+
+        // Filtros de mês/ano
+        let mesMatch = true;
+        let anoMatch = true;
+        const refDate = atividade.activity_date || atividade.data_inicio || atividade.created_at;
+        if (filtroMes !== 'todos' && refDate) {
+          const d = new Date(refDate);
+          if (!isNaN(d.getTime())) {
+            const mesNum = d.getMonth() + 1;
+            const anoNum = d.getFullYear();
+            mesMatch = Number(filtroMes) === mesNum;
+            if (filtroAno !== 'todos') {
+              anoMatch = Number(filtroAno) === anoNum;
+            }
+          }
+        } else if (filtroAno !== 'todos' && refDate) {
+          const d = new Date(refDate);
+          if (!isNaN(d.getTime())) {
+            anoMatch = Number(filtroAno) === d.getFullYear();
+          }
+        }
+
+        // Filtro de atividade específica (label)
+        let atividadeMatch = true;
+        if (filtroAtividade !== '') {
+          const atividadeLabel = atividade.atividade_label || atividade.titulo || atividade.tipo || 'Outros';
+          atividadeMatch = isActivityMatch({ titulo: atividadeLabel }, filtroAtividade);
+        }
+
+        return statusMatch && equipeMatch && mesMatch && anoMatch && atividadeMatch;
+      });
+
+      const atividadesPorTipo = atividadesFiltradas.reduce((acc, atividade) => {
+        const tipo = atividade.atividade_label || atividade.titulo || atividade.tipo || 'Outros';
+        if (!acc[tipo]) {
+          acc[tipo] = { quantidade: 0, atividades: [] };
+        }
+        acc[tipo].quantidade += (parseInt(atividade.quantidade) || 1);
+        acc[tipo].atividades.push(atividade);
+        return acc;
+      }, {} as Record<string, { quantidade: number; atividades: any[] }>);
+
+      return Object.entries(atividadesPorTipo).map(([label, dados]) => {
+        const metasDaAtividade = (metasFiltradas || metas)?.filter(m => isActivityMatch(m, label)) || [];
+        const totalMeta = metasDaAtividade.reduce((sum, m) => sum + (m.valorMeta || m.valor_meta || 0), 0);
+        // Para NPS, calcular a média ao invés da soma
+        const totalAtual = label.toLowerCase().includes('nps') && dados.atividades.length > 0 
+          ? dados.quantidade / dados.atividades.length 
+          : dados.quantidade;
+        const percentualRealizado = totalMeta > 0 ? Math.min((totalAtual / totalMeta) * 100, 100) : 0;
+        return {
+          label,
+          value: label.toLowerCase().replace(/\s+/g, '_'),
+          totalMeta,
+          totalAtual,
+          percentualRealizado,
+          quantidadeMetas: metasDaAtividade.length,
+          dadosReais: true,
+          semMetas: totalMeta === 0
+        };
+      }).sort((a, b) => {
         if (a.totalMeta > 0 && b.totalMeta === 0) return -1;
         if (a.totalMeta === 0 && b.totalMeta > 0) return 1;
         return b.totalAtual - a.totalAtual;
@@ -827,9 +1081,23 @@ export default function DashboardMetasPage() {
             return isActivityMatch({ titulo: atividadeLabel }, label) && atividade.status === 'ativo';
           });
           
-          totalAtual = atividadesDaTipo.reduce((sum, atividade) => {
-            return sum + (parseInt(atividade.quantidade) || 1);
-          }, 0);
+          // Tratamento especial para NPS - calcular média ao invés de soma
+          if (label.toLowerCase().includes('nps')) {
+            if (atividadesDaTipo.length > 0) {
+              const totalNPS = atividadesDaTipo.reduce((sum, atividade) => {
+                const quantidade = parseFloat(atividade.quantidade) || 0;
+                return sum + quantidade;
+              }, 0);
+              totalAtual = Number((totalNPS / atividadesDaTipo.length).toFixed(1));
+            } else {
+              totalAtual = 0;
+            }
+          } else {
+            // Para outras atividades, manter o comportamento de soma
+            totalAtual = atividadesDaTipo.reduce((sum, atividade) => {
+              return sum + (parseInt(atividade.quantidade) || 1);
+            }, 0);
+          }
         } else {
           // Usar o valor atual das metas (comportamento original)
           totalAtual = metasDaAtividade.reduce((sum, m) => sum + (m.valorAtual || m.valor_atual || 0), 0);
@@ -850,7 +1118,7 @@ export default function DashboardMetasPage() {
       // Filtrar apenas atividades que têm metas registradas (quantidadeMetas > 0)
       .filter(atividade => atividade.quantidadeMetas > 0)
       .sort((a, b) => b.percentualRealizado - a.percentualRealizado);
-  }, [metas, metasFiltradas, filtroRegional, filtroAtividade, filtroEquipe, filtroMes, filtroAno, atividadesRegionais]);
+  }, [metas, metasFiltradas, filtroRegional, filtroAtividade, filtroEquipe, filtroMes, filtroAno, atividadesRegionais, usuarios]);
 
   // Adicionar useEffect para recarregar dados quando necessário
   useEffect(() => {

@@ -1,28 +1,25 @@
-module.exports = (req, res) => {
-  // Set CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+// Vercel Serverless Function wrapper for the Express app
+export default async function handler(req, res) {
+  try {
+    // Reconstrói o path original a partir do query param adicionado pela rota
+    const qp = req.query || {};
+    const rawPath = typeof qp.path === 'string' ? qp.path : '';
+    // Garantir que Express receba o prefixo "/api/" para resolver corretamente os routers montados
+    const originalPath = rawPath
+      ? (rawPath.startsWith('api/') ? `/${rawPath}` : `/api/${rawPath}`)
+      : req.url;
+    // Preserva querystring original se houver
+    const qsIndex = (req.url || '').indexOf('?');
+    const originalQS = qsIndex >= 0 ? (req.url || '').slice(qsIndex) : '';
+    // Atualiza req.url para o Express enxergar a rota correta
+    req.url = originalPath + (originalQS && !originalPath.includes('?') ? originalQS : '');
 
-  // Handle preflight requests
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
+    // Importa o app Express compilado (server.js) do backend
+    const { default: app } = await import('../backend/dist/server.js');
+    return app(req, res);
+  } catch (err) {
+    console.error('[vercel-api] Failed to initialize app:', err);
+    const message = (err && err.message) ? err.message : 'unknown_error';
+    res.status(500).json({ error: 'handler_init_failed', message });
   }
-
-  // Handle GET requests
-  if (req.method === 'GET') {
-    res.status(200).json({
-      message: 'API is working',
-      timestamp: new Date().toISOString(),
-      endpoints: {
-        health: '/api/health',
-        test: '/api/test'
-      }
-    });
-    return;
-  }
-
-  // Method not allowed
-  res.status(405).json({ error: 'Method not allowed' });
-};
+}

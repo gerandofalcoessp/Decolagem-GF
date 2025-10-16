@@ -48,29 +48,46 @@ export class AuthService {
     return token ? { Authorization: `Bearer ${token}` } : {};
   }
 
-  private static async postJsonWithFallback(endpoint: string, payload: any, headers: Record<string, string> = {}) {
+  private static async postJsonWithFallback(endpoint: string, payload: any, headers: Record<string, string> = {}): Promise<Response> {
     const primaryUrl = `${API_BASE_URL}${endpoint}`;
+    let lastError: Error;
+    
+    // Tentar URL primária
     try {
-      return await fetch(primaryUrl, {
+      const response = await fetch(primaryUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...headers },
         body: JSON.stringify(payload),
       });
+      // Garantir que response não seja undefined (cobre cenário de mocks incorretos)
+      if (!response) {
+        throw new Error('Network error');
+      }
+      return response;
     } catch (err) {
+      lastError = err as Error;
+      
       // Fallback para backend local em 4005 quando API_BASE_URL aponta para 4000
       if (API_BASE_URL.startsWith('http://localhost:4000')) {
         const fallbackUrl = `http://localhost:4005${endpoint}`;
         try {
-          return await fetch(fallbackUrl, {
+          const response = await fetch(fallbackUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...headers },
             body: JSON.stringify(payload),
           });
+          if (!response) {
+            throw lastError;
+          }
+          return response;
         } catch (err2) {
-          throw err2;
+          // Re-lançar o erro original se ambos falharam
+          throw lastError;
         }
       }
-      throw err;
+      
+      // Re-lançar o erro original se não há fallback
+      throw lastError;
     }
   }
 
@@ -78,13 +95,44 @@ export class AuthService {
    * Realiza login usando o backend
    */
   static async login(email: string, password: string): Promise<LoginResponse> {
+    let response: Response | undefined;
+    
     try {
-      const response = await this.postJsonWithFallback('/api/auth/login', { email, password });
+      response = await this.postJsonWithFallback('/api/auth/login', { email, password });
+    } catch (error) {
+      // Erro de rede ou outro erro antes de obter resposta - propagar o erro original
+      throw error;
+    }
+    
+    try {
+      const contentType = response.headers.get('content-type') || '';
+      let data: any = null;
+      let rawText: string | null = null;
 
-      const data = await response.json();
+      if (contentType.includes('application/json')) {
+        try {
+          data = await response.json();
+        } catch (e) {
+          // Se a resposta não for JSON válido, tentar ler como texto
+          rawText = await response.text().catch(() => '');
+        }
+      } else {
+        // Conteúdo não-JSON (por exemplo, HTML ou vazio)
+        rawText = await response.text().catch(() => '');
+      }
 
       if (!response.ok) {
-        throw new Error(data.error || 'Erro no login');
+        const msg = (data && data.error) ? data.error : (rawText ? rawText : `Erro no login (HTTP ${response.status})`);
+        throw new Error(msg);
+      }
+
+      if (!data) {
+        // Tentar converter texto em JSON se possível, senão erro claro
+        try {
+          data = rawText ? JSON.parse(rawText) : {};
+        } catch {
+          throw new Error('Resposta do servidor inválida: conteúdo não JSON');
+        }
       }
 
       // Salvar token no localStorage (apenas no navegador)
@@ -95,7 +143,8 @@ export class AuthService {
 
       return data;
     } catch (error) {
-      throw new Error(error instanceof Error ? error.message : 'Erro no login');
+      // Re-lançar o erro original (incluindo erros de rede)
+      throw error;
     }
   }
 
@@ -162,11 +211,30 @@ export class AuthService {
           this.clearAuthData();
           return null;
         }
-        throw new Error('Erro ao obter dados do usuário');
+        const raw = await response.text().catch(() => '');
+        throw new Error(raw || 'Erro ao obter dados do usuário');
       }
 
       logger.debug('✅ AuthService: Resposta OK, processando dados');
-      const data = await response.json();
+      const contentType = response.headers.get('content-type') || '';
+      let data: any = null;
+      let rawText: string | null = null;
+      if (contentType.includes('application/json')) {
+        try {
+          data = await response.json();
+        } catch {
+          rawText = await response.text().catch(() => '');
+        }
+      } else {
+        rawText = await response.text().catch(() => '');
+      }
+      if (!data) {
+        try {
+          data = rawText ? JSON.parse(rawText) : {};
+        } catch {
+          throw new Error('Resposta do servidor inválida: conteúdo não JSON');
+        }
+      }
       logger.debug('📦 AuthService: Dados recebidos:', data);
       return data;
     } catch (error) {
@@ -186,6 +254,12 @@ export class AuthService {
     role: string;
     regional: string;
   }): Promise<void> {
+    // Verificar se há token de administrador
+    const token = this.getToken();
+    if (!token) {
+      throw new Error('Token de administrador necessário');
+    }
+
     try {
       const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
         method: 'POST',
@@ -233,6 +307,11 @@ export class AuthService {
    * Atualiza senha do usuário
    */
   static async updatePassword(newPassword: string): Promise<void> {
+    const token = this.getToken();
+    if (!token) {
+      throw new Error('Token não encontrado');
+    }
+
     try {
       const response = await fetch(`${API_BASE_URL}/api/auth/update-password`, {
         method: 'PUT',

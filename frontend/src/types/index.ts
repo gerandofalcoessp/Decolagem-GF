@@ -49,7 +49,8 @@ export type TipoAtividade =
   // Novos tipos adicionados
   | 'ligas_maras_formadas'
   | 'familias_embarcadas_decolagem'
-  | 'diagnosticos_realizados';
+  | 'diagnosticos_realizados'
+  | 'leads_do_dia';
 
 // Interface para ONG
 export interface ONG {

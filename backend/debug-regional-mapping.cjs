@@ -1,127 +1,155 @@
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// Replicar as funções do regionalService para debug
-let regionalsCache = null;
-
-async function getRegionals() {
-  if (regionalsCache) return regionalsCache;
-  
-  const { data, error } = await supabase
-    .from('regionals')
-    .select('*')
-    .order('name');
-  
-  if (error) {
-    console.error('Erro ao buscar regionais:', error);
-    throw new Error('Falha ao buscar regionais do banco de dados');
-  }
-  
-  regionalsCache = data;
-  return data;
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('❌ Variáveis de ambiente do Supabase não encontradas');
+  process.exit(1);
 }
 
-async function getUserRegionalId(userRegional) {
-  try {
-    const regionals = await getRegionals();
-    
-    // Remover prefixo "R. " se existir
-    const cleanRegional = userRegional.replace(/^R\.\s*/, '');
-    
-    console.log(`🔍 Buscando regional do usuário: "${userRegional}" -> "${cleanRegional}"`);
-    
-    // Buscar regional correspondente
-    const regional = regionals.find(r => 
-      r.name.toLowerCase() === cleanRegional.toLowerCase()
-    );
-    
-    console.log(`📍 Regional encontrada:`, regional ? `${regional.name} (${regional.id})` : 'Não encontrada');
-    
-    return regional?.id || null;
-  } catch (error) {
-    console.error('Erro ao buscar ID da regional:', error);
-    return null;
-  }
-}
-
-async function getEventRegionalId(eventRegional) {
-  try {
-    const regionals = await getRegionals();
-    
-    // Mapeamento de nomes de eventos para nomes de regionais
-    const eventToRegionalMapping = {
-      'norte': 'Norte',
-      'nordeste_1': 'Nordeste 1',
-      'nordeste_2': 'Nordeste 2',
-      'centro_oeste': 'Centro-Oeste',
-      'sao_paulo': 'São Paulo',
-      'rio_de_janeiro': 'Rio de Janeiro',
-      'rj': 'Rio de Janeiro',
-      'mg_es': 'MG/ES',
-      'sul': 'Sul',
-      'nacional': 'Nacional',
-      'comercial': 'Comercial'
-    };
-    
-    console.log(`🔍 Buscando regional do evento: "${eventRegional}"`);
-    
-    const regionalName = eventToRegionalMapping[eventRegional.toLowerCase()];
-    console.log(`📍 Mapeamento encontrado: "${eventRegional}" -> "${regionalName}"`);
-    
-    if (!regionalName) {
-      // Se não encontrar no mapeamento, tentar busca direta
-      const regional = regionals.find(r => 
-        r.name.toLowerCase() === eventRegional.toLowerCase()
-      );
-      console.log(`📍 Busca direta:`, regional ? `${regional.name} (${regional.id})` : 'Não encontrada');
-      return regional?.id || null;
-    }
-    
-    const regional = regionals.find(r => 
-      r.name.toLowerCase() === regionalName.toLowerCase()
-    );
-    
-    console.log(`📍 Regional final encontrada:`, regional ? `${regional.name} (${regional.id})` : 'Não encontrada');
-    
-    return regional?.id || null;
-  } catch (error) {
-    console.error('Erro ao buscar ID da regional do evento:', error);
-    return null;
-  }
-}
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
 async function debugRegionalMapping() {
+  console.log('🔍 Debugando mapeamento regional...\n');
+
   try {
-    console.log('🔍 Debugando mapeamento de regionais...\n');
-    
-    // Testar o usuário Rio de Janeiro
-    const userRegional = 'R. Rio de Janeiro';
-    const userRegionalId = await getUserRegionalId(userRegional);
-    
-    console.log('\n---\n');
-    
-    // Testar os eventos
-    const eventRegionals = ['rj', 'norte', 'nordeste_2'];
-    
-    for (const eventRegional of eventRegionals) {
-      console.log(`\n🎯 Testando evento regional: "${eventRegional}"`);
-      const eventRegionalId = await getEventRegionalId(eventRegional);
-      
-      const canSee = userRegionalId && eventRegionalId && userRegionalId === eventRegionalId;
-      console.log(`✅ Pode ver evento? ${canSee ? 'SIM' : 'NÃO'}`);
-      console.log(`   User ID: ${userRegionalId}`);
-      console.log(`   Event ID: ${eventRegionalId}`);
-      console.log('---');
+    // 1. Verificar todas as regionais únicas nas atividades
+    console.log('1️⃣ Verificando regionais únicas nas atividades...');
+    const { data: activities, error: activitiesError } = await supabaseAdmin
+      .from('regional_activities')
+      .select('regional')
+      .not('regional', 'is', null);
+
+    if (activitiesError) {
+      console.error('❌ Erro ao buscar atividades:', activitiesError);
+      return;
     }
+
+    const uniqueRegionals = [...new Set(activities.map(a => a.regional))];
+    console.log('📊 Regionais encontradas nas atividades:', uniqueRegionals);
+    console.log('📈 Total de atividades:', activities.length);
+
+    // 2. Verificar todas as regionais únicas nos eventos do calendário
+    console.log('\n2️⃣ Verificando regionais únicas nos eventos...');
+    const { data: events, error: eventsError } = await supabaseAdmin
+      .from('calendar_events')
+      .select('regional')
+      .not('regional', 'is', null);
+
+    if (eventsError) {
+      console.error('❌ Erro ao buscar eventos:', eventsError);
+      return;
+    }
+
+    const uniqueEventRegionals = [...new Set(events.map(e => e.regional))];
+    console.log('📊 Regionais encontradas nos eventos:', uniqueEventRegionals);
+    console.log('📈 Total de eventos:', events.length);
+
+    // 3. Testar mapeamento específico para "R. Centro-Oeste"
+    console.log('\n3️⃣ Testando mapeamento para "R. Centro-Oeste"...');
+    const userRegional = 'R. Centro-Oeste';
     
+    const mapUserRegionalToActivityFormat = (regional) => {
+      if (!regional) return '';
+      
+      const mapping = {
+        'R. Norte': 'norte',
+        'R. Centro-Oeste': 'centro_oeste',
+        'R. Nordeste': 'nordeste',
+        'R. Sudeste': 'sudeste',
+        'R. Sul': 'sul',
+        'R. MG/ES': 'mg_es',
+        'R. Rio de Janeiro': 'rj',
+        'R. São Paulo': 'sp',
+        'R. Nordeste 1': 'nordeste_1',
+        'R. Nordeste 2': 'nordeste_2',
+        'Nacional': 'nacional',
+        'Comercial': 'comercial',
+        // Casos já no formato correto
+        'norte': 'norte',
+        'centro_oeste': 'centro_oeste',
+        'nordeste': 'nordeste',
+        'sudeste': 'sudeste',
+        'sul': 'sul',
+        'mg_es': 'mg_es',
+        'rj': 'rj',
+        'sp': 'sp',
+        'nordeste_1': 'nordeste_1',
+        'nordeste_2': 'nordeste_2',
+        'nacional': 'nacional',
+        'comercial': 'comercial'
+      };
+      
+      return mapping[regional] || regional.toLowerCase();
+    };
+
+    const mappedRegional = mapUserRegionalToActivityFormat(userRegional);
+    console.log('🔄 Mapeamento:', { original: userRegional, mapped: mappedRegional });
+
+    // 4. Buscar atividades com a regional mapeada
+    console.log('\n4️⃣ Buscando atividades com regional "centro_oeste"...');
+    const { data: centroOesteActivities, error: centroOesteError } = await supabaseAdmin
+      .from('regional_activities')
+      .select('*')
+      .eq('regional', 'centro_oeste');
+
+    if (centroOesteError) {
+      console.error('❌ Erro ao buscar atividades centro-oeste:', centroOesteError);
+    } else {
+      console.log('📊 Atividades encontradas para centro_oeste:', centroOesteActivities.length);
+      if (centroOesteActivities.length > 0) {
+        console.log('📋 Primeira atividade:', {
+          id: centroOesteActivities[0].id,
+          titulo: centroOesteActivities[0].titulo,
+          regional: centroOesteActivities[0].regional,
+          created_at: centroOesteActivities[0].created_at
+        });
+      }
+    }
+
+    // 5. Buscar eventos com a regional mapeada
+    console.log('\n5️⃣ Buscando eventos com regional "centro_oeste"...');
+    const { data: centroOesteEvents, error: centroOesteEventsError } = await supabaseAdmin
+      .from('calendar_events')
+      .select('*')
+      .eq('regional', 'centro_oeste');
+
+    if (centroOesteEventsError) {
+      console.error('❌ Erro ao buscar eventos centro-oeste:', centroOesteEventsError);
+    } else {
+      console.log('📊 Eventos encontrados para centro_oeste:', centroOesteEvents.length);
+      if (centroOesteEvents.length > 0) {
+        console.log('📋 Primeiro evento:', {
+          id: centroOesteEvents[0].id,
+          title: centroOesteEvents[0].title,
+          regional: centroOesteEvents[0].regional,
+          start_date: centroOesteEvents[0].start_date
+        });
+      }
+    }
+
+    // 6. Verificar se existem dados com outras variações de centro-oeste
+    console.log('\n6️⃣ Verificando variações de centro-oeste...');
+    const variations = ['Centro-Oeste', 'centro-oeste', 'CENTRO_OESTE', 'Centro Oeste'];
+    
+    for (const variation of variations) {
+      const { data: variationActivities } = await supabaseAdmin
+        .from('regional_activities')
+        .select('id, titulo, regional')
+        .eq('regional', variation);
+      
+      if (variationActivities && variationActivities.length > 0) {
+        console.log(`📊 Encontradas ${variationActivities.length} atividades com regional "${variation}"`);
+      }
+    }
+
   } catch (error) {
-    console.error('❌ Erro:', error);
+    console.error('❌ Erro geral:', error);
   }
 }
 
-debugRegionalMapping();
+debugRegionalMapping().then(() => {
+  console.log('\n🎯 Debug concluído!');
+});

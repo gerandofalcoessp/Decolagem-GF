@@ -1,26 +1,41 @@
-// Util de logger dev-only: em produção suprime debug/info/warn, mantém error
+// Utility for conditional logging based on environment
+const isDevelopment = import.meta.env.DEV;
+
 export const logger = {
-  debug: (...args: any[]) => {
-    if (import.meta?.env?.DEV) {
-      // eslint-disable-next-line no-console
+  debug: (...args: unknown[]) => {
+    if (isDevelopment) {
       console.debug(...args);
     }
   },
-  info: (...args: any[]) => {
-    if (import.meta?.env?.DEV) {
-      // eslint-disable-next-line no-console
+  
+  info: (...args: unknown[]) => {
+    if (isDevelopment) {
       console.info(...args);
     }
   },
-  warn: (...args: any[]) => {
-    if (import.meta?.env?.DEV) {
-      // eslint-disable-next-line no-console
+  
+  warn: (...args: unknown[]) => {
+    if (isDevelopment) {
       console.warn(...args);
     }
   },
-  error: (...args: any[]) => {
-    // Sempre exibir erros
-    // eslint-disable-next-line no-console
+  
+  error: (...args: unknown[]) => {
+    // Always log errors, even in production
     console.error(...args);
   },
+  
+  // For development-only logs with emojis
+  dev: (...args: unknown[]) => {
+    if (isDevelopment) {
+      console.log(...args);
+    }
+  }
+};
+
+// Legacy support - can be gradually replaced
+export const conditionalLog = (...args: unknown[]) => {
+  if (isDevelopment) {
+    console.log(...args);
+  }
 };

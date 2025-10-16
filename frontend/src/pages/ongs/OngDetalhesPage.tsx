@@ -85,7 +85,7 @@ export default function OngDetalhesPage() {
     try {
       // Criar URL para visualizar o documento usando a mesma base URL da API
       const API_BASE_URL = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '');
-      const documentUrl = `${API_BASE_URL}/instituicoes/${id}/documentos/${encodeURIComponent(documentName)}`;
+      const documentUrl = `/api/instituicoes/${id}/documentos/${encodeURIComponent(documentName)}`;
       window.open(documentUrl, '_blank');
     } catch (error) {
       console.error('Erro ao visualizar documento:', error);
@@ -97,7 +97,7 @@ export default function OngDetalhesPage() {
     try {
       // Criar URL para download do documento usando a mesma base URL da API
       const API_BASE_URL = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '');
-      const downloadUrl = `${API_BASE_URL}/instituicoes/${id}/documentos/${encodeURIComponent(documentName)}?download=true`;
+      const downloadUrl = `/api/instituicoes/${id}/documentos/${encodeURIComponent(documentName)}?download=true`;
       
       // Criar um link temporário para forçar o download
       const link = document.createElement('a');
@@ -160,7 +160,7 @@ export default function OngDetalhesPage() {
       formData.append('tipo', 'documento');
 
       const API_BASE_URL = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '');
-      const response = await fetch(`${API_BASE_URL}/instituicoes/${id}/documentos`, {
+      const response = await fetch(`${API_BASE_URL}/api/instituicoes/${id}/documentos`, {
         method: 'POST',
         body: formData,
         headers: {

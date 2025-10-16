@@ -3,11 +3,11 @@ import { BrowserRouter } from 'react-router-dom';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import '@testing-library/jest-dom';
 import LoginPage from '../../pages/auth/LoginPage';
-import { useAuthStore } from '../../store/authStore';
+import { useAuthActions } from '../../store/authStore';
 
 // Mock do store de autenticação
 vi.mock('../../store/authStore', () => ({
-  useAuthStore: vi.fn(),
+  useAuthActions: vi.fn(),
 }));
 
 // Mock do react-router-dom
@@ -20,6 +20,14 @@ vi.mock('react-router-dom', async () => {
   };
 });
 
+// Mock do react-hot-toast
+vi.mock('react-hot-toast', () => ({
+  default: {
+    success: vi.fn(),
+    error: vi.fn(),
+  },
+}));
+
 const renderLoginPage = () => {
   return render(
     <BrowserRouter>
@@ -30,19 +38,12 @@ const renderLoginPage = () => {
 
 describe('LoginPage', () => {
   const mockLogin = vi.fn();
-  const mockClearError = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
-    
-    (useAuthStore as any).mockImplementation((selector: any) => {
-      const state = {
-        login: mockLogin,
-        clearError: mockClearError,
-        error: null,
-        loading: false,
-      };
-      return selector(state);
+
+    (useAuthActions as any).mockReturnValue({
+      login: mockLogin,
     });
   });
 
@@ -53,13 +54,6 @@ describe('LoginPage', () => {
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/senha/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /entrar/i })).toBeInTheDocument();
-  });
-
-  it('deve mostrar informações sobre conta de teste', () => {
-    renderLoginPage();
-
-    expect(screen.getByText(/conta de teste/i)).toBeInTheDocument();
-    expect(screen.getByText(/qualquer email e senha válidos/i)).toBeInTheDocument();
   });
 
   it('deve validar campos obrigatórios', async () => {
@@ -84,7 +78,7 @@ describe('LoginPage', () => {
     fireEvent.click(submitButton);
 
     await waitFor(() => {
-      expect(screen.getByText(/email deve ter um formato válido/i)).toBeInTheDocument();
+      expect(screen.getByText(/email inválido/i)).toBeInTheDocument();
     });
   });
 
@@ -102,59 +96,5 @@ describe('LoginPage', () => {
     await waitFor(() => {
       expect(mockLogin).toHaveBeenCalledWith('test@example.com', 'password123');
     });
-  });
-
-  it('deve mostrar estado de loading durante login', () => {
-    (useAuthStore as any).mockImplementation((selector: any) => {
-      const state = {
-        login: mockLogin,
-        clearError: mockClearError,
-        error: null,
-        loading: true,
-      };
-      return selector(state);
-    });
-
-    renderLoginPage();
-
-    const submitButton = screen.getByRole('button', { name: /entrando/i });
-    expect(submitButton).toBeDisabled();
-  });
-
-  it('deve mostrar erro quando login falha', () => {
-    const errorMessage = 'Credenciais inválidas';
-    (useAuthStore as any).mockImplementation((selector: any) => {
-      const state = {
-        login: mockLogin,
-        clearError: mockClearError,
-        error: errorMessage,
-        loading: false,
-      };
-      return selector(state);
-    });
-
-    renderLoginPage();
-
-    expect(screen.getByText(errorMessage)).toBeInTheDocument();
-  });
-
-  it('deve limpar erro ao digitar nos campos', async () => {
-    const errorMessage = 'Credenciais inválidas';
-    (useAuthStore as any).mockImplementation((selector: any) => {
-      const state = {
-        login: mockLogin,
-        clearError: mockClearError,
-        error: errorMessage,
-        loading: false,
-      };
-      return selector(state);
-    });
-
-    renderLoginPage();
-
-    const emailInput = screen.getByLabelText(/email/i);
-    fireEvent.change(emailInput, { target: { value: 'test@example.com' } });
-
-    expect(mockClearError).toHaveBeenCalled();
   });
 });

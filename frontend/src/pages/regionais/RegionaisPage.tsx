@@ -233,14 +233,20 @@ export default function RegionaisPage() {
         type: form.atividade,
         activity_date: form.dataAtividade,
         responsavel_id: form.responsavel || null,
-        regional: selectedRegionalId || form.regional,
+        // Para atividades NPS, sempre usar a primeira regional selecionada no formulário
+        // Isso garante que a nota NPS seja contabilizada para a regional escolhida
+        regional: form.atividade === 'nps' 
+          ? (form.regionaisNPS && form.regionaisNPS.length > 0 ? form.regionaisNPS[0] : selectedRegionalId || form.regional)
+          : selectedRegionalId || form.regional,
         // Adicionar os campos que estavam faltando
         programa: form.programa || '',
         estados: form.estados || [],
         instituicaoId: form.instituicaoId || '',
         quantidade: form.quantidade || null,
         atividadeLabel: form.atividadeLabel || '',
-        atividadeCustomLabel: form.atividadeCustomLabel || ''
+        atividadeCustomLabel: form.atividadeCustomLabel || '',
+        // Para atividades NPS, incluir todas as regionais selecionadas
+        regionaisNPS: form.atividade === 'nps' ? form.regionaisNPS || [] : []
       };
 
       // Adicionar campos de dados ao FormData

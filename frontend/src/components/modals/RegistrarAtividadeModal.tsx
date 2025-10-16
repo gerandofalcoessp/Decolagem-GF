@@ -18,10 +18,11 @@ interface RegistrarAtividadeForm {
   dataAtividade: string;
   regional: Regional;
   estados: string[];
-  programa: Programa | string;
+  programa: Programa[] | string[]; // Alterado para array de programas
   instituicaoId: string;
   evidencias: Evidencia[];
   quantidade?: number;
+  regionaisNPS?: string[]; // Regionais selecionadas para NPS
 }
 
 interface RegistrarAtividadeModalProps {
@@ -53,10 +54,11 @@ export function RegistrarAtividadeModal({
     dataAtividade: '',
     regional: regionalId as Regional || 'nacional',
     estados: [],
-    programa: '',
+    programa: [], // Inicializar como array vazio
     instituicaoId: '',
     evidencias: [],
     quantidade: undefined,
+    regionaisNPS: [], // Inicializar array vazio para regionais NPS
   });
 
   const [customTypes, setCustomTypes] = useState<{ value: TipoAtividade; label: string }[]>([]);
@@ -75,6 +77,7 @@ export function RegistrarAtividadeModal({
     centroeste: ['centroeste', 'centro-oeste', 'centrooeste', 'r. centro-oeste', 'r.centro-oeste'],
     centro_oeste: ['centroeste', 'centro-oeste', 'centrooeste', 'r. centro-oeste', 'r.centro-oeste'],
     nordeste: ['nordeste'],
+    nordeste_1: ['nordeste1', 'nordeste 1', 'nordeste_1', 'r.nordeste1', 'r. nordeste 1', 'r.nordeste 1'],
     nordeste_2: ['nordeste2', 'nordeste 2', 'nordeste_2', 'r.nordeste2', 'r. nordeste 2', 'r.nordeste 2'],
     norte: ['norte'],
     rj: ['rj', 'riodejaneiro', 'rio de janeiro', 'r. rio de janeiro', 'r.rio de janeiro'],
@@ -136,9 +139,9 @@ export function RegistrarAtividadeModal({
       (a.nome || a.email || '').localeCompare(b.nome || b.email || '')
     ));
 
-  // Debug log para verificar todos os usuários carregados
+  // Debug log para verificar todos os usuários carregados - only when needed
   useEffect(() => {
-    if (form.regional === 'centroeste' && usersWithMembers) {
+    if (form.regional === 'centroeste' && usersWithMembers && usersWithMembers.length > 0) {
       console.log('🔍 DEBUG Todos os usuários carregados:', usersWithMembers.map(u => ({
         id: u.id,
         nome: u.nome || u.email,
@@ -147,7 +150,7 @@ export function RegistrarAtividadeModal({
         user_metadata: u.user_metadata
       })));
     }
-  }, [form.regional, usersWithMembers]);
+  }, [form.regional, usersWithMembers?.length]); // Only depend on length to avoid unnecessary re-runs
 
   // Reset form when modal opens
   useEffect(() => {
@@ -247,18 +250,18 @@ export function RegistrarAtividadeModal({
     };
     
     loadOngs();
-  }, [isOpen, user?.regional]); // Add user?.regional as dependency
+  }, [isOpen, user?.regional]); // Optimized: only depend on specific user property
 
-  // Focus management
-  useEffect(() => {
-    if (isOpen && firstFieldRef.current) {
-      firstFieldRef.current.focus();
-    }
-  }, [isOpen]);
-
+  // Focus management - combined for better performance
   useEffect(() => {
     if (!isOpen) return;
     
+    // Set focus
+    if (firstFieldRef.current) {
+      firstFieldRef.current.focus();
+    }
+    
+    // Store previously focused element
     previouslyFocusedElement.current = document.activeElement as HTMLElement;
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -272,7 +275,7 @@ export function RegistrarAtividadeModal({
       document.removeEventListener('keydown', handleKeyDown);
       previouslyFocusedElement.current?.focus();
     };
-  }, [isOpen]);
+  }, [isOpen]); // Combined both focus-related effects
 
   const handleEvidenciasChange = async (files: FileList | null) => {
     if (!files) return;
@@ -340,9 +343,17 @@ export function RegistrarAtividadeModal({
   };
 
   const handleSubmit = () => {
-    if (!form.atividade || !form.dataAtividade || !form.regional || !form.programa) {
+    if (!form.atividade || !form.dataAtividade || !form.regional || !Array.isArray(form.programa) || form.programa.length === 0) {
+      alert('Por favor, preencha todos os campos obrigatórios.');
       return;
     }
+    
+    // Validação específica para NPS - deve ter pelo menos uma regional selecionada
+    if (form.atividade === 'nps' && (!form.regionaisNPS || form.regionaisNPS.length === 0)) {
+      alert('Para atividades NPS, você deve selecionar pelo menos uma regional.');
+      return;
+    }
+    
     onSubmit(form);
     handleCancel();
   };
@@ -398,20 +409,76 @@ export function RegistrarAtividadeModal({
               </select>
             </div>
 
+            {/* Seleção de Regionais para NPS - aparece apenas quando NPS é selecionado */}
+            {form.atividade === 'nps' && (
+              <div className="md:col-span-2">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Regionais para aplicar NPS *</label>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 p-4 border border-gray-300 rounded-xl bg-gray-50">
+                  {Object.entries(REGIONAL_LABELS)
+                    .filter(([key]) => key !== 'todas')
+                    .map(([key, label]) => (
+                      <label key={key} className="flex items-center space-x-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={form.regionaisNPS?.includes(key) || false}
+                          onChange={(e) => {
+                            const currentRegionais = form.regionaisNPS || [];
+                            if (e.target.checked) {
+                              setForm({ 
+                                ...form, 
+                                regionaisNPS: [...currentRegionais, key] 
+                              });
+                            } else {
+                              setForm({ 
+                                ...form, 
+                                regionaisNPS: currentRegionais.filter(r => r !== key) 
+                              });
+                            }
+                          }}
+                          className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                        />
+                        <span className="text-sm text-gray-700">{label}</span>
+                      </label>
+                    ))}
+                </div>
+                <p className="mt-2 text-xs text-gray-500">
+                  Selecione as regionais onde a nota NPS será aplicada
+                </p>
+              </div>
+            )}
+
             {/* Programa */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Programa *</label>
-              <select
-                aria-label="Selecionar programa"
-                value={form.programa}
-                onChange={(e) => setForm({ ...form, programa: e.target.value as Programa })}
-                className="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 shadow-sm transition-colors"
-              >
-                <option value="">Selecione um programa</option>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Programas *</label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-4 border border-gray-300 rounded-xl bg-gray-50">
                 {Object.entries(PROGRAMA_LABELS).map(([key, label]) => (
-                  <option key={key} value={key}>{label}</option>
+                  <label key={key} className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={Array.isArray(form.programa) ? form.programa.includes(key as Programa) : false}
+                      onChange={(e) => {
+                        const currentProgramas = Array.isArray(form.programa) ? form.programa : [];
+                        if (e.target.checked) {
+                          setForm({ 
+                            ...form, 
+                            programa: [...currentProgramas, key as Programa] 
+                          });
+                        } else {
+                          setForm({ 
+                            ...form, 
+                            programa: currentProgramas.filter(p => p !== key) 
+                          });
+                        }
+                      }}
+                      className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                    />
+                    <span className="text-sm text-gray-700">{label}</span>
+                  </label>
                 ))}
-              </select>
+              </div>
+              <p className="mt-2 text-xs text-gray-500">
+                Selecione um ou mais programas para esta atividade
+              </p>
             </div>
 
             {/* Quantidade */}

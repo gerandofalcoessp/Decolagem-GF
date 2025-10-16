@@ -14,7 +14,18 @@ if (import.meta && import.meta.env && import.meta.env.PROD) {
   console.log = noop;
   console.debug = noop;
   console.info = noop;
-  console.warn = noop; // adicional
+  console.warn = noop;
+  console.error = (...args: unknown[]) => {
+    // Manter apenas erros críticos em produção
+    if (args.some(arg => typeof arg === 'string' && (
+      arg.includes('❌') || 
+      arg.includes('Elemento root não encontrado') ||
+      arg.includes('Erro crítico')
+    ))) {
+      // eslint-disable-next-line no-console
+      console.error(...args);
+    }
+  };
 }
 
 console.log('🚀 Main: Iniciando aplicação React');

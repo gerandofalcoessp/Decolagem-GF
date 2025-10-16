@@ -254,6 +254,10 @@ export default function GestaoAtividadesRegionaisPage() {
 
   // Filtrar atividades
   const filteredActivities = useMemo(() => {
+    console.log('🔍 DEBUG FILTRO - Iniciando filtro de atividades');
+    console.log('📊 Total de atividades:', activities.length);
+    console.log('🎯 Filtros aplicados:', filters);
+    
     return activities.filter(activity => {
       const matchSearch = !filters.search || 
         activity.titulo.toLowerCase().includes(filters.search.toLowerCase()) ||
@@ -273,13 +277,17 @@ export default function GestaoAtividadesRegionaisPage() {
       const matchMes = filters.mes === 'todos' || filters.mes === mes;
       const matchAno = filters.ano === 'todos' || filters.ano === ano;
 
+
+
       // Filtro por regional - aplicar apenas se uma regional específica foi selecionada
       const regionalParam = searchParams.get('regional');
       const matchRegional = !regionalParam || regionalParam === 'todas' || 
         activity.regional === regionalParam;
 
-      return matchSearch && matchTipo && matchEstado && matchResponsavel && 
+      const finalMatch = matchSearch && matchTipo && matchEstado && matchResponsavel && 
              matchMes && matchAno && matchRegional;
+
+      return finalMatch;
     });
   }, [activities, filters, searchParams]);
 
@@ -695,6 +703,98 @@ export default function GestaoAtividadesRegionaisPage() {
                       </p>
                     </div>
 
+                    {/* Regional - Especial para NPS */}
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <div className="flex items-center gap-2 mb-1">
+                        <MapPin className="w-4 h-4 text-gray-500" />
+                        <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                          {activity.tipo === 'nps' ? 'Regionais NPS' : 'Regional'}
+                        </span>
+                      </div>
+                      <p className="text-sm font-medium text-gray-900">
+                        {(() => {
+                          // Para atividades NPS, mostrar as regionais selecionadas
+                          if (activity.tipo === 'nps' && activity.regionais_nps) {
+                            try {
+                              const regionaisNPS = typeof activity.regionais_nps === 'string' 
+                                ? JSON.parse(activity.regionais_nps) 
+                                : activity.regionais_nps;
+                              
+                              if (Array.isArray(regionaisNPS) && regionaisNPS.length > 0) {
+                                // Mapear IDs para labels legíveis
+                                const regionaisLabels = regionaisNPS.map(regionalId => {
+                                  const mapping: Record<string, string> = {
+                                    'nacional': 'Nacional',
+                                    'comercial': 'Comercial',
+                                    'centro_oeste': 'Centro-Oeste',
+                                    'norte': 'Norte',
+                                    'nordeste': 'Nordeste',
+                                    'sudeste': 'Sudeste',
+                                    'sul': 'Sul',
+                                    'mg_es': 'MG/ES',
+                                    'rj': 'Rio de Janeiro',
+                                    'sp': 'São Paulo',
+                                    'nordeste_1': 'Nordeste 1',
+                                    'nordeste_2': 'Nordeste 2'
+                                  };
+                                  return mapping[regionalId] || regionalId;
+                                });
+                                return regionaisLabels.join(', ');
+                              }
+                            } catch (error) {
+                              console.error('Erro ao parsear regionais NPS:', error);
+                            }
+                          }
+                          
+                          // Para outras atividades, mostrar a regional normal
+                          const regionalMapping: Record<string, string> = {
+                            'nacional': 'Nacional',
+                            'comercial': 'Comercial',
+                            'centro_oeste': 'Centro-Oeste',
+                            'norte': 'Norte',
+                            'nordeste': 'Nordeste',
+                            'sudeste': 'Sudeste',
+                            'sul': 'Sul',
+                            'mg_es': 'MG/ES',
+                            'rj': 'Rio de Janeiro',
+                            'sp': 'São Paulo',
+                            'nordeste_1': 'Nordeste 1',
+                            'nordeste_2': 'Nordeste 2'
+                          };
+                          return regionalMapping[activity.regional] || activity.regional || 'N/A';
+                        })()}
+                      </p>
+                    </div>
+
+                    {/* Programa */}
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Activity className="w-4 h-4 text-gray-500" />
+                        <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Programa</span>
+                      </div>
+                      <p className="text-sm font-medium text-gray-900">
+                        {(() => {
+                          // Parse do programa se necessário
+                          let programa = activity.programa;
+                          if (typeof programa === 'string') {
+                            try {
+                              programa = JSON.parse(programa);
+                            } catch {
+                              // Se não conseguir fazer parse, usar como string
+                              return programa || 'N/A';
+                            }
+                          }
+
+                          // Se é array, juntar os valores
+                          if (Array.isArray(programa) && programa.length > 0) {
+                            return programa.join(', ');
+                          }
+                          
+                          return programa || 'N/A';
+                        })()}
+                      </p>
+                    </div>
+
                     {/* Estados */}
                     <div className="bg-gray-50 rounded-lg p-4">
                       <div className="flex items-center gap-2 mb-1">
@@ -721,7 +821,10 @@ export default function GestaoAtividadesRegionaisPage() {
                         })()}
                       </p>
                     </div>
+                  </div>
 
+                  {/* Informações secundárias */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
                     {/* Responsável */}
                     <div className="bg-gray-50 rounded-lg p-4">
                       <div className="flex items-center gap-2 mb-1">
@@ -743,10 +846,6 @@ export default function GestaoAtividadesRegionaisPage() {
                         {activity.instituicao?.nome || activity.instituicao || 'N/A'}
                       </p>
                     </div>
-                  </div>
-
-                  {/* Informações secundárias */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
                     {/* Participantes - só exibir se houver participantes confirmados */}
                     {activity.participantes_confirmados > 0 && (
                       <div className="bg-gray-50 rounded-lg p-4">

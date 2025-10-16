@@ -24,7 +24,8 @@ const GOAL_OPTIONS = [
   'Imersão Ongs',
   'Encontro líder Maras',
   'Processo seletivo',
-  'Retenção',
+  'Retenção Decolagem',
+  'Retenção Maras',
   'Inadimplência',
   'NPS',
   'Outra'
@@ -49,16 +50,16 @@ export default function MetaFormFields({ meta, setMeta, className }: Props) {
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            {meta.nome === 'Retenção' ? 'Porcentagem (%)' : 'Quantidade'}
+            {(meta.nome === 'Retenção Decolagem' || meta.nome === 'Retenção Maras') ? 'Porcentagem (%)' : 'Quantidade'}
           </label>
           <input
             type="number"
             value={meta.quantidade}
             onChange={(e) => setMeta({ ...meta, quantidade: e.target.value })}
-            placeholder={meta.nome === 'Retenção' ? 'Ex: 85' : 'Ex: 300'}
+            placeholder={(meta.nome === 'Retenção Decolagem' || meta.nome === 'Retenção Maras') ? 'Ex: 85' : 'Ex: 300'}
             className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition-colors"
           />
-          {meta.nome === 'Retenção' && (
+          {(meta.nome === 'Retenção Decolagem' || meta.nome === 'Retenção Maras') && (
             <p className="text-xs text-gray-500 mt-0.5">Digite apenas o número (ex: 85 para 85%)</p>
           )}
         </div>

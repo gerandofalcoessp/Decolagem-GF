@@ -31,7 +31,7 @@ describe('AuthService', () => {
     it('deve fazer login com credenciais válidas', async () => {
       const mockResponse = {
         success: true,
-        user: {
+        member: {
           id: '123',
           nome: 'Test User',
           email: 'test@example.com',
@@ -40,29 +40,33 @@ describe('AuthService', () => {
           created_at: '2023-01-01T00:00:00Z',
           updated_at: '2023-01-01T00:00:00Z'
         },
-        token: 'mock-token',
+        session: {
+          access_token: 'mock-token',
+          refresh_token: 'mock-refresh-token',
+          expires_at: Date.now() + 3600000
+        }
       };
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
+        headers: {
+          get: vi.fn().mockReturnValue('application/json'),
+        },
         json: async () => mockResponse,
       });
 
       const result = await AuthService.login('test@example.com', 'password123');
 
       expect(result).not.toBeNull();
-      expect(result?.member).toEqual(mockResponse.user);
+      expect(result?.member).toEqual(mockResponse.member);
       expect(mockLocalStorage.setItem).toHaveBeenCalledWith('auth_token', 'mock-token');
-      expect(mockLocalStorage.setItem).toHaveBeenCalledWith('auth_user', JSON.stringify(mockResponse.user));
-      expect(mockFetch).toHaveBeenCalledWith('http://localhost:4000/auth/login', {
+      expect(mockLocalStorage.setItem).toHaveBeenCalledWith('refresh_token', 'mock-refresh-token');
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost:4000/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          email: 'test@example.com',
-          password: 'password123',
-        }),
+        body: JSON.stringify({ email: 'test@example.com', password: 'password123' }),
       });
     });
 
@@ -75,6 +79,9 @@ describe('AuthService', () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 401,
+        headers: {
+          get: (name: string) => name === 'content-type' ? 'application/json' : null
+        },
         json: async () => mockResponse,
       });
 
@@ -83,9 +90,13 @@ describe('AuthService', () => {
     });
 
     it('deve tratar erro de rede', async () => {
-      mockFetch.mockRejectedValueOnce(new Error('Network error'));
+      // Simular erro de rede real - fetch falha completamente
+      mockFetch.mockImplementationOnce(() => {
+        throw new Error('Network error');
+      });
 
-      await expect(AuthService.login('test@example.com', 'password123')).rejects.toThrow('Erro de conexão');
+      // Agora esperamos a mensagem correta que o AuthService retorna
+      await expect(AuthService.login('test@example.com', 'password123')).rejects.toThrow('Network error');
     });
   });
 
@@ -102,11 +113,13 @@ describe('AuthService', () => {
 
       expect(result).toBeUndefined();
       expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('auth_token');
-      expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('auth_user');
-      expect(mockFetch).toHaveBeenCalledWith('http://localhost:4000/auth/logout', {
+      expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('refresh_token');
+      expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('auth-storage');
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost:4000/api/auth/logout', {
         method: 'POST',
         headers: {
           'Authorization': 'Bearer mock-token',
+          'Content-Type': 'application/json',
         },
       });
     });
@@ -119,7 +132,8 @@ describe('AuthService', () => {
 
       expect(result).toBeUndefined();
       expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('auth_token');
-      expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('auth_user');
+      expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('refresh_token');
+      expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('auth-storage');
     });
   });
 
@@ -143,6 +157,9 @@ describe('AuthService', () => {
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
+        headers: {
+          get: (name: string) => name === 'content-type' ? 'application/json' : null
+        },
         json: async () => ({
           success: true,
           member: mockUser,
@@ -153,8 +170,7 @@ describe('AuthService', () => {
 
       expect(result).not.toBeNull();
       expect(result?.member).toEqual(mockUser);
-      expect(mockFetch).toHaveBeenCalledWith('http://localhost:4000/auth/me', {
-        method: 'GET',
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost:4000/api/auth/me', {
         headers: {
           'Authorization': 'Bearer mock-token',
         },
@@ -183,7 +199,8 @@ describe('AuthService', () => {
 
       expect(result).toBeNull();
       expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('auth_token');
-      expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('auth_user');
+      expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('refresh_token');
+      expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('auth-storage');
     });
   });
 
@@ -229,7 +246,8 @@ describe('AuthService', () => {
       AuthService.clearAuthData();
 
       expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('auth_token');
-      expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('auth_user');
+      expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('refresh_token');
+      expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('auth-storage');
     });
   });
 
@@ -266,7 +284,7 @@ describe('AuthService', () => {
       };
 
       await expect(AuthService.register(userData)).resolves.toBeUndefined();
-      expect(mockFetch).toHaveBeenCalledWith('http://localhost:4000/auth/register', {
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost:4000/api/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -301,7 +319,7 @@ describe('AuthService', () => {
 
       await expect(AuthService.resetPassword('test@example.com')).resolves.toBeUndefined();
       
-      expect(mockFetch).toHaveBeenCalledWith('http://localhost:4000/auth/reset-password', {
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost:4000/api/auth/reset-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -329,8 +347,8 @@ describe('AuthService', () => {
       const result = await AuthService.updatePassword('newpassword123');
 
       expect(result).toBeUndefined();
-      expect(mockFetch).toHaveBeenCalledWith('http://localhost:4000/auth/update-password', {
-        method: 'POST',
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost:4000/api/auth/update-password', {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer mock-token',

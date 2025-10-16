@@ -53,7 +53,7 @@ export class GoalService {
    */
   private static adaptGoalToFrontend(goal: Goal): FrontendGoal {
     // Valores padrão para campos obrigatórios
-    let mes: string[] = ['01']; // Janeiro como padrão
+    let mes: string[] = ['todo-ano']; // Meta anual por padrão
     let regionais: string[] = ['SP']; // SP como padrão
     let ano = new Date().getFullYear().toString();
     

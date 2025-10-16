@@ -99,8 +99,8 @@ export default function MetasTab({
                     <div className="flex-1 mb-3">
                       <p className="font-medium text-gray-900 text-sm">{meta.nome}</p>
                       <p className="text-sm text-gray-600">
-                        {meta.nome === 'Retenção' ? 'Porcentagem' : 'Quantidade'}: {meta.quantidade}
-                        {meta.nome === 'Retenção' ? '%' : ''}
+                        {(meta.nome === 'Retenção Decolagem' || meta.nome === 'Retenção Maras') ? 'Porcentagem' : 'Quantidade'}: {meta.quantidade}
+                        {(meta.nome === 'Retenção Decolagem' || meta.nome === 'Retenção Maras') ? '%' : ''}
                       </p>
                       <p className="text-sm text-gray-600">
                         Período:{' '}

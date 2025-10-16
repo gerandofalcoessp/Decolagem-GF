@@ -38,7 +38,7 @@ export const useAuthStore = create<AuthState>()(
 
       login: async (email: string, password: string) => {
         try {
-          set({ isLoading: true });
+          set({ isLoading: true, error: null });
           
           const response = await AuthService.login(email, password);
           const user = AuthService.mapToFrontendUser(response);
@@ -49,8 +49,8 @@ export const useAuthStore = create<AuthState>()(
             isLoading: false,
           });
         } catch (error) {
-          set({ isLoading: false });
-          throw error;
+          const errorMessage = error instanceof Error ? error.message : 'Erro ao fazer login';
+          set({ isLoading: false, error: errorMessage });
         }
       },
 
@@ -112,34 +112,34 @@ export const useAuthStore = create<AuthState>()(
         regional: string;
       }) => {
         try {
-          set({ isLoading: true });
+          set({ isLoading: true, error: null });
           await AuthService.register(userData);
           set({ isLoading: false });
         } catch (error) {
-          set({ isLoading: false });
-          throw error;
+          const errorMessage = error instanceof Error ? error.message : 'Erro ao registrar usuário';
+          set({ isLoading: false, error: errorMessage });
         }
       },
 
       resetPassword: async (email: string) => {
         try {
-          set({ isLoading: true });
+          set({ isLoading: true, error: null });
           await AuthService.resetPassword(email);
           set({ isLoading: false });
         } catch (error) {
-          set({ isLoading: false });
-          throw error;
+          const errorMessage = error instanceof Error ? error.message : 'Erro ao solicitar recuperação de senha';
+          set({ isLoading: false, error: errorMessage });
         }
       },
 
       updatePassword: async (newPassword: string) => {
         try {
-          set({ isLoading: true });
+          set({ isLoading: true, error: null });
           await AuthService.updatePassword(newPassword);
           set({ isLoading: false });
         } catch (error) {
-          set({ isLoading: false });
-          throw error;
+          const errorMessage = error instanceof Error ? error.message : 'Erro ao atualizar senha';
+          set({ isLoading: false, error: errorMessage });
         }
       },
 

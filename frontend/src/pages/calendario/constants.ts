@@ -33,6 +33,7 @@ export const ATIVIDADE_OPTIONS: { value: TipoAtividade; label: string }[] = [
   { value: 'ligas_maras_formadas', label: 'Ligas Maras Formadas' },
   { value: 'familias_embarcadas_decolagem', label: 'Famílias Embarcadas Decolagem' },
   { value: 'diagnosticos_realizados', label: 'Diagnósticos Realizados' },
+  { value: 'leads_do_dia', label: 'Leads do Dia' },
   // Opção de customização
   { value: 'outros', label: 'OUTRA' },
 ];
@@ -54,6 +55,7 @@ export const TYPE_COLOR_CLASSES: Record<TipoAtividade, string> = {
   ligas_maras_formadas: 'bg-fuchsia-600',
   familias_embarcadas_decolagem: 'bg-sky-600',
   diagnosticos_realizados: 'bg-orange-600',
+  leads_do_dia: 'bg-cyan-600',
 };
 
 export const REGIONAL_COLOR_CLASSES: Record<string, string> = {
