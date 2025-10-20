@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { getSupabaseForToken, getUserFromToken } from '../services/supabaseClient.js';
+import { z } from 'zod';
+import { requireRole } from '../middlewares/authMiddleware.js';
 
 const router = Router();
 
@@ -25,12 +27,12 @@ router.get('/', async (req, res) => {
     res.json(familias || []);
   } catch (error: any) {
     console.error('Erro ao buscar dados do Decolagem:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    res.status(500).json({ error: 'internal_server_error' });
   }
 });
 
 // POST /decolagem - Criar nova família
-router.post('/', async (req, res) => {
+router.post('/', requireRole('super_admin'), async (req, res) => {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
   const s = getSupabaseForToken(token);
@@ -43,7 +45,15 @@ router.post('/', async (req, res) => {
   if (meErr || !me) return res.status(404).json({ error: 'member_not_found' });
 
   const body = req.body || {};
-  const payload = { ...body, member_id: me.id };
+  const createSchema = z.object({}).passthrough().refine(obj => !('member_id' in obj), {
+    message: 'member_id_not_allowed'
+  });
+  const parsed = createSchema.safeParse(body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'invalid_payload', details: parsed.error.flatten() });
+  }
+
+  const payload = { ...parsed.data, member_id: me.id };
 
   const { data, error } = await s.from('familias_decolagem').insert(payload).select('*').single();
   if (error) return res.status(400).json({ error: error.message });
@@ -51,16 +61,28 @@ router.post('/', async (req, res) => {
 });
 
 // PUT /decolagem/:id - Atualizar família
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireRole('super_admin'), async (req, res) => {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
   const s = getSupabaseForToken(token);
   if (!s) return res.status(500).json({ error: 'supabase_client_unavailable' });
 
-  const id = req.params.id;
+  const idSchema = z.string().min(1);
+  const idParse = idSchema.safeParse(req.params.id);
+  if (!idParse.success) {
+    return res.status(400).json({ error: 'invalid_id', details: idParse.error.flatten() });
+  }
+  const id = idParse.data;
+
   const body = req.body || {};
-  if ('member_id' in body) delete body.member_id;
-  const payload = body;
+  const updateSchema = z.object({}).passthrough().refine(obj => !('member_id' in obj), {
+    message: 'member_id_not_allowed'
+  });
+  const parsed = updateSchema.safeParse(body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'invalid_payload', details: parsed.error.flatten() });
+  }
+  const payload = parsed.data;
 
   const { data, error } = await s.from('familias_decolagem').update(payload).eq('id', id).select('*').single();
   if (error) return res.status(400).json({ error: error.message });
@@ -68,11 +90,17 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE /decolagem/:id - Deletar família
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireRole('super_admin'), async (req, res) => {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
   const s = getSupabaseForToken(token);
   if (!s) return res.status(500).json({ error: 'supabase_client_unavailable' });
+  
+  const idSchema = z.string().min(1);
+  const idParse = idSchema.safeParse(req.params.id);
+  if (!idParse.success) {
+    return res.status(400).json({ error: 'invalid_id', details: idParse.error.flatten() });
+  }
   
   const { data, error } = await s.from('familias_decolagem').delete().eq('id', req.params.id).select('*').single();
   if (error) return res.status(400).json({ error: error.message });

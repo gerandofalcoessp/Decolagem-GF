@@ -25,7 +25,7 @@ router.get('/', async (req, res) => {
 
     res.json({ data });
   } catch (e: any) {
-    res.status(500).json({ error: e?.message || 'unknown_error' });
+    res.status(500).json({ error: 'internal_server_error' });
   }
 });
 
@@ -73,7 +73,7 @@ router.get('/users', async (req, res) => {
     const { data, error } = await query;
 
     if (error) {
-      return res.status(500).json({ error: error.message });
+      return res.status(500).json({ error: 'internal_server_error' });
     }
 
     const users = (data || []).map((u: any) => ({
@@ -91,7 +91,7 @@ router.get('/users', async (req, res) => {
 
     return res.json({ users });
   } catch (e: any) {
-    return res.status(500).json({ error: e?.message || 'unknown_error' });
+    return res.status(500).json({ error: 'internal_server_error' });
   }
 });
 

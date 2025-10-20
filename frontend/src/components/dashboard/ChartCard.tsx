@@ -38,6 +38,11 @@ interface ChartCardProps {
   // Personalização para gráfico de linha
   lineColor?: string;
   lineBgOpacity?: number; // 0..1
+  // Média móvel (apenas para 'line')
+  showMovingAverage?: boolean;
+  movingAverageWindow?: number;
+  movingAvgColor?: string;
+  movingAvgLabel?: string;
 }
 
 export default function ChartCard({
@@ -48,6 +53,10 @@ export default function ChartCard({
   isLoading = false,
   lineColor,
   lineBgOpacity = 0.12,
+  showMovingAverage = false,
+  movingAverageWindow = 3,
+  movingAvgColor = '#10B981',
+  movingAvgLabel = 'Média móvel',
 }: ChartCardProps) {
   const chartRef = useRef<any>(null);
 
@@ -146,19 +155,32 @@ export default function ChartCard({
 
     if (type === 'line') {
       const lc = lineColor || '#EC4899';
-      return {
-        labels: data.map((item: any) => item.name),
-        datasets: [
-          {
-            label: 'Dados',
-            data: data.map((item: any) => item.value),
-            borderColor: lc,
-            backgroundColor: hexToRgba(lc, lineBgOpacity),
-            fill: true,
-            borderWidth: 2,
-          },
-        ],
-      };
+      const labels = data.map((item: any) => item.name);
+      const baseValues = data.map((item: any) => item.value);
+      const datasets: any[] = [
+        {
+          label: 'Dados',
+          data: baseValues,
+          borderColor: lc,
+          backgroundColor: hexToRgba(lc, lineBgOpacity),
+          fill: true,
+          borderWidth: 2,
+        },
+      ];
+      if (showMovingAverage) {
+        const maValues = computeMovingAverage(baseValues, movingAverageWindow);
+        datasets.push({
+          label: movingAvgLabel,
+          data: maValues,
+          borderColor: movingAvgColor,
+          backgroundColor: 'transparent',
+          fill: false,
+          borderWidth: 2,
+          borderDash: [6, 6],
+          pointRadius: 0,
+        });
+      }
+      return { labels, datasets };
     }
 
     if (type === 'doughnut') {
@@ -201,6 +223,17 @@ export default function ChartCard({
       labels: [],
       datasets: []
     };
+  };
+
+  // Helper: média móvel simples
+  const computeMovingAverage = (values: number[], window: number) => {
+    const w = Math.max(1, Math.floor(window));
+    return values.map((_, i) => {
+      const start = Math.max(0, i - w + 1);
+      const slice = values.slice(start, i + 1);
+      const sum = slice.reduce((acc, v) => acc + (typeof v === 'number' ? v : 0), 0);
+      return slice.length ? +(sum / slice.length).toFixed(2) : 0;
+    });
   };
 
   if (isLoading) {

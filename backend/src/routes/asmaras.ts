@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { getSupabaseForToken, getUserFromToken } from '../services/supabaseClient.js';
+import { requireRole } from '../middlewares/authMiddleware.js';
 
 const router = Router();
 
@@ -25,12 +26,12 @@ router.get('/', async (req, res) => {
     res.json(participantes || []);
   } catch (error: any) {
     console.error('Erro ao buscar dados do As Maras:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    res.status(500).json({ error: 'internal_server_error' });
   }
 });
 
 // POST /asmaras - Criar novo participante
-router.post('/', async (req, res) => {
+router.post('/', requireRole('super_admin'), async (req, res) => {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
   const s = getSupabaseForToken(token);
@@ -51,7 +52,7 @@ router.post('/', async (req, res) => {
 });
 
 // PUT /asmaras/:id - Atualizar participante
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireRole('super_admin'), async (req, res) => {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
   const s = getSupabaseForToken(token);
@@ -68,7 +69,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE /asmaras/:id - Deletar participante
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireRole('super_admin'), async (req, res) => {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
   const s = getSupabaseForToken(token);

@@ -16,13 +16,14 @@ import MonthSelector from '../components/modals/meta/MonthSelector';
 import YearInput from '../components/modals/meta/YearInput';
 import RegionaisSelector from '../components/modals/meta/RegionaisSelector';
 import ActionButtons from '../components/modals/meta/ActionButtons';
-import { useMembers, useUsers, useUsersWithMembers, useGoals } from '../hooks/useApi';
+import { useUsers, useUsersWithMembers, useGoals } from '../hooks/useApi';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { MemberService } from '../services/memberService';
 import { GoalService } from '../services/goalService';
 import { AuthService } from '../services/authService';
 import { useNotificationStore } from '../store/notificationStore';
 import { API_BASE_URL } from '../utils/config';
+import { useToastContext } from '../contexts/ToastContext';
 
 interface TabItem {
   id: string;
@@ -94,6 +95,7 @@ const prefetchTab = (id: string) => {
 export default function Configuracoes() {
   const [activeTab, setActiveTab] = useState('senhas');
   const { showSuccess, showError, showConfirmation } = useNotificationStore();
+  const toast = useToastContext();
 
   // Prefetch inicial de abas mais acessadas
   useEffect(() => {
@@ -137,8 +139,8 @@ export default function Configuracoes() {
    const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [memberToDelete, setMemberToDelete] = useState<any>(null);
   // Usando dados reais da API
-  const { data: members, refetch: refetchMembers } = useMembers();
-  const { data: usersWithMembers, loading: usersLoading, error: usersError, refetch: refetchUsers } = useUsersWithMembers();
+  const { data: users, refetch: refetchUsers } = useUsers();
+  const { data: usersWithMembers, loading: usersLoading, error: usersError, refetch: refetchUsersWithMembers } = useUsersWithMembers();
   
   // Extrair usuários dos dados combinados e mapear para o formato esperado pela aba Gestão de Senhas
   const usuarios = useMemo(() => {
@@ -355,16 +357,17 @@ export default function Configuracoes() {
 
   // Filtrar membros baseado nos filtros ativos
   const filteredMembros = useMemo(() => {
-    if (!members || members.length === 0) return [];
+    // users retorna um objeto com propriedade users que contém o array
+    if (!users?.users || users.users.length === 0) return [];
     
-    return members.filter((membro: any) => {
-      const matchesSearch = (membro.name || '').toLowerCase().includes(searchTerm.toLowerCase());
+    return users.users.filter((membro: any) => {
+      const matchesSearch = (membro.nome || membro.name || '').toLowerCase().includes(searchTerm.toLowerCase());
       const matchesFuncao = selectedFuncao === 'Todas as funções' || membro.funcao === selectedFuncao;
       const matchesRegional = selectedRegional === 'Todas as áreas' || membro.area === selectedRegional;
       
       return matchesSearch && matchesFuncao && matchesRegional;
     });
-  }, [members, searchTerm, selectedFuncao, selectedRegional]);
+  }, [users, searchTerm, selectedFuncao, selectedRegional]);
 
   // Filtrar usuários baseado nos filtros ativos
   const filteredUsuarios = useMemo(() => {
@@ -402,8 +405,8 @@ export default function Configuracoes() {
 
       await MemberService.updateMember(editingMember.id, memberData);
       
-      // Atualizar a lista de membros
-      await refetchMembers();
+      // Atualizar a lista de usuários
+      await refetchUsers();
       
       // Fechar modal
       setEditingMember(null);
@@ -561,8 +564,8 @@ export default function Configuracoes() {
       
       // Atualizar ambas as listas após criação bem-sucedida
       await Promise.all([
-        refetchUsers(),
-        refetchMembers()
+        refetchUsersWithMembers(),
+        refetchUsers()
       ]);
       
       // Fechar modal e resetar formulário

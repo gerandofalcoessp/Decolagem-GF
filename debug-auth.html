@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Auth</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+        button { padding: 10px 15px; margin: 5px; }
+        pre { background: #f5f5f5; padding: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Debug Autenticação Frontend</h1>
+    <div class="section">
+        <h2>1. Verificar localStorage</h2>
+        <button onclick="checkLocalStorage()">Verificar Storage</button>
+        <div id="storage-result"></div>
+    </div>
+    <div class="section">
+        <h2>2. Testar Login</h2>
+        <button onclick="testLogin()">Fazer Login</button>
+        <div id="login-result"></div>
+    </div>
+    <div class="section">
+        <h2>3. Testar API com Token</h2>
+        <button onclick="testApiWithToken()">Testar /api/goals</button>
+        <div id="api-result"></div>
+    </div>
+    <div class="section">
+        <h2>4. Logs</h2>
+        <button onclick="clearLogs()">Limpar Logs</button>
+        <div id="logs"></div>
+    </div>
+    <script>
+        const API_BASE_URL = "http://localhost:4000";
+        function log(message, type = "info") {
+            const logs = document.getElementById("logs");
+            const timestamp = new Date().toLocaleTimeString();
+            logs.innerHTML += `<div class="${type}">[${timestamp}] ${message}</div>`;
+        }
+        function clearLogs() {
+            document.getElementById("logs").innerHTML = "";
+        }
+        function checkLocalStorage() {
+            const result = document.getElementById("storage-result");
+            const token = localStorage.getItem("auth_token");
+            const authStorage = localStorage.getItem("auth-storage");
+            log("Verificando localStorage...");
+            log(`Token: ${token ? "Presente" : "Ausente"}`, token ? "success" : "error");
+            log(`Auth Storage: ${authStorage ? "Presente" : "Ausente"}`, authStorage ? "success" : "error");
+            result.innerHTML = `
+                <div class="${token ? "success" : "error"}">
+                    <p><strong>Auth Token:</strong> ${token ? "Presente" : "Ausente"}</p>
+                    ${token ? `<p>Token: ${token.substring(0, 50)}...</p>` : ""}
+                </div>
+                <div class="${authStorage ? "info" : "error"}">
+                    <p><strong>Auth Storage:</strong> ${authStorage ? "Presente" : "Ausente"}</p>
+                    ${authStorage ? `<pre>${authStorage}</pre>` : ""}
+                </div>
+            `;
+        }
+        async function testLogin() {
+            const result = document.getElementById("login-result");
+            result.innerHTML = "<p>Fazendo login...</p>";
+            log("🔐 Iniciando teste de login...");
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        email: "admin@decolagem.com",
+                        password: "admin123"
+                    }),
+                });
+                log(`Status da resposta: ${response.status}`);
+                const loginData = await response.json();
+                log(`Dados recebidos: ${JSON.stringify(loginData, null, 2)}`);
+                if (!response.ok) {
+                    throw new Error(loginData.error || "Erro no login");
+                }
+                log("✅ Login bem-sucedido!", "success");
+                // Salvar token
+                if (loginData.session?.access_token) {
+                    localStorage.setItem("auth_token", loginData.session.access_token);
+                    localStorage.setItem("refresh_token", loginData.session.refresh_token);
+                    log("💾 Token salvo no localStorage", "success");
+                }
+                result.innerHTML = `
+                    <div class="success">
+                        <p><strong>Login realizado com sucesso!</strong></p>
+                        <p>Usuário: ${loginData.member?.nome || "N/A"}</p>
+                        <p>Email: ${loginData.member?.email || "N/A"}</p>
+                        <p>Role: ${loginData.member?.role || "N/A"}</p>
+                    </div>
+                `;
+            } catch (error) {
+                log(`❌ Erro no login: ${error.message}`, "error");
+                result.innerHTML = `<div class="error">Erro: ${error.message}</div>`;
+            }
+        }
+        async function testApiWithToken() {
+            const result = document.getElementById("api-result");
+            const token = localStorage.getItem("auth_token");
+            if (!token) {
+                result.innerHTML = "<div class=\"error\">Nenhum token encontrado. Faça login primeiro.</div>";
+                return;
+            }
+            result.innerHTML = "<p>Testando API...</p>";
+            log("📡 Testando /api/goals com token...");
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/goals`, {
+                    method: "GET",
+                    headers: {
+                        "Authorization": `Bearer ${token}`,
+                        "Content-Type": "application/json",
+                    },
+                });
+                log(`Status da resposta: ${response.status}`);
+                const apiData = await response.json();
+                log(`Dados da API: ${JSON.stringify(apiData, null, 2)}`);
+                if (!response.ok) {
+                    throw new Error(apiData.error || `Erro ${response.status}`);
+                }
+                log("✅ API funcionando!", "success");
+                result.innerHTML = `
+                    <div class="success">
+                        <p><strong>API funcionando!</strong></p>
+                        <pre>${JSON.stringify(apiData, null, 2)}</pre>
+                    </div>
+                `;
+            } catch (error) {
+                log(`❌ Erro na API: ${error.message}`, "error");
+                result.innerHTML = `<div class="error">Erro: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>

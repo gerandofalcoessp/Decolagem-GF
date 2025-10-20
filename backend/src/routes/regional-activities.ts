@@ -207,7 +207,7 @@ router.get('/', cacheMiddleware({ ttl: 180 }), async (req, res) => {
 });
 
 // POST - Criar nova atividade regional
-router.post('/', requireRole('super_admin'), upload.array('evidencias', 2), invalidateCacheMiddleware(['regional-activities']), async (req, res) => {
+router.post('/', requireRole(['super_admin', 'equipe_interna', 'user']), upload.array('evidencias', 2), invalidateCacheMiddleware(['regional-activities']), async (req, res) => {
   let userId: string | undefined;
   let memberId: string | undefined;
   try {
@@ -237,13 +237,19 @@ router.post('/', requireRole('super_admin'), upload.array('evidencias', 2), inva
     }
     memberId = member.id;
 
-    // Validação de payload com Zod
+    // Validação de payload com Zod (aceitando os campos enviados pelo frontend)
     const createSchema = z.object({
+      title: z.string().min(1),
+      description: z.string().optional(),
+      type: z.string().min(1),
+      activity_date: z.string().min(1),
+      regional: z.string().min(1),
+      status: z.string().optional(),
       responsavel_id: z.string().uuid().optional().nullable(),
       programa: z.string().optional(),
       estados: z.union([z.array(z.string()), z.string()]).optional(),
-      instituicaoId: z.string().uuid().optional().nullable(),
-      instituicao_id: z.string().uuid().optional().nullable(),
+      instituicaoId: z.union([z.string().uuid(), z.string().length(0)]).optional().nullable(),
+      instituicao_id: z.union([z.string().uuid(), z.string().length(0)]).optional().nullable(),
       quantidade: z.coerce.number().int().nonnegative().optional(),
       atividadeLabel: z.string().optional(),
       atividadeCustomLabel: z.string().optional(),
@@ -256,6 +262,12 @@ router.post('/', requireRole('super_admin'), upload.array('evidencias', 2), inva
     }
 
     const { 
+      title,
+      description,
+      type,
+      activity_date,
+      regional,
+      status,
       responsavel_id, 
       programa,
       estados,
@@ -267,6 +279,14 @@ router.post('/', requireRole('super_admin'), upload.array('evidencias', 2), inva
       ...otherData 
     } = parsedBody.data as any;
     const files = req.files as Express.Multer.File[];
+
+    // Normalizar estados (aceitar string JSON ou array)
+    let estadosArray: string[] = [];
+    if (typeof estados === 'string') {
+      try { estadosArray = JSON.parse(estados as string); } catch { estadosArray = []; }
+    } else if (Array.isArray(estados)) {
+      estadosArray = estados as string[];
+    }
 
     // Processar uploads de evidências se houver arquivos
     const evidences = [];
@@ -314,17 +334,21 @@ router.post('/', requireRole('super_admin'), upload.array('evidencias', 2), inva
 
     // Construir payload para inserção
     const payload = {
-      ...otherData,
+      // Campos básicos mapeados do frontend
+      title,
+      description: description || '',
+      type,
+      activity_date,
+      regional,
+      // Campos adicionais e normalizados
       member_id: member.id,
       evidences: evidences,
-      // Mapear campos específicos do formulário
       programa: programa || null,
-      estados: estados ? JSON.stringify(estados) : '[]',
+      estados: JSON.stringify(estadosArray || []),
       instituicao_id: instituicaoId || null,
-      quantidade: quantidade ? parseInt(quantidade) : null,
+      quantidade: typeof quantidade === 'number' ? quantidade : (quantidade ? parseInt(String(quantidade)) : null),
       atividade_label: atividadeLabel || null,
       atividade_custom_label: atividadeCustomLabel || null,
-      // Para atividades NPS, armazenar as regionais selecionadas
       regionais_nps: regionaisNPS ? JSON.stringify(regionaisNPS) : null,
       ...(responsavel_id && { responsavel_id })
     };
@@ -484,7 +508,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // PUT - Atualizar atividade regional com arquivos
-router.put('/:id/with-files', requireRole('super_admin'), upload.array('evidencias', 10), invalidateCacheMiddleware(['regional-activities']), async (req, res) => {
+router.put('/:id/with-files', requireRole(['super_admin', 'equipe_interna', 'user']), upload.array('evidencias', 10), invalidateCacheMiddleware(['regional-activities']), async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
     const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
@@ -673,7 +697,7 @@ router.put('/:id/with-files', requireRole('super_admin'), upload.array('evidenci
 });
 
 // PUT - Atualizar atividade regional
-router.put('/:id', requireRole('super_admin'), invalidateCacheMiddleware(['regional-activities']), async (req, res) => {
+router.put('/:id', requireRole(['super_admin', 'equipe_interna', 'user']), invalidateCacheMiddleware(['regional-activities']), async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
     const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
@@ -789,7 +813,7 @@ router.put('/:id', requireRole('super_admin'), invalidateCacheMiddleware(['regio
 });
 
 // DELETE - Deletar atividade regional
-router.delete('/:id', requireRole('super_admin'), invalidateCacheMiddleware(['regional-activities']), async (req, res) => {
+router.delete('/:id', requireRole(['super_admin', 'equipe_interna', 'user']), invalidateCacheMiddleware(['regional-activities']), async (req, res) => {
   try {
     // Validar id do parâmetro com Zod
     const idParamsSchema = z.object({ id: z.string().uuid() });

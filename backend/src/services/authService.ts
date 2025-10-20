@@ -1,4 +1,4 @@
-import { supabaseAdmin, supabase } from './supabaseClient';
+import { supabaseAdmin, supabase } from './supabaseClient.js';
 import { AuthError, User } from '@supabase/supabase-js';
 
 export interface AuthResponse {
@@ -99,13 +99,8 @@ export class AuthService {
         };
       }
 
-      // Criar entrada na tabela usuarios após criar no Auth
-      if (data.user) {
-        await this.syncUserToUsuariosTable(data.user.id, {
-          email: data.user.email,
-          ...userData.metadata
-        });
-      }
+      // Os triggers do banco de dados criam automaticamente a entrada na tabela usuarios
+      console.log('✅ Usuário criado no Auth:', data.user?.email);
 
       return {
         user: data.user,
@@ -443,7 +438,8 @@ export class AuthService {
 
       // Mapear dados da tabela usuarios para o formato esperado
       const users: ListedUser[] = usuariosData.map(usuario => ({
-        id: usuario.auth_user_id,
+        id: usuario.id, // Usar o ID da tabela usuarios, não o auth_user_id
+        auth_user_id: usuario.auth_user_id, // Manter o auth_user_id separado
         email: usuario.email,
         created_at: usuario.created_at,
         updated_at: usuario.updated_at,
@@ -582,7 +578,7 @@ export class AuthService {
   /**
    * Exclui um usuário
    */
-  static async deleteUser(userId: string) {
+  static async deleteUser(userId: string, userContext?: any) {
     if (!supabaseAdmin) {
       return { success: false, error: new AuthError('Supabase Admin não configurado', 500) };
     }
@@ -590,8 +586,8 @@ export class AuthService {
     try {
       const admin = supabaseAdmin!;
 
-      // Determinar se o parâmetro é um UUID (auth_user_id) ou um ID numérico da tabela usuarios
-      let targetAuthId: string | null = userId;
+      // Determinar se o parâmetro é um UUID ou um ID numérico da tabela usuarios
+      let targetAuthId: string | null = null;
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
       if (!uuidRegex.test(userId)) {
@@ -613,29 +609,37 @@ export class AuthService {
         }
         // Se não tiver auth_user_id, seguimos apenas removendo da tabela usuarios
         targetAuthId = (usuario?.auth_user_id as string) || null;
+      } else {
+        // Se userId é um UUID, assumir que é auth_user_id e tentar deletar diretamente
+        targetAuthId = userId;
       }
 
-      // Excluir do Supabase Auth (se tivermos auth_user_id)
+      // Excluir do Supabase Auth usando admin (necessário para deletar outros usuários)
       if (targetAuthId) {
         const { error: deleteAuthErr } = await admin!.auth.admin.deleteUser(targetAuthId);
         if (deleteAuthErr) {
           console.warn('Falha ao excluir usuário no Auth, prosseguindo com remoção na tabela usuarios:', deleteAuthErr);
           // Não retornar erro aqui; seguimos para remover na tabela usuarios.
+        } else {
+          console.log(`Usuário removido com sucesso do Supabase Auth: ${targetAuthId}`);
         }
       }
 
+      // Para a tabela usuarios, usar o contexto do usuário se disponível (para RLS)
+      // Caso contrário, usar admin (para casos onde RLS não se aplica)
+      const clientToUse = userContext && userContext.supabase ? userContext.supabase : admin;
+
       // Remover também da tabela usuarios (obrigatório para sucesso)
-      const deleteQuery = admin!
-        .from('usuarios')
-        .delete();
+      let deleteQuery;
 
       if (uuidRegex.test(userId)) {
-        // Se userId é um UUID, buscar pelo auth_user_id
-        deleteQuery.eq('auth_user_id', userId);
+        // Se userId é um UUID, buscar pelo auth_user_id (que é o campo correto para UUIDs)
+        console.log(`Buscando usuário por auth_user_id: ${userId}`);
+        deleteQuery = clientToUse.from('usuarios').delete().eq('auth_user_id', userId);
       } else {
         const numericId = Number(userId);
         if (Number.isFinite(numericId)) {
-          deleteQuery.eq('id', numericId);
+          deleteQuery = clientToUse.from('usuarios').delete().eq('id', numericId);
         } else {
           return { success: false, error: new AuthError('Identificador do usuário ausente para remoção na base de dados', 400) };
         }
@@ -643,14 +647,23 @@ export class AuthService {
 
       const { data: deletedRows, error: deleteUsuarioErr } = await deleteQuery.select('id');
       if (deleteUsuarioErr) {
-        console.warn('Falha ao remover usuário da tabela usuarios:', deleteUsuarioErr);
+        console.error('Falha ao remover usuário da tabela usuarios:', deleteUsuarioErr);
         return { success: false, error: new AuthError('Falha ao remover usuário da base de dados', 500) };
       }
+      
+      // Verificar se algum registro foi deletado
       if (!deletedRows || deletedRows.length === 0) {
         console.warn('Nenhum registro removido da tabela usuarios para o identificador:', userId);
+        // Se o usuário foi removido do Auth mas não da tabela usuarios, ainda consideramos sucesso
+        // pois o objetivo principal (remover acesso) foi alcançado
+        if (targetAuthId) {
+          console.log('Usuário removido do Auth com sucesso, mesmo sem registro na tabela usuarios');
+          return { success: true, error: null };
+        }
         return { success: false, error: new AuthError('Usuário não encontrado na base de dados', 404) };
       }
 
+      console.log(`Usuário removido com sucesso da tabela usuarios: ${userId}`);
       return { success: true, error: null };
     } catch (error) {
       console.error('Erro ao excluir usuário:', error);

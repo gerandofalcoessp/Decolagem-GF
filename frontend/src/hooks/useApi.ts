@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/authStore';
 import { supabase, isSupabaseConfigured } from '@/services/supabaseClient';
 
-const API_BASE_URL = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '');
+import { API_BASE_URL } from '@/utils/config';
 
 interface ApiResponse<T> {
   data: T;
@@ -28,8 +28,6 @@ export function useApi<T>(endpoint: string, options: UseApiOptions = { immediate
 
     setLoading(true);
     setError(null);
-
-    console.log(`🔄 Fazendo fetch para: ${endpoint}`);
 
     try {
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -75,10 +73,8 @@ export function useApi<T>(endpoint: string, options: UseApiOptions = { immediate
 
       // Se tem propriedade 'data', usar ela; senão, usar a resposta diretamente
       const responseData = result.data !== undefined ? result.data : result;
-      console.log(`✅ Dados processados para ${endpoint}:`, responseData);
       setData(responseData as T);
     } catch (err) {
-      console.error(`❌ Erro ao fazer fetch para ${endpoint}:`, err);
       setError(err instanceof Error ? err.message : 'Erro desconhecido');
     } finally {
       setLoading(false);
@@ -191,6 +187,10 @@ export const useActivities = () => {
     queryKey: ['activities'],
     queryFn: fetchActivities,
     enabled: !!token,
+    staleTime: 5 * 60 * 1000, // 5 minutos
+    gcTime: 15 * 60 * 1000, // 15 minutos
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
   });
 
   return {
@@ -233,7 +233,7 @@ export const useRegionalActivities = () => {
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
-    refetchInterval: isSupabaseConfigured() ? false : 10000,
+    refetchInterval: isSupabaseConfigured() ? false : 30000, // Reduzido de 10s para 30s quando Supabase não está configurado
   });
 
   // Assinatura em tempo real via Supabase para invalidar cache quando houver mudanças
@@ -266,19 +266,12 @@ export const useCalendarEvents = (isGlobal = false) => {
   const token = localStorage.getItem('auth_token');
   const { user } = useAuthStore();
   
-  console.log('🚀 useCalendarEvents: Hook chamado');
-  console.log('🔑 useCalendarEvents: Token presente:', !!token);
-  console.log('👤 useCalendarEvents: Usuário regional:', user?.regional);
-  console.log('🌍 useCalendarEvents: Modo global:', isGlobal);
-  
   const fetchCalendarEvents = async () => {
     if (!token) {
-      console.log('❌ useCalendarEvents: Token não encontrado');
       throw new Error('Usuário não autenticado');
     }
 
     const endpoint = isGlobal ? '/api/calendar-events?global=true' : '/api/calendar-events';
-    console.log('🔄 useCalendarEvents: Fazendo requisição para', endpoint);
     
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       headers: {
@@ -288,25 +281,10 @@ export const useCalendarEvents = (isGlobal = false) => {
     });
 
     if (!response.ok) {
-      console.error('❌ useCalendarEvents: Erro na resposta:', response.status, response.statusText);
       throw new Error('Erro ao carregar eventos de calendário');
     }
 
     const result = await response.json();
-    console.log('📥 useCalendarEvents: Resposta da API recebida:', result);
-    console.log('📊 useCalendarEvents: Número de eventos:', result.data?.length || result?.length || 0);
-    
-    // Log detalhado dos eventos
-    const events = result.data || result;
-    if (events && events.length > 0) {
-      console.log('🔍 useCalendarEvents: Detalhes dos eventos:');
-      events.forEach((event, index) => {
-        console.log(`  ${index + 1}. ${event.titulo} - Regional: ${event.regional}`);
-      });
-    } else {
-      console.log('✅ useCalendarEvents: Nenhum evento retornado pela API');
-    }
-    
     return result.data || result;
   };
 
@@ -367,13 +345,6 @@ export const useCalendarEvents = (isGlobal = false) => {
     refetchOnReconnect: true, // Refetch ao reconectar
   });
 
-  console.log('📊 useCalendarEvents: React Query state:');
-  console.log('  - queryKey:', ['calendar-events', user?.regional || 'no-regional']);
-  console.log('  - data:', data);
-  console.log('  - isLoading:', isLoading);
-  console.log('  - error:', error);
-  console.log('  - enabled:', !!token);
-
   return {
     data,
     loading: isLoading,
@@ -392,10 +363,11 @@ export function useGoals() {
       const { GoalService } = await import('@/services/goalService');
       return await GoalService.getGoals();
     },
-    staleTime: 5 * 60 * 1000, // 5 minutos - dados considerados frescos por mais tempo
-    gcTime: 10 * 60 * 1000, // 10 minutos de cache
+    staleTime: 10 * 60 * 1000, // 10 minutos - dados considerados frescos por mais tempo
+    gcTime: 30 * 60 * 1000, // 30 minutos de cache
     refetchOnWindowFocus: false, // Não recarregar automaticamente ao focar na janela
     refetchOnMount: false, // Não recarregar sempre ao montar se há dados em cache
+    refetchOnReconnect: true, // Refetch ao reconectar
   });
 
   return {
@@ -407,7 +379,8 @@ export function useGoals() {
 }
 
 export function useMembers() {
-  return useApi<any[]>('/api/members');
+  // DEPRECATED: Use useUsers() instead - this endpoint returns data from 'usuarios' table
+  return useApi<any[]>('/api/regionals/users');
 }
 
 export function useUsers() {
@@ -420,7 +393,6 @@ export function useUsersWithMembers() {
   const [error, setError] = useState<string | null>(null);
 
   const fetchUsersWithMembers = useCallback(async () => {
-    console.log('🔄 Buscando usuários da tabela usuarios...');
     setLoading(true);
     setError(null);
 
@@ -443,15 +415,12 @@ export function useUsersWithMembers() {
       }
 
       const usersData = await usersResponse.json();
-      console.log('📥 Dados dos usuários recebidos da tabela usuarios:', usersData);
 
       // Os dados já vêm completos da tabela usuarios, não precisa combinar
       const userData = usersData.users || usersData;
       
-      console.log('✅ Dados dos usuários processados:', userData);
       setData(userData);
     } catch (err) {
-      console.error('❌ Erro ao buscar dados:', err);
       setError(err instanceof Error ? err.message : 'Erro desconhecido');
     } finally {
       setLoading(false);
@@ -485,7 +454,7 @@ export function useDecolagem() {
 }
 
 export async function fetchUsers(token: string) {
-  const API_BASE_URL = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '');
+
   const usersResponse = await fetch(`${API_BASE_URL}/api/regionals/users`, {
     headers: {
       'Authorization': `Bearer ${token}`,

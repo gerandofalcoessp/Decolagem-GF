@@ -84,7 +84,7 @@ class SuperAdminCreator {
         .from('members')
         .insert({
           auth_user_id: authUser.user.id,
-          regional_id: regionalId,
+          regional: data.regional,
           name: data.nome,
           email: data.email,
         })

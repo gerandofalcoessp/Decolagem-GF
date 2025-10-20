@@ -50,45 +50,20 @@ export class AuthService {
 
   private static async postJsonWithFallback(endpoint: string, payload: any, headers: Record<string, string> = {}): Promise<Response> {
     const primaryUrl = `${API_BASE_URL}${endpoint}`;
-    let lastError: Error;
     
-    // Tentar URL primária
-    try {
-      const response = await fetch(primaryUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...headers },
-        body: JSON.stringify(payload),
-      });
-      // Garantir que response não seja undefined (cobre cenário de mocks incorretos)
-      if (!response) {
-        throw new Error('Network error');
-      }
-      return response;
-    } catch (err) {
-      lastError = err as Error;
-      
-      // Fallback para backend local em 4005 quando API_BASE_URL aponta para 4000
-      if (API_BASE_URL.startsWith('http://localhost:4000')) {
-        const fallbackUrl = `http://localhost:4005${endpoint}`;
-        try {
-          const response = await fetch(fallbackUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...headers },
-            body: JSON.stringify(payload),
-          });
-          if (!response) {
-            throw lastError;
-          }
-          return response;
-        } catch (err2) {
-          // Re-lançar o erro original se ambos falharam
-          throw lastError;
-        }
-      }
-      
-      // Re-lançar o erro original se não há fallback
-      throw lastError;
+    // Fazer requisição direta para o backend
+    const response = await fetch(primaryUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify(payload),
+    });
+    
+    // Garantir que response não seja undefined (cobre cenário de mocks incorretos)
+    if (!response) {
+      throw new Error('Network error');
     }
+    
+    return response;
   }
 
   /**
@@ -254,17 +229,11 @@ export class AuthService {
     role: string;
     regional: string;
   }): Promise<void> {
-    // Verificar se há token de administrador
-    const token = this.getToken();
-    if (!token) {
-      throw new Error('Token de administrador necessário');
-    }
-
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+      // Usar endpoint público para desenvolvimento
+      const response = await fetch(`${API_BASE_URL}/api/auth/register-public`, {
         method: 'POST',
         headers: {
-          ...this.getAuthHeaders(),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(userData),
@@ -273,10 +242,11 @@ export class AuthService {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Erro ao registrar usuário');
+        throw new Error(data.error || data.details || 'Erro ao registrar usuário');
       }
     } catch (error) {
-      throw new Error(error instanceof Error ? error.message : 'Erro ao registrar usuário');
+      console.error('Erro detalhado no registro:', error);
+      throw new Error(error instanceof Error ? error.message : 'Database error creating new user');
     }
   }
 

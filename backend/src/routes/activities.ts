@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { getSupabaseForToken, getUserFromToken } from '../services/supabaseClient.js';
+import { z } from 'zod';
+import { requireRole } from '../middlewares/authMiddleware.js';
 
 const router = Router();
 
@@ -94,7 +96,7 @@ router.get('/', async (req, res) => {
   res.json({ data: mappedData });
 });
 
-router.post('/', async (req, res) => {
+router.post('/', requireRole('super_admin'), async (req, res) => {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
   const s = getSupabaseForToken(token);
@@ -107,35 +109,62 @@ router.post('/', async (req, res) => {
   if (meErr || !me) return res.status(404).json({ error: 'member_not_found' });
 
   const body = req.body || {};
-  const payload = { ...body, member_id: me.id };
+  const createActivitySchema = z.object({}).passthrough().refine(obj => !('member_id' in obj), {
+    message: 'member_id_not_allowed'
+  });
+  const parsed = createActivitySchema.safeParse(body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'invalid_payload', details: parsed.error.flatten() });
+  }
+
+  const payload = { ...parsed.data, member_id: me.id };
 
   const { data, error } = await s.from('activities').insert(payload).select('*').single();
   if (error) return res.status(400).json({ error: error.message });
   res.status(201).json({ data });
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireRole('super_admin'), async (req, res) => {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
   const s = getSupabaseForToken(token);
   if (!s) return res.status(500).json({ error: 'supabase_client_unavailable' });
 
-  const id = req.params.id;
-  const body = req.body || {};
-  if ('member_id' in body) delete body.member_id;
-  const payload = body;
+  const idSchema = z.string().min(1);
+  const idParse = idSchema.safeParse(req.params.id);
+  if (!idParse.success) {
+    return res.status(400).json({ error: 'invalid_id', details: idParse.error.flatten() });
+  }
 
-  const { data, error } = await s.from('activities').update(payload).eq('id', id).select('*').single();
+  const body = req.body || {};
+  const updateActivitySchema = z.object({}).passthrough().refine(obj => !('member_id' in obj), {
+    message: 'member_id_not_allowed'
+  });
+  const parsed = updateActivitySchema.safeParse(body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'invalid_payload', details: parsed.error.flatten() });
+  }
+
+  const payload = parsed.data;
+
+  const { data, error } = await s.from('activities').update(payload).eq('id', idParse.data).select('*').single();
   if (error) return res.status(400).json({ error: error.message });
   res.json({ data });
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireRole('super_admin'), async (req, res) => {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
   const s = getSupabaseForToken(token);
   if (!s) return res.status(500).json({ error: 'supabase_client_unavailable' });
-  const { data, error } = await s.from('activities').delete().eq('id', req.params.id).select('*').single();
+
+  const idSchema = z.string().min(1);
+  const idParse = idSchema.safeParse(req.params.id);
+  if (!idParse.success) {
+    return res.status(400).json({ error: 'invalid_id', details: idParse.error.flatten() });
+  }
+
+  const { data, error } = await s.from('activities').delete().eq('id', idParse.data).select('*').single();
   if (error) return res.status(400).json({ error: error.message });
   res.json({ data });
 });

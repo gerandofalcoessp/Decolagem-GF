@@ -1,49 +1,24 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { InstituicaoService, Instituicao } from '@/services/instituicaoService';
 
 export function useInstituicoes() {
-  const [data, setData] = useState<Instituicao[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchInstituicoes = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const instituicoes = await InstituicaoService.getInstituicoes();
-      setData(instituicoes);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao carregar instituições');
-      console.error('Error fetching instituicoes:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const refetch = useCallback(() => {
-    return fetchInstituicoes();
-  }, [fetchInstituicoes]);
-
-  // Carregar dados iniciais
-  useEffect(() => {
-    fetchInstituicoes();
-  }, [fetchInstituicoes]);
-
-  // Atualização automática a cada 15 minutos (reduzido de 5 minutos para melhor performance)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (!loading) {
-        fetchInstituicoes();
-      }
-    }, 15 * 60 * 1000); // 15 minutos
-
-    return () => clearInterval(interval);
-  }, [fetchInstituicoes, loading]);
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['instituicoes'],
+    queryFn: async () => {
+      return await InstituicaoService.getInstituicoes();
+    },
+    staleTime: 30 * 60 * 1000, // 30 minutos - dados considerados frescos por mais tempo
+    gcTime: 60 * 60 * 1000, // 1 hora de cache
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: true,
+    refetchInterval: 30 * 60 * 1000, // Polling a cada 30 minutos (reduzido de 15 minutos)
+  });
 
   return {
-    data,
-    loading,
-    error,
+    data: data || [],
+    loading: isLoading,
+    error: error?.message || null,
     refetch
   };
 }

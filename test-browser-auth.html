@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de Autenticação - Frontend</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #6c757d; cursor: not-allowed; }
+        pre {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Teste de Autenticação - Frontend</h1>
+        
+        <div class="form-group">
+            <label for="email">Email:</label>
+            <input type="email" id="email" value="coord.regional.sp@gerandofalcoes.com">
+        </div>
+        
+        <div class="form-group">
+            <label for="password">Senha:</label>
+            <input type="password" id="password" value="123456">
+        </div>
+        
+        <button onclick="checkCurrentAuth()">1. Verificar Auth Atual</button>
+        <button onclick="doLogin()">2. Fazer Login</button>
+        <button onclick="testRegionalActivities()">3. Testar Atividades Regionais</button>
+        <button onclick="testUserData()">4. Testar Dados do Usuário</button>
+        <button onclick="clearAuth()">5. Limpar Auth</button>
+    </div>
+
+    <div class="container">
+        <h2>📊 Status</h2>
+        <div id="status"></div>
+    </div>
+
+    <div class="container">
+        <h2>📋 Logs</h2>
+        <pre id="logs"></pre>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:4000';
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logElement = document.getElementById('logs');
+            logElement.textContent += `[${timestamp}] ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+            
+            const statusElement = document.getElementById('status');
+            const statusClass = type === 'error' ? 'error' : type === 'success' ? 'success' : 'info';
+            statusElement.innerHTML = `<div class="${statusClass}">${message}</div>`;
+        }
+
+        function getStoredToken() {
+            // Verificar diferentes chaves possíveis para o token
+            const tokenKeys = ['auth_token', 'access_token', 'token'];
+            for (const key of tokenKeys) {
+                const token = localStorage.getItem(key);
+                if (token) {
+                    return { key, token };
+                }
+            }
+            return null;
+        }
+
+        async function checkCurrentAuth() {
+            log('🔍 Verificando autenticação atual...');
+            
+            // Verificar localStorage
+            const storedToken = getStoredToken();
+            if (storedToken) {
+                log(`✅ Token encontrado no localStorage (chave: ${storedToken.key})`);
+                log(`Token: ${storedToken.token.substring(0, 50)}...`);
+                
+                // Testar se o token é válido
+                try {
+                    const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+                        headers: {
+                            'Authorization': `Bearer ${storedToken.token}`,
+                            'Content-Type': 'application/json',
+                        },
+                    });
+                    
+                    if (response.ok) {
+                        const userData = await response.json();
+                        log('✅ Token válido! Usuário autenticado:', 'success');
+                        log(JSON.stringify(userData, null, 2));
+                    } else {
+                        log('❌ Token inválido ou expirado', 'error');
+                    }
+                } catch (error) {
+                    log(`❌ Erro ao verificar token: ${error.message}`, 'error');
+                }
+            } else {
+                log('❌ Nenhum token encontrado no localStorage', 'error');
+            }
+        }
+
+        async function doLogin() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            log(`🔐 Fazendo login com ${email}...`);
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                log(`Status da resposta: ${response.status}`);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    log(`❌ Erro no login: ${errorText}`, 'error');
+                    return;
+                }
+
+                const loginData = await response.json();
+                log('✅ Login bem-sucedido!', 'success');
+                log('Dados recebidos:');
+                log(JSON.stringify(loginData, null, 2));
+
+                // Salvar token no localStorage (simulando o comportamento do frontend)
+                const token = loginData.session?.access_token;
+                if (token) {
+                    localStorage.setItem('access_token', token);
+                    localStorage.setItem('auth_token', token); // Backup
+                    log('💾 Token salvo no localStorage');
+                    
+                    // Salvar também outros dados se disponíveis
+                    if (loginData.session?.refresh_token) {
+                        localStorage.setItem('refresh_token', loginData.session.refresh_token);
+                    }
+                    if (loginData.user) {
+                        localStorage.setItem('user_data', JSON.stringify(loginData.user));
+                    }
+                } else {
+                    log('❌ Token não encontrado na resposta!', 'error');
+                }
+
+            } catch (error) {
+                log(`💥 Erro geral no login: ${error.message}`, 'error');
+            }
+        }
+
+        async function testRegionalActivities() {
+            log('📊 Testando API de atividades regionais...');
+            
+            const storedToken = getStoredToken();
+            if (!storedToken) {
+                log('❌ Nenhum token encontrado. Faça login primeiro.', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/regional-activities`, {
+                    headers: {
+                        'Authorization': `Bearer ${storedToken.token}`,
+                        'Content-Type': 'application/json',
+                    },
+                });
+
+                log(`Status da resposta: ${response.status}`);
+                
+                if (response.ok) {
+                    const activities = await response.json();
+                    log('✅ Atividades carregadas com sucesso!', 'success');
+                    log(`Número de atividades: ${activities.length || 0}`);
+                    if (activities.length > 0) {
+                        log('Primeiras 3 atividades:');
+                        log(JSON.stringify(activities.slice(0, 3), null, 2));
+                    }
+                } else {
+                    const errorText = await response.text();
+                    log(`❌ Erro ao carregar atividades: ${errorText}`, 'error');
+                }
+            } catch (error) {
+                log(`💥 Erro geral: ${error.message}`, 'error');
+            }
+        }
+
+        async function testUserData() {
+            log('👤 Testando API de dados do usuário...');
+            
+            const storedToken = getStoredToken();
+            if (!storedToken) {
+                log('❌ Nenhum token encontrado. Faça login primeiro.', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+                    headers: {
+                        'Authorization': `Bearer ${storedToken.token}`,
+                        'Content-Type': 'application/json',
+                    },
+                });
+
+                log(`Status da resposta: ${response.status}`);
+                
+                if (response.ok) {
+                    const userData = await response.json();
+                    log('✅ Dados do usuário carregados com sucesso!', 'success');
+                    log(JSON.stringify(userData, null, 2));
+                } else {
+                    const errorText = await response.text();
+                    log(`❌ Erro ao carregar dados do usuário: ${errorText}`, 'error');
+                }
+            } catch (error) {
+                log(`💥 Erro geral: ${error.message}`, 'error');
+            }
+        }
+
+        function clearAuth() {
+            log('🧹 Limpando dados de autenticação...');
+            
+            const keysToRemove = ['auth_token', 'access_token', 'token', 'refresh_token', 'user_data'];
+            keysToRemove.forEach(key => {
+                if (localStorage.getItem(key)) {
+                    localStorage.removeItem(key);
+                    log(`Removido: ${key}`);
+                }
+            });
+            
+            log('✅ Dados de autenticação limpos!', 'success');
+        }
+
+        // Verificar auth ao carregar a página
+        window.onload = function() {
+            log('🚀 Página carregada. Verificando autenticação...');
+            checkCurrentAuth();
+        };
+    </script>
+</body>
+</html>

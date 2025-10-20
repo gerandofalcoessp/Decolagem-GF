@@ -19,6 +19,7 @@ import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { RegistrarAtividadeModal } from '@/components/modals/RegistrarAtividadeModal';
 import { NotificationModal } from '@/components/modals/NotificationModal';
+import { API_BASE_URL } from '@/utils/config';
 
 interface Regional {
   id: string;
@@ -292,7 +293,7 @@ export default function RegionaisPage() {
       console.log('🔍 DEBUG - FormData preparado para envio');
 
       // Chamar a nova API para salvar a atividade regional
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/regional-activities`, {
+      const response = await fetch(`${API_BASE_URL}/api/regional-activities`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

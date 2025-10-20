@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 
-const API_BASE_URL = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '');
+import { API_BASE_URL } from '@/utils/config';
 
 export interface UserStats {
   lideresRegionais: number;
@@ -16,7 +16,6 @@ export function useUserStats() {
   const [error, setError] = useState<string | null>(null);
 
   const fetchUserStats = useCallback(async () => {
-    console.log('🔄 Buscando estatísticas dos usuários...');
     setLoading(true);
     setError(null);
 
@@ -41,7 +40,6 @@ export function useUserStats() {
       }
 
       const usersData = await usersResponse.json();
-      console.log('📥 Dados dos usuários recebidos:', usersData);
 
       const users = usersData.users || usersData;
 

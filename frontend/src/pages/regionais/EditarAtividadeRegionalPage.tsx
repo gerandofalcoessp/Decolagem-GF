@@ -9,6 +9,7 @@ import type { TipoAtividade, Programa, Regional, Evidencia, Atividade } from '@/
 import { REGIONAL_LABELS, ATIVIDADE_OPTIONS, PROGRAMA_LABELS, REGIONAL_STATES, STATE_LABELS } from '@/pages/calendario/constants';
 import { useUsersWithMembers } from '@/hooks/useApi';
 import { useRegionalData } from '@/hooks/useRegionalData';
+import { API_BASE_URL } from '@/utils/config';
 
 interface EditarAtividadeForm {
   atividade: TipoAtividade | string;
@@ -157,7 +158,7 @@ export default function EditarAtividadeRegionalPage() {
           return;
         }
 
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/regional-activities/${id}`, {
+        const response = await fetch(`${API_BASE_URL}/api/regional-activities/${id}/with-files`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -220,7 +221,7 @@ export default function EditarAtividadeRegionalPage() {
         const token = localStorage.getItem('auth_token');
         if (!token) return;
 
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/ongs`, {
+        const response = await fetch(`${API_BASE_URL}/api/ongs`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -299,7 +300,7 @@ export default function EditarAtividadeRegionalPage() {
           formData.append('evidencias', file);
         });
 
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/regional-activities/${id}/with-files`, {
+        const response = await fetch(`${API_BASE_URL}/api/regional-activities/${id}/with-files`, {
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${token}`
@@ -313,7 +314,7 @@ export default function EditarAtividadeRegionalPage() {
         }
       } else {
         // Sem novas evidências, usar JSON
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/regional-activities/${id}`, {
+        const response = await fetch(`${API_BASE_URL}/api/regional-activities/${id}`, {
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${token}`,

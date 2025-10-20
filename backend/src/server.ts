@@ -31,6 +31,7 @@ import instituicoesRouter from './routes/instituicoes.js'
 const app = express();
 const PORT = Number(process.env.PORT) || 3002;
 const CORS_ORIGIN = process.env.CORS_ORIGIN ?? 'http://localhost:3001';
+const FRONTEND_URL = process.env.FRONTEND_URL ?? '';
 
 const isProd = process.env.NODE_ENV === 'production';
 
@@ -44,14 +45,30 @@ const allowedDevOrigins = [
   'http://localhost:8081',
 ];
 
+// Deriva o slug do projeto Vercel a partir de FRONTEND_URL ou CORS_ORIGIN
+const getVercelProjectSlug = (): string | null => {
+  try {
+    const baseUrl = FRONTEND_URL || CORS_ORIGIN;
+    if (!baseUrl) return null;
+    const u = new URL(baseUrl);
+    const host = u.hostname.toLowerCase();
+    if (!host.endsWith('.vercel.app')) return null;
+    return host.replace('.vercel.app', '');
+  } catch {
+    return null;
+  }
+};
+
 const allowPreviewFrontend = (origin?: string) => {
   if (!origin) return true;
   try {
     const o = origin.toLowerCase();
-    // Allow stable domain via env
-    if (o === CORS_ORIGIN.toLowerCase()) return true;
-    // Allow any Vercel deployment alias for the frontend project
-    if (o.startsWith('https://decolagem-gf-frontend') && o.endsWith('.vercel.app')) {
+    // Permite domínio estável via env
+    if (CORS_ORIGIN && o === CORS_ORIGIN.toLowerCase()) return true;
+
+    // Permite qualquer alias de preview do mesmo projeto Vercel
+    const projectSlug = getVercelProjectSlug();
+    if (projectSlug && o.startsWith(`https://${projectSlug}`) && o.endsWith('.vercel.app')) {
       return true;
     }
   } catch {}
@@ -150,7 +167,8 @@ app.use('/api/ongs', authMiddleware, instituicoesRouter); // Alias for instituic
 app.use('/api/db', dbRouter);
 
 // Rotas DEV: criar usuário de teste e retornar um JWT para validações
-if (process.env.NODE_ENV !== 'production') {
+const allowDevEndpoints = process.env.ALLOW_DEV_ENDPOINTS === 'true';
+if (allowDevEndpoints) {
   app.post('/dev/create-test-user', async (req, res) => {
     try {
       if (!supabaseAdmin || !supabase) {

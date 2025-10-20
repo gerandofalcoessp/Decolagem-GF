@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { getSupabaseForToken, getUserFromToken } from '../services/supabaseClient.js';
 import { getUserRegionalId, canUserSeeRegionalEvents } from '../services/regionalService.js';
+import { z } from 'zod';
+import { requireRole } from '../middlewares/authMiddleware.js';
 
 const router = Router();
 
@@ -75,7 +77,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST - Criar novo evento de calendário
-router.post('/', async (req, res) => {
+router.post('/', requireRole('super_admin'), async (req, res) => {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
   const s = getSupabaseForToken(token);
@@ -85,32 +87,56 @@ router.post('/', async (req, res) => {
   if (!user) return res.status(401).json({ error: 'unauthorized' });
 
   const body = req.body || {};
-  const { data, error } = await s.from('calendar_events').insert(body).select('*').single();
+  const createSchema = z.object({}).passthrough();
+  const parsed = createSchema.safeParse(body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'invalid_payload', details: parsed.error.flatten() });
+  }
+
+  const { data, error } = await s.from('calendar_events').insert(parsed.data).select('*').single();
   if (error) return res.status(400).json({ error: error.message });
   res.status(201).json({ data });
 });
 
 // PUT - Atualizar evento de calendário
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireRole('super_admin'), async (req, res) => {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
   const s = getSupabaseForToken(token);
   if (!s) return res.status(500).json({ error: 'supabase_client_unavailable' });
 
-  const id = req.params.id;
+  const idSchema = z.string().min(1);
+  const idParse = idSchema.safeParse(req.params.id);
+  if (!idParse.success) {
+    return res.status(400).json({ error: 'invalid_id', details: idParse.error.flatten() });
+  }
+  const id = idParse.data;
+
   const body = req.body || {};
-  const { data, error } = await s.from('calendar_events').update(body).eq('id', id).select('*').single();
+  const updateSchema = z.object({}).passthrough();
+  const parsed = updateSchema.safeParse(body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'invalid_payload', details: parsed.error.flatten() });
+  }
+
+  const { data, error } = await s.from('calendar_events').update(parsed.data).eq('id', id).select('*').single();
   if (error) return res.status(400).json({ error: error.message });
   res.json({ data });
 });
 
 // DELETE - Deletar evento de calendário
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireRole('super_admin'), async (req, res) => {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
   const s = getSupabaseForToken(token);
   if (!s) return res.status(500).json({ error: 'supabase_client_unavailable' });
   
+  const idSchema = z.string().min(1);
+  const idParse = idSchema.safeParse(req.params.id);
+  if (!idParse.success) {
+    return res.status(400).json({ error: 'invalid_id', details: idParse.error.flatten() });
+  }
+
   const { data, error } = await s.from('calendar_events').delete().eq('id', req.params.id).select('*').single();
   if (error) return res.status(400).json({ error: error.message });
   res.json({ data });

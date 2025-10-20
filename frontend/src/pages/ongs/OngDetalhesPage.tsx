@@ -6,6 +6,7 @@ import { Building2, Edit, ArrowLeft, FileText, Download, Eye, Calendar, MapPin, 
 import { useNotificationStore } from '@/store/notificationStore';
 import { InstituicaoService, Instituicao } from '@/services/instituicaoService';
 import { Regional, Programa } from '@/types';
+import { API_BASE_URL } from '@/utils/config';
 
 export default function OngDetalhesPage() {
   const { id } = useParams<{ id: string }>();
@@ -83,9 +84,8 @@ export default function OngDetalhesPage() {
 
   const handleViewDocument = (documentName: string) => {
     try {
-      // Criar URL para visualizar o documento usando a mesma base URL da API
-      const API_BASE_URL = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '');
-      const documentUrl = `/api/instituicoes/${id}/documentos/${encodeURIComponent(documentName)}`;
+      // Criar URL para visualizar o documento usando a base URL centralizada
+      const documentUrl = `${API_BASE_URL}/api/instituicoes/${id}/documentos/${encodeURIComponent(documentName)}`;
       window.open(documentUrl, '_blank');
     } catch (error) {
       console.error('Erro ao visualizar documento:', error);
@@ -95,9 +95,8 @@ export default function OngDetalhesPage() {
 
   const handleDownloadDocument = (documentName: string) => {
     try {
-      // Criar URL para download do documento usando a mesma base URL da API
-      const API_BASE_URL = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '');
-      const downloadUrl = `/api/instituicoes/${id}/documentos/${encodeURIComponent(documentName)}?download=true`;
+      // Criar URL para download do documento usando a base URL centralizada
+      const downloadUrl = `${API_BASE_URL}/api/instituicoes/${id}/documentos/${encodeURIComponent(documentName)}?download=true`;
       
       // Criar um link temporário para forçar o download
       const link = document.createElement('a');
@@ -159,7 +158,6 @@ export default function OngDetalhesPage() {
       
       formData.append('tipo', 'documento');
 
-      const API_BASE_URL = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '');
       const response = await fetch(`${API_BASE_URL}/api/instituicoes/${id}/documentos`, {
         method: 'POST',
         body: formData,

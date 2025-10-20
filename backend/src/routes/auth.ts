@@ -1,8 +1,10 @@
 import { Router, Request, Response } from 'express';
-import { AuthService } from '../services/authService';
-import { authMiddleware } from '../middlewares/authMiddleware';
-import { logger } from '../utils/logger';
-import { supabaseAdmin } from '../services/supabaseClient'
+import { AuthService } from '../services/authService.js'
+import { authMiddleware, requireRole } from '../middlewares/authMiddleware.js';
+import { logger } from '../utils/logger.js';
+import { supabaseAdmin } from '../services/supabaseClient.js'
+import { createClient } from '@supabase/supabase-js';
+import { z } from 'zod';
 
 const router = Router();
 
@@ -12,23 +14,27 @@ const router = Router();
  */
 router.post('/login', async (req: Request, res: Response) => {
   const startTime = Date.now();
-  const { email } = req.body;
+
+  const loginSchema = z.object({
+    email: z.string().email(),
+    password: z.string().min(6)
+  });
+  const parsed = loginSchema.safeParse(req.body);
+  if (!parsed.success) {
+    logger.logAuthEvent('auth_failure', undefined, req.ip, {
+      stage: 'login',
+      reason: 'invalid_payload',
+      issues: parsed.error.issues,
+      userAgent: req.get('User-Agent')
+    });
+    return res.status(400).json({
+      error: 'invalid_payload',
+      details: parsed.error.flatten()
+    });
+  }
+  const { email, password } = parsed.data;
   
   try {
-    const { password } = req.body;
-
-    if (!email || !password) {
-      logger.logAuthEvent('auth_failure', undefined, req.ip, {
-        stage: 'login',
-        reason: 'missing_credentials',
-        email,
-        userAgent: req.get('User-Agent')
-      });
-      return res.status(400).json({
-        error: 'Email e senha são obrigatórios',
-      });
-    }
-
     logger.logAuthEvent('login', undefined, req.ip, {
       stage: 'attempt',
       email,
@@ -47,7 +53,7 @@ router.post('/login', async (req: Request, res: Response) => {
         email
       });
       return res.status(401).json({
-        error: result.error.message,
+        error: 'invalid_credentials',
       });
     }
 
@@ -60,7 +66,7 @@ router.post('/login', async (req: Request, res: Response) => {
         duration: `${Date.now() - startTime}ms`
       });
       return res.status(401).json({
-        error: 'Credenciais inválidas',
+        error: 'invalid_credentials',
       });
     }
 
@@ -100,9 +106,7 @@ router.post('/login', async (req: Request, res: Response) => {
       userAgent: req.get('User-Agent'),
       duration: `${Date.now() - startTime}ms`
     });
-    return res.status(500).json({
-      error: 'Erro interno do servidor',
-    });
+    return res.status(500).json({ error: 'internal_server_error' });
   }
 });
 
@@ -124,9 +128,7 @@ router.post('/logout', authMiddleware, async (req: Request, res: Response) => {
         reason: 'no_token',
         userAgent: req.get('User-Agent')
       });
-      return res.status(400).json({
-        error: 'Token não fornecido',
-      });
+      return res.status(400).json({ error: 'invalid_token' });
     }
 
     logger.logAuthEvent('logout', user?.id, req.ip, {
@@ -169,9 +171,7 @@ router.post('/logout', authMiddleware, async (req: Request, res: Response) => {
       userAgent: req.get('User-Agent'),
       duration: `${Date.now() - startTime}ms`
     });
-    return res.status(500).json({
-      error: 'Erro interno do servidor',
-    });
+    return res.status(500).json({ error: 'internal_server_error' });
   }
 });
 
@@ -190,9 +190,7 @@ router.get('/me', authMiddleware, async (req: Request, res: Response) => {
         reason: 'no_user',
         userAgent: req.get('User-Agent')
       });
-      return res.status(401).json({
-        error: 'Usuário não autenticado',
-      });
+      return res.status(401).json({ error: 'unauthorized' });
     }
 
     // Buscar dados do membro associado
@@ -227,9 +225,74 @@ router.get('/me', authMiddleware, async (req: Request, res: Response) => {
         stack: error instanceof Error ? error.stack : undefined,
       }
     });
-    return res.status(500).json({
-      error: 'Erro interno do servidor',
+    return res.status(500).json({ error: 'internal_server_error' });
+  }
+});
+
+/**
+ * POST /auth/register-public
+ * Registra novo usuário (endpoint público para desenvolvimento)
+ */
+router.post('/register-public', async (req: Request, res: Response) => {
+  try {
+    const { email, password, nome, role, tipo, regional, funcao, area, permissao } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: 'email_and_password_required' });
+    }
+
+    const result = await AuthService.signUp({
+      email,
+      password,
+      metadata: {
+        nome,
+        role: role || permissao || 'user',
+        tipo,
+        regional,
+        funcao,
+        area
+      }
     });
+
+    if (result.error) {
+      logger.error('Error in public user registration', {
+        error: result.error,
+        email,
+        ip: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+      return res.status(400).json({ 
+        error: 'registration_failed',
+        details: result.error.message 
+      });
+    }
+
+    logger.info('Public user registration successful', {
+      userId: result.user?.id,
+      email,
+      ip: req.ip,
+      userAgent: req.get('User-Agent')
+    });
+
+    return res.status(201).json({
+      message: 'user_created_successfully',
+      user: {
+        id: result.user?.id,
+        email: result.user?.email,
+        ...result.user?.user_metadata,
+      }
+    });
+  } catch (error) {
+    logger.error('Error in public user registration', {
+      error: {
+        name: error instanceof Error ? error.name : 'Error',
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+      },
+      ip: req.ip,
+      userAgent: req.get('User-Agent')
+    });
+    return res.status(500).json({ error: 'internal_server_error' });
   }
 });
 
@@ -237,24 +300,12 @@ router.get('/me', authMiddleware, async (req: Request, res: Response) => {
  * POST /auth/register
  * Registra novo usuário (apenas para admins)
  */
-router.post('/register', authMiddleware, async (req: Request, res: Response) => {
+router.post('/register', authMiddleware, requireRole('super_admin'), async (req: Request, res: Response) => {
   try {
-    const user = (req as any).user;
-    
-    // Verificar se o usuário tem permissão para criar outros usuários
-    const memberData = await AuthService.getMemberData(user.id);
-    if (!memberData || memberData.role !== 'super_admin') {
-      return res.status(403).json({
-        error: 'Acesso negado. Apenas super admins podem criar usuários.',
-      });
-    }
-
     const { email, password, nome, role, tipo, regional, funcao } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({
-        error: 'Email e senha são obrigatórios',
-      });
+      return res.status(400).json({ error: 'email_and_password_required' });
     }
 
     const result = await AuthService.signUp({
@@ -275,42 +326,8 @@ router.post('/register', authMiddleware, async (req: Request, res: Response) => 
       });
     }
 
-    // Criar entrada na tabela usuarios após o registro bem-sucedido
-    if (result.user) {
-      try {
-        // const { supabaseAdmin } = require('../services/supabaseClient.js');
-        
-        const usuarioData = {
-          auth_user_id: result.user.id,
-          nome: nome || email.split('@')[0],
-          email: result.user.email,
-          funcao: funcao || null,
-          area: regional || null,
-          regional: regional || null,
-          tipo: tipo || 'nacional',
-          permissao: role || 'user', // Usar permissao como campo principal
-          role: role || 'user', // Manter role por compatibilidade
-          status: 'ativo',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-
-        console.log('🆕 Criando usuario para novo usuário:', usuarioData);
-
-        const { error: usuarioError } = await supabaseAdmin
-          .from('usuarios')
-          .insert(usuarioData);
-
-        if (usuarioError) {
-          console.error('❌ Erro ao criar entrada na tabela usuarios:', usuarioError);
-          // Não falhar o registro se a criação do usuario falhar
-        } else {
-          console.log('✅ Entrada criada na tabela usuarios para:', result.user.email);
-        }
-      } catch (usuarioCreationError) {
-        console.error('Erro ao criar entrada na tabela usuarios:', usuarioCreationError);
-      }
-    }
+    // Os triggers do banco de dados criam automaticamente a entrada na tabela usuarios
+    console.log('✅ Usuário criado no Auth:', result.user?.email);
 
     return res.status(201).json({
       message: 'Usuário criado com sucesso',
@@ -322,9 +339,7 @@ router.post('/register', authMiddleware, async (req: Request, res: Response) => 
     });
   } catch (error) {
     console.error('Erro ao registrar usuário:', error);
-    return res.status(500).json({
-      error: 'Erro interno do servidor',
-    });
+    return res.status(500).json({ error: 'internal_server_error' });
   }
 });
 
@@ -332,25 +347,12 @@ router.post('/register', authMiddleware, async (req: Request, res: Response) => 
  * GET /auth/users
  * Lista todos os usuários cadastrados (apenas para super admins)
  */
-router.get('/users', authMiddleware, async (req: Request, res: Response) => {
+router.get('/users', authMiddleware, requireRole('super_admin'), async (req: Request, res: Response) => {
   try {
-    const user = (req as any).user;
-    
-    // Verificar se o usuário é super admin
-    const memberData = await AuthService.getMemberData(user.id);
-    
-    if (!memberData || memberData.role !== 'super_admin') {
-      return res.status(403).json({
-        error: 'Acesso negado. Apenas super admins podem listar usuários.',
-      });
-    }
-
     const result = await AuthService.listUsers();
 
     if (result.error) {
-      return res.status(500).json({
-        error: 'Erro ao listar usuários',
-      });
+      return res.status(500).json({ error: 'list_users_failed' });
     }
 
     return res.json({
@@ -358,9 +360,7 @@ router.get('/users', authMiddleware, async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Erro ao listar usuários:', error);
-    return res.status(500).json({
-      error: 'Erro interno do servidor',
-    });
+    return res.status(500).json({ error: 'internal_server_error' });
   }
 });
 
@@ -368,18 +368,12 @@ router.get('/users', authMiddleware, async (req: Request, res: Response) => {
  * PUT /auth/users/:id
  * Atualiza um usuário
  */
-router.put('/users/:id', authMiddleware, async (req: Request, res: Response) => {
+router.put('/users/:id', authMiddleware, requireRole('super_admin'), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { email, nome, regional, role, tipo, funcao } = req.body;
 
     console.log('🔄 Atualizando usuário:', { id, email, nome, regional, role, tipo, funcao });
-
-    // Verificar se é super admin
-    const userRole = (req as any).user?.role;
-    if (userRole !== 'super_admin') {
-      return res.status(403).json({ error: 'Acesso negado. Apenas super admins podem atualizar usuários.' });
-    }
 
     // Preparar dados para atualização no user_metadata
     const userData: any = {};
@@ -403,7 +397,7 @@ router.put('/users/:id', authMiddleware, async (req: Request, res: Response) => 
     const result = await AuthService.updateUser(id, userData);
 
     if (!result.success) {
-      return res.status(400).json({ error: result.error?.message || 'Erro ao atualizar usuário' });
+      return res.status(400).json({ error: result.error?.message || 'update_user_failed' });
     }
 
     console.log('✅ user_metadata atualizado com sucesso');
@@ -490,7 +484,7 @@ router.put('/users/:id', authMiddleware, async (req: Request, res: Response) => 
     });
   } catch (error) {
     console.error('❌ Erro ao atualizar usuário:', error);
-    return res.status(500).json({ error: 'Erro interno do servidor' });
+    return res.status(500).json({ error: 'internal_server_error' });
   }
 });
 
@@ -498,27 +492,15 @@ router.put('/users/:id', authMiddleware, async (req: Request, res: Response) => 
  * POST /auth/users/:id/block
  * Bloqueia um usuário
  */
-router.post('/users/:id/block', authMiddleware, async (req: Request, res: Response) => {
+router.post('/users/:id/block', authMiddleware, requireRole('super_admin'), async (req: Request, res: Response) => {
   try {
-    const user = (req as any).user;
     const { id } = req.params;
     const { duration } = req.body;
-    
-    // Verificar se o usuário é super admin
-    const memberData = await AuthService.getMemberData(user.id);
-    
-    if (!memberData || memberData.role !== 'super_admin') {
-      return res.status(403).json({
-        error: 'Acesso negado. Apenas super admins podem bloquear usuários.',
-      });
-    }
 
     const result = await AuthService.blockUser(id, duration);
 
     if (!result.success) {
-      return res.status(500).json({
-        error: 'Erro ao bloquear usuário',
-      });
+      return res.status(500).json({ error: 'block_user_failed' });
     }
 
     return res.json({
@@ -527,9 +509,7 @@ router.post('/users/:id/block', authMiddleware, async (req: Request, res: Respon
     });
   } catch (error) {
     console.error('Erro ao bloquear usuário:', error);
-    return res.status(500).json({
-      error: 'Erro interno do servidor',
-    });
+    return res.status(500).json({ error: 'internal_server_error' });
   }
 });
 
@@ -537,26 +517,14 @@ router.post('/users/:id/block', authMiddleware, async (req: Request, res: Respon
  * POST /auth/users/:id/unblock
  * Desbloqueia um usuário
  */
-router.post('/users/:id/unblock', authMiddleware, async (req: Request, res: Response) => {
+router.post('/users/:id/unblock', authMiddleware, requireRole('super_admin'), async (req: Request, res: Response) => {
   try {
-    const user = (req as any).user;
     const { id } = req.params;
     
-    // Verificar se o usuário é super admin
-    const memberData = await AuthService.getMemberData(user.id);
-    
-    if (!memberData || memberData.role !== 'super_admin') {
-      return res.status(403).json({
-        error: 'Acesso negado. Apenas super admins podem desbloquear usuários.',
-      });
-    }
-
     const result = await AuthService.unblockUser(id);
 
     if (!result.success) {
-      return res.status(500).json({
-        error: 'Erro ao desbloquear usuário',
-      });
+      return res.status(500).json({ error: 'unblock_user_failed' });
     }
 
     return res.json({
@@ -565,9 +533,7 @@ router.post('/users/:id/unblock', authMiddleware, async (req: Request, res: Resp
     });
   } catch (error) {
     console.error('Erro ao desbloquear usuário:', error);
-    return res.status(500).json({
-      error: 'Erro interno do servidor',
-    });
+    return res.status(500).json({ error: 'internal_server_error' });
   }
 });
 
@@ -575,36 +541,48 @@ router.post('/users/:id/unblock', authMiddleware, async (req: Request, res: Resp
  * DELETE /auth/users/:id
  * Exclui um usuário
  */
-router.delete('/users/:id', authMiddleware, async (req: Request, res: Response) => {
+router.delete('/users/:id', authMiddleware, requireRole('super_admin'), async (req: Request, res: Response) => {
   try {
-    const user = (req as any).user;
     const { id } = req.params;
+    const user = (req as any).user;
     
-    // Verificar se o usuário é super admin
-    const memberData = await AuthService.getMemberData(user.id);
+    // Criar contexto de usuário autenticado para o AuthService
+    const userContext = {
+      supabase: createClient(
+        process.env.SUPABASE_URL!,
+        process.env.SUPABASE_ANON_KEY!,
+        {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false
+          }
+        }
+      )
+    };
+
+    // Definir a sessão do usuário autenticado
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
     
-    if (!memberData || memberData.role !== 'super_admin') {
-      return res.status(403).json({
-        error: 'Acesso negado. Apenas super admins podem excluir usuários.',
+    if (token) {
+      await userContext.supabase.auth.setSession({
+        access_token: token,
+        refresh_token: '' // Não precisamos do refresh token para esta operação
       });
     }
-
-    const result = await AuthService.deleteUser(id);
+    
+    const result = await AuthService.deleteUser(id, userContext);
 
     if (!result.success) {
       return res.status((result.error as any)?.status || 500).json({
-        error: result.error?.message || 'Erro ao excluir usuário',
+        error: result.error?.message || 'delete_user_failed',
       });
     }
 
-    return res.json({
-      message: 'Usuário excluído com sucesso',
-    });
+    return res.json({ message: 'user_deleted_successfully' });
   } catch (error) {
     console.error('Erro ao excluir usuário:', error);
-    return res.status(500).json({
-      error: 'Erro interno do servidor',
-    });
+    return res.status(500).json({ error: 'internal_server_error' });
   }
 });
 
@@ -617,9 +595,7 @@ router.post('/reset-password', async (req: Request, res: Response) => {
     const { email } = req.body;
 
     if (!email) {
-      return res.status(400).json({
-        error: 'Email é obrigatório',
-      });
+      return res.status(400).json({ error: 'email_required' });
     }
 
     const result = await AuthService.resetPassword(email);
@@ -635,9 +611,7 @@ router.post('/reset-password', async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Erro ao enviar email de recuperação:', error);
-    return res.status(500).json({
-      error: 'Erro interno do servidor',
-    });
+    return res.status(500).json({ error: 'internal_server_error' });
   }
 });
 
@@ -652,15 +626,11 @@ router.put('/update-password', authMiddleware, async (req: Request, res: Respons
     const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : '';
 
     if (!newPassword) {
-      return res.status(400).json({
-        error: 'Nova senha é obrigatória',
-      });
+      return res.status(400).json({ error: 'new_password_required' });
     }
 
     if (!token) {
-      return res.status(400).json({
-        error: 'Token não fornecido',
-      });
+      return res.status(400).json({ error: 'invalid_token' });
     }
 
     const result = await AuthService.updatePassword(token, newPassword);
@@ -676,9 +646,7 @@ router.put('/update-password', authMiddleware, async (req: Request, res: Respons
     });
   } catch (error) {
     console.error('Erro ao atualizar senha:', error);
-    return res.status(500).json({
-      error: 'Erro interno do servidor',
-    });
+    return res.status(500).json({ error: 'internal_server_error' });
   }
 });
 
@@ -686,33 +654,19 @@ router.put('/update-password', authMiddleware, async (req: Request, res: Respons
  * PUT /auth/users/:id/update-password
  * Atualiza senha de um usuário específico (apenas admin)
  */
-router.put('/users/:id/update-password', authMiddleware, async (req: Request, res: Response) => {
+router.put('/users/:id/update-password', authMiddleware, requireRole('super_admin'), async (req: Request, res: Response) => {
   try {
-    const user = (req as any).user;
     const { id } = req.params;
     const { newPassword } = req.body;
     
-    // Verificar se o usuário é super admin
-    const memberData = await AuthService.getMemberData(user.id);
-    
-    if (!memberData || memberData.role !== 'super_admin') {
-      return res.status(403).json({
-        error: 'Acesso negado. Apenas super admins podem atualizar senhas de usuários.',
-      });
-    }
-
     if (!newPassword) {
-      return res.status(400).json({
-        error: 'Nova senha é obrigatória',
-      });
+      return res.status(400).json({ error: 'new_password_required' });
     }
 
     const result = await AuthService.updateUserPassword(id, newPassword);
 
     if (!result.success || result.error) {
-      return res.status(400).json({
-        error: result.error?.message || 'Erro ao atualizar senha',
-      });
+      return res.status(400).json({ error: result.error?.message || 'update_password_failed' });
     }
 
     return res.json({
@@ -720,9 +674,7 @@ router.put('/users/:id/update-password', authMiddleware, async (req: Request, re
     });
   } catch (error) {
     console.error('Erro ao atualizar senha do usuário:', error);
-    return res.status(500).json({
-      error: 'Erro interno do servidor',
-    });
+    return res.status(500).json({ error: 'internal_server_error' });
   }
 });
 
@@ -730,20 +682,10 @@ router.put('/users/:id/update-password', authMiddleware, async (req: Request, re
  * POST /auth/users/:id/generate-password
  * Gera uma nova senha temporária para um usuário
  */
-router.post('/users/:id/generate-password', authMiddleware, async (req: Request, res: Response) => {
+router.post('/users/:id/generate-password', authMiddleware, requireRole('super_admin'), async (req: Request, res: Response) => {
   try {
-    const user = (req as any).user;
     const { id } = req.params;
     
-    // Verificar se o usuário é super admin
-    const memberData = await AuthService.getMemberData(user.id);
-    
-    if (!memberData || memberData.role !== 'super_admin') {
-      return res.status(403).json({
-        error: 'Acesso negado. Apenas super admins podem gerar novas senhas.',
-      });
-    }
-
     const result = await AuthService.generateNewPassword(id);
 
     if (result.error) {
@@ -753,14 +695,12 @@ router.post('/users/:id/generate-password', authMiddleware, async (req: Request,
     }
 
     return res.json({
-      message: 'Nova senha gerada com sucesso',
+      message: 'new_password_generated',
       password: result.password,
     });
   } catch (error) {
     console.error('Erro ao gerar nova senha:', error);
-    return res.status(500).json({
-      error: 'Erro interno do servidor',
-    });
+    return res.status(500).json({ error: 'internal_server_error' });
   }
 });
 

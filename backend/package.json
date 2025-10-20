@@ -42,7 +42,7 @@
     "@supabase/supabase-js": "^2.58.0",
     "@types/multer": "^2.0.0",
     "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
+    "dotenv": "^16.6.1",
     "express": "^4.19.2",
     "express-rate-limit": "^6.11.2",
     "helmet": "^7.1.0",
@@ -50,6 +50,7 @@
     "multer": "^2.0.2",
     "node-fetch": "^3.3.2",
     "pg": "^8.16.3",
+    "socket.io": "^4.8.1",
     "zod": "^3.22.4"
   },
   "devDependencies": {
@@ -58,6 +59,7 @@
     "@types/jest": "^29.5.12",
     "@types/morgan": "^1.9.5",
     "@types/node": "^20.11.30",
+    "@types/socket.io": "^3.0.1",
     "@types/supertest": "^6.0.2",
     "@typescript-eslint/eslint-plugin": "^8.46.1",
     "@typescript-eslint/parser": "^8.46.1",

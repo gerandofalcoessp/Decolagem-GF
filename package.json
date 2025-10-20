@@ -42,8 +42,9 @@
     "setup": "npm run install:all && npm run db:migrate && npm run db:seed",
     "clean": "npm run clean:backend && npm run clean:frontend",
     "clean:backend": "cd backend && npm run clean",
-    "clean:frontend": "cd frontend && npm run clean"
-  },
+    "clean:frontend": "cd frontend && npm run clean",
+    "vercel-build": "npm --prefix backend install --legacy-peer-deps && npm --prefix backend run vercel-build && npm --prefix frontend install --legacy-peer-deps && npm --prefix frontend run build && rm -f index.html && rm -rf assets && cp -R frontend/dist/* . && rm -rf api/_backend_dist && mkdir -p api/_backend_dist && cp -R backend/dist/* api/_backend_dist/ && cp backend/dist/server.js api/server.js && cp backend/dist/server.js api/server.mjs"
+   },
   "keywords": [
     "crm",
     "erp",
@@ -82,6 +83,16 @@
   },
   "dependencies": {
     "form-data": "^4.0.4",
-    "node-fetch": "^2.7.0"
+    "node-fetch": "^2.7.0",
+    "express": "^4.19.2",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "morgan": "^1.10.0",
+    "express-rate-limit": "^6.11.2",
+    "multer": "^2.0.2",
+    "@supabase/supabase-js": "^2.58.0",
+    "pg": "^8.16.3",
+    "zod": "^3.22.4",
+    "dotenv": "^16.4.5"
   }
 }

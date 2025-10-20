@@ -1,4 +1,4 @@
-import handler from "./index.js";
+import handler from "./index.mjs";
 
 export default async function route(req, res) {
   try {

@@ -1,14 +1,16 @@
 {
   "version": 2,
-  "buildCommand": "npm --prefix backend run vercel-build && rm -rf api/_backend_dist && mkdir -p api/_backend_dist && cp -R backend/dist/* api/_backend_dist/ && cp backend/dist/server.js api/server.js && mkdir -p public",
+  "buildCommand": "npm run vercel-build",
   "routes": [
     { "src": "/api/health", "dest": "/api?path=health" },
     { "src": "/health", "dest": "/api?path=health" },
+    { "src": "/api/(.*)", "dest": "/api/[...path]" },
     { "handle": "filesystem" },
-    { "src": "/api/(.*)", "dest": "/api/[...path]" }
+    { "src": "/(.*)", "dest": "/index.html" }
   ],
   "env": {
     "NODE_ENV": "production",
+    "VITE_API_URL": "https://decolagem-gf-backend.vercel.app",
     "CORS_ORIGIN": "https://decolagem-gf-frontend.vercel.app",
     "FRONTEND_URL": "https://decolagem-gf-frontend.vercel.app"
   }

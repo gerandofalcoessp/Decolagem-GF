@@ -54,13 +54,22 @@ export default defineConfig({
           ui: ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-tabs'],
           supabase: ['@supabase/supabase-js'],
           forms: ['react-hook-form', '@hookform/resolvers', 'zod'],
+          utils: ['date-fns', 'clsx', 'tailwind-merge'],
+          icons: ['lucide-react'],
+          query: ['@tanstack/react-query'],
         },
+        // Otimizar nomes de arquivos para melhor cache
+        entryFileNames: 'assets/[name]-[hash].js',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]',
       },
     },
   },
   optimizeDeps: {
     entries: ['index.html', './src/main.tsx'],
-    include: ['react', 'react-dom', 'react-router-dom'],
+    include: ['react', 'react-dom', 'react-router-dom', '@tanstack/react-query', 'lucide-react'],
+    // Forçar pré-bundling de dependências comuns
+    force: false,
   },
   define: {
     'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')

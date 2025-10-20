@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 
-const API_BASE_URL = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '');
+import { API_BASE_URL } from '@/utils/config';
 
 export interface RegionalLeader {
   nome: string;
@@ -30,7 +30,6 @@ export function useRegionalData(): UseRegionalDataReturn {
   const [error, setError] = useState<string | null>(null);
 
   const fetchRegionalData = useCallback(async () => {
-    console.log('🔄 Buscando dados regionais...');
     setLoading(true);
     setError(null);
 

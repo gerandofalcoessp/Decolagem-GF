@@ -1,4 +1,4 @@
-const API_BASE_URL = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '');
+import { API_BASE_URL } from '@/utils/config';
 
 export interface Member {
   id?: string;
@@ -26,94 +26,109 @@ export class MemberService {
   }
 
   /**
-   * Cria um novo membro
+   * Cria um novo usuário (usando endpoint de auth/users)
    */
   static async createMember(memberData: CreateMemberData): Promise<Member> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/members`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/users`, {
         method: 'POST',
         headers: {
           ...this.getAuthHeaders(),
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(memberData),
+        body: JSON.stringify({
+          email: memberData.email,
+          nome: memberData.name,
+          regional: memberData.regional_id,
+          funcao: memberData.funcao,
+          area: memberData.area,
+          password: '123456', // Senha padrão temporária
+          role: 'user',
+          tipo: 'Colaborador',
+          status: 'ativo'
+        }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Erro ao criar membro');
+        throw new Error(data.error || 'Erro ao criar usuário');
       }
 
       return data.data;
     } catch (error) {
-      throw new Error(error instanceof Error ? error.message : 'Erro ao criar membro');
+      throw new Error(error instanceof Error ? error.message : 'Erro ao criar usuário');
     }
   }
 
   /**
-   * Obtém todos os membros
+   * Obtém todos os usuários (usando endpoint de auth/users)
    */
   static async getMembers(): Promise<Member[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/members`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/users`, {
         headers: this.getAuthHeaders(),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Erro ao buscar membros');
+        throw new Error(data.error || 'Erro ao buscar usuários');
       }
 
       return data.data || [];
     } catch (error) {
-      throw new Error(error instanceof Error ? error.message : 'Erro ao buscar membros');
+      throw new Error(error instanceof Error ? error.message : 'Erro ao buscar usuários');
     }
   }
 
   /**
-   * Atualiza um membro
+   * Atualiza um usuário (usando endpoint de auth/users)
    */
   static async updateMember(id: string, memberData: Partial<CreateMemberData>): Promise<Member> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/members/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/users/${id}`, {
         method: 'PUT',
         headers: {
           ...this.getAuthHeaders(),
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(memberData),
+        body: JSON.stringify({
+          nome: memberData.name,
+          regional: memberData.regional_id,
+          funcao: memberData.funcao,
+          area: memberData.area
+        }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Erro ao atualizar membro');
+        throw new Error(data.error || 'Erro ao atualizar usuário');
       }
 
       return data.data;
     } catch (error) {
-      throw new Error(error instanceof Error ? error.message : 'Erro ao atualizar membro');
+      throw new Error(error instanceof Error ? error.message : 'Erro ao atualizar usuário');
     }
   }
 
   /**
-   * Deleta um membro
+   * Deleta um usuário (usando endpoint de auth/users)
    */
   static async deleteMember(id: string): Promise<void> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/members/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/users/${id}`, {
         method: 'DELETE',
         headers: this.getAuthHeaders(),
       });
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || 'Erro ao deletar membro');
+        throw new Error(data.error || 'Erro ao deletar usuário');
       }
     } catch (error) {
-      throw new Error(error instanceof Error ? error.message : 'Erro ao deletar membro');
+      throw new Error(error instanceof Error ? error.message : 'Erro ao deletar usuário');
     }
   }
 }

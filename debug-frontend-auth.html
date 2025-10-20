@@ -4,267 +4,86 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Debug Frontend Auth</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-        .container {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        button {
-            background: #007bff;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 4px;
-            cursor: pointer;
-            margin: 5px;
-        }
-        button:hover {
-            background: #0056b3;
-        }
-        .success {
-            background: #d4edda;
-            color: #155724;
-            padding: 10px;
-            border-radius: 4px;
-            margin: 10px 0;
-        }
-        .error {
-            background: #f8d7da;
-            color: #721c24;
-            padding: 10px;
-            border-radius: 4px;
-            margin: 10px 0;
-        }
-        .info {
-            background: #d1ecf1;
-            color: #0c5460;
-            padding: 10px;
-            border-radius: 4px;
-            margin: 10px 0;
-        }
-        pre {
-            background: #f8f9fa;
-            padding: 10px;
-            border-radius: 4px;
-            overflow-x: auto;
-            white-space: pre-wrap;
-        }
-        .logs {
-            height: 300px;
-            overflow-y: auto;
-            background: #000;
-            color: #00ff00;
-            padding: 10px;
-            border-radius: 4px;
-            font-family: monospace;
-        }
-    </style>
 </head>
 <body>
-    <h1>🔍 Debug Frontend Auth & Goals</h1>
+    <h1>Debug Frontend Auth</h1>
+    <div id="output"></div>
     
-    <div class="container">
-        <h2>1. Verificar LocalStorage</h2>
-        <button onclick="checkLocalStorage()">Verificar Tokens</button>
-        <button onclick="clearStorage()">Limpar Storage</button>
-        <div id="storage-result"></div>
-    </div>
-
-    <div class="container">
-        <h2>2. Testar Login</h2>
-        <button onclick="testLogin()">Fazer Login</button>
-        <div id="login-result"></div>
-    </div>
-
-    <div class="container">
-        <h2>3. Testar API de Metas</h2>
-        <button onclick="testGoalsAPI()">Buscar Metas</button>
-        <div id="goals-result"></div>
-    </div>
-
-    <div class="container">
-        <h2>4. Logs em Tempo Real</h2>
-        <button onclick="clearLogs()">Limpar Logs</button>
-        <div id="logs" class="logs"></div>
-    </div>
-
     <script>
-        const API_BASE_URL = 'http://localhost:4000';
+        const output = document.getElementById('output');
         
-        function log(message, type = 'info') {
-            const logsDiv = document.getElementById('logs');
-            const timestamp = new Date().toLocaleTimeString();
-            const color = type === 'error' ? '#ff6b6b' : type === 'success' ? '#51cf66' : '#74c0fc';
-            logsDiv.innerHTML += `<div style="color: ${color}">[${timestamp}] ${message}</div>`;
-            logsDiv.scrollTop = logsDiv.scrollHeight;
-            console.log(`[${type.toUpperCase()}] ${message}`);
+        function log(message) {
+            console.log(message);
+            output.innerHTML += '<p>' + message + '</p>';
         }
         
-        function clearLogs() {
-            document.getElementById('logs').innerHTML = '';
-        }
-        
-        function checkLocalStorage() {
-            const result = document.getElementById('storage-result');
-            const token = localStorage.getItem('auth_token');
-            const refreshToken = localStorage.getItem('refresh_token');
-            const authStorage = localStorage.getItem('auth-storage');
-            
-            log(`Verificando localStorage...`);
-            log(`Token: ${token ? 'Presente' : 'Ausente'}`, token ? 'success' : 'error');
-            log(`Refresh Token: ${refreshToken ? 'Presente' : 'Ausente'}`, refreshToken ? 'success' : 'error');
-            log(`Auth Storage: ${authStorage ? 'Presente' : 'Ausente'}`, authStorage ? 'success' : 'error');
-            
-            result.innerHTML = `
-                <div class="${token ? 'success' : 'error'}">
-                    <p><strong>Auth Token:</strong> ${token ? 'Presente' : 'Ausente'}</p>
-                    ${token ? `<p>Token: ${token.substring(0, 50)}...</p>` : ''}
-                </div>
-                <div class="${refreshToken ? 'success' : 'error'}">
-                    <p><strong>Refresh Token:</strong> ${refreshToken ? 'Presente' : 'Ausente'}</p>
-                </div>
-                <div class="${authStorage ? 'info' : 'error'}">
-                    <p><strong>Auth Storage:</strong> ${authStorage ? 'Presente' : 'Ausente'}</p>
-                    ${authStorage ? `<pre>${authStorage}</pre>` : ''}
-                </div>
-            `;
-        }
-        
-        function clearStorage() {
-            localStorage.removeItem('auth_token');
-            localStorage.removeItem('refresh_token');
-            localStorage.removeItem('auth-storage');
-            log('Storage limpo', 'info');
-            checkLocalStorage();
-        }
-        
+        // Script para verificar localStorage no navegador
+        log('=== Verificando dados de autenticação ===');
+        log('auth_token: ' + localStorage.getItem('auth_token'));
+        log('access_token: ' + localStorage.getItem('access_token'));
+        log('token: ' + localStorage.getItem('token'));
+        log('auth-storage: ' + localStorage.getItem('auth-storage'));
+        log('auth_user: ' + localStorage.getItem('auth_user'));
+
+        // Tentar fazer login programaticamente
         async function testLogin() {
-            const result = document.getElementById('login-result');
-            result.innerHTML = '<p>Fazendo login...</p>';
-            
-            log('🔐 Iniciando teste de login...');
-            
             try {
-                const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                log('Tentando fazer login...');
+                const response = await fetch('http://localhost:4000/api/auth/login', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        email: 'teste@decolagem.com',
-                        password: 'Teste123!'
-                    }),
+                        email: 'coord.regional.sp@gerandofalcoes.com',
+                        password: 'senha123'
+                    })
                 });
                 
-                log(`Status da resposta: ${response.status}`);
-                
-                const loginData = await response.json();
-                log(`Dados recebidos: ${JSON.stringify(loginData, null, 2)}`);
-                
-                if (!response.ok) {
-                    throw new Error(loginData.error || 'Erro no login');
-                }
-                
-                log('✅ Login bem-sucedido!', 'success');
-                
-                // Verificar estrutura do token
-                let tokenSaved = false;
-                
-                if (loginData.data && loginData.data.token) {
-                    localStorage.setItem('auth_token', loginData.data.token);
-                    log('💾 Token salvo de data.token', 'success');
-                    tokenSaved = true;
-                } else if (loginData.session && loginData.session.access_token) {
-                    localStorage.setItem('auth_token', loginData.session.access_token);
-                    localStorage.setItem('refresh_token', loginData.session.refresh_token);
-                    log('💾 Token salvo de session.access_token', 'success');
-                    tokenSaved = true;
-                } else if (loginData.token) {
-                    localStorage.setItem('auth_token', loginData.token);
-                    log('💾 Token salvo diretamente', 'success');
-                    tokenSaved = true;
-                }
-                
-                result.innerHTML = `<div class="success">
-                    <p>✅ Login realizado com sucesso!</p>
-                    <p>Token salvo: ${tokenSaved ? 'Sim' : 'Não'}</p>
-                    <pre>${JSON.stringify(loginData, null, 2)}</pre>
-                </div>`;
-                
-            } catch (error) {
-                log(`❌ Erro no login: ${error.message}`, 'error');
-                result.innerHTML = `<div class="error">
-                    <p>❌ Erro no login: ${error.message}</p>
-                </div>`;
-            }
-        }
-
-        async function testGoalsAPI() {
-            const result = document.getElementById('goals-result');
-            result.innerHTML = '<p>Testando API /goals...</p>';
-            
-            const token = localStorage.getItem('auth_token');
-            
-            if (!token) {
-                log('❌ Token não encontrado. Faça login primeiro.', 'error');
-                result.innerHTML = `<div class="error">
-                    <p>❌ Token não encontrado. Faça login primeiro.</p>
-                </div>`;
-                return;
-            }
-            
-            log('🎯 Testando API de metas...');
-            log(`Token usado: ${token.substring(0, 30)}...`);
-            
-            try {
-                const response = await fetch(`${API_BASE_URL}/goals`, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
+                if (response.ok) {
+                    const data = await response.json();
+                    log('Login bem-sucedido: ' + JSON.stringify(data, null, 2));
+                    
+                    if (data.session && data.session.access_token) {
+                        localStorage.setItem('auth_token', data.session.access_token);
+                        log('Token salvo no localStorage');
+                        
+                        // Testar API de atividades regionais
+                        await testRegionalActivities(data.session.access_token);
                     }
-                });
-                
-                log(`Status da resposta: ${response.status}`);
-                
-                const goalsData = await response.json();
-                log(`Dados recebidos: ${JSON.stringify(goalsData, null, 2)}`);
-                
-                if (!response.ok) {
-                    throw new Error(goalsData.error || 'Erro ao buscar metas');
+                } else {
+                    const errorText = await response.text();
+                    log('Erro no login: ' + response.status + ' - ' + errorText);
                 }
-                
-                log('✅ Metas obtidas com sucesso!', 'success');
-                log(`Número de metas: ${goalsData.data?.length || 0}`, 'success');
-                
-                result.innerHTML = `<div class="success">
-                    <p>✅ API de metas funcionando!</p>
-                    <p>Metas encontradas: ${goalsData.data?.length || 0}</p>
-                    <pre>${JSON.stringify(goalsData, null, 2)}</pre>
-                </div>`;
-                
             } catch (error) {
-                log(`❌ Erro na API de metas: ${error.message}`, 'error');
-                result.innerHTML = `<div class="error">
-                    <p>❌ Erro na API de metas: ${error.message}</p>
-                </div>`;
+                log('Erro: ' + error.message);
             }
         }
         
-        // Inicializar
-        window.onload = function() {
-            log('🚀 Debug Frontend Auth carregado');
-            checkLocalStorage();
-        };
+        async function testRegionalActivities(token) {
+            try {
+                log('Testando API de atividades regionais...');
+                const response = await fetch('http://localhost:4000/api/regional-activities', {
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json',
+                    },
+                });
+                
+                if (response.ok) {
+                    const activities = await response.json();
+                    log('Atividades carregadas: ' + JSON.stringify(activities, null, 2));
+                } else {
+                    const errorText = await response.text();
+                    log('Erro ao carregar atividades: ' + response.status + ' - ' + errorText);
+                }
+            } catch (error) {
+                log('Erro ao testar atividades: ' + error.message);
+            }
+        }
+
+        // Executar o teste de login
+        testLogin();
     </script>
 </body>
 </html>

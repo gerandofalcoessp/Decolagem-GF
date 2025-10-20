@@ -2,11 +2,16 @@ import { Router } from 'express';
 import { getSupabaseForToken, getUserFromToken } from '../services/supabaseClient.js';
 import { logger } from '../utils/logger.js';
 import { cacheMiddleware, invalidateCacheMiddleware } from '../middlewares/cacheMiddleware.js';
+import { z } from 'zod';
+import { requireRole } from '../middlewares/authMiddleware.js';
 
 const router = Router();
 
-// CRUD básico de members sob RLS
+// DEPRECATED: Esta rota está sendo descontinuada
+// Use /api/regionals/users para obter dados de usuários da tabela usuarios
 router.get('/', cacheMiddleware({ ttl: 300 }), async (req, res) => {
+  logger.warn('DEPRECATED: /api/members endpoint is deprecated. Use /api/regionals/users instead.');
+  
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
   const s = getSupabaseForToken(token);
@@ -17,8 +22,11 @@ router.get('/', cacheMiddleware({ ttl: 300 }), async (req, res) => {
   res.json({ data });
 });
 
-// Retorna o registro do member do usuário autenticado
+// DEPRECATED: Esta rota está sendo descontinuada
+// Use /api/regionals/users para obter dados do usuário autenticado
 router.get('/me', cacheMiddleware({ ttl: 180 }), async (req, res) => {
+  logger.warn('DEPRECATED: /api/members/me endpoint is deprecated. Use /api/regionals/users instead.');
+  
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
   const s = getSupabaseForToken(token);
@@ -32,7 +40,7 @@ router.get('/me', cacheMiddleware({ ttl: 180 }), async (req, res) => {
   res.json({ data });
 });
 
-router.post('/', invalidateCacheMiddleware(['members']), async (req, res) => {
+router.post('/', requireRole('super_admin'), invalidateCacheMiddleware(['members']), async (req, res) => {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
   const s = getSupabaseForToken(token);
@@ -53,6 +61,15 @@ router.post('/', invalidateCacheMiddleware(['members']), async (req, res) => {
   });
 
   const body = req.body || {};
+  const createMemberSchema = z.object({}).passthrough().refine(obj => !('auth_user_id' in obj), {
+    message: 'auth_user_id_not_allowed'
+  });
+  const parsedBody = createMemberSchema.safeParse(body);
+  if (!parsedBody.success) {
+    return res.status(400).json({ error: 'invalid_payload', details: parsedBody.error.flatten() });
+  }
+
+  const safeBody = parsedBody.data;
   
   // Verificar se o usuário atual já tem um registro na tabela members
   const { data: existingMember, error: checkError } = await s
@@ -67,11 +84,11 @@ router.post('/', invalidateCacheMiddleware(['members']), async (req, res) => {
     // Usuário já tem um member - criar um novo member sem auth_user_id (para outros usuários)
     // Isso permite que admins criem membros para outras pessoas
     payload = { 
-      name: body.name,
-      email: body.email,
-      regional_id: body.regional_id,
-      funcao: body.funcao,
-      area: body.area
+      name: safeBody.name,
+      email: safeBody.email,
+      regional_id: safeBody.regional_id,
+      funcao: safeBody.funcao,
+      area: safeBody.area
       // Não incluir auth_user_id - será null, permitindo múltiplos membros sem usuário associado
     };
     
@@ -87,7 +104,7 @@ router.post('/', invalidateCacheMiddleware(['members']), async (req, res) => {
     });
   } else {
     // Usuário não tem member ainda - criar member para ele mesmo
-    payload = { ...body, auth_user_id: user.id };
+    payload = { ...safeBody, auth_user_id: user.id };
     
     logger.info('User creating their own member record', {
       userId: user.id,
@@ -120,7 +137,7 @@ router.post('/', invalidateCacheMiddleware(['members']), async (req, res) => {
   res.status(201).json({ data });
 });
 
-router.put('/:id', invalidateCacheMiddleware(['members']), async (req, res) => {
+router.put('/:id', requireRole('super_admin'), invalidateCacheMiddleware(['members']), async (req, res) => {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
   const s = getSupabaseForToken(token);
@@ -129,17 +146,28 @@ router.put('/:id', invalidateCacheMiddleware(['members']), async (req, res) => {
   const user = await getUserFromToken(token);
   if (!user) return res.status(401).json({ error: 'unauthorized' });
 
-  const id = req.params.id;
+  const idSchema = z.string().min(1);
+  const idParse = idSchema.safeParse(req.params.id);
+  if (!idParse.success) {
+    return res.status(400).json({ error: 'invalid_id', details: idParse.error.flatten() });
+  }
+
   const body = req.body || {};
-  
-  // Nunca permitir mudar o vínculo do usuário
-  if ('auth_user_id' in body) delete body.auth_user_id;
+  const updateMemberSchema = z.object({}).passthrough().refine(obj => !('auth_user_id' in obj), {
+    message: 'auth_user_id_not_allowed'
+  });
+  const parsed = updateMemberSchema.safeParse(body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'invalid_payload', details: parsed.error.flatten() });
+  }
+
+  const safeBody = parsed.data;
   
   // Verificar se o membro existe primeiro
   const { data: existingMember, error: checkError } = await s
     .from('members')
     .select('*')
-    .eq('id', id);
+    .eq('id', idParse.data);
 
   if (checkError) {
     logger.error('Error checking existing member', {
@@ -155,7 +183,7 @@ router.put('/:id', invalidateCacheMiddleware(['members']), async (req, res) => {
   }
 
   if (!existingMember || existingMember.length === 0) {
-    return res.status(404).json({ error: 'Membro não encontrado' });
+    return res.status(404).json({ error: 'member_not_found' });
   }
 
   if (existingMember.length > 1) {
@@ -168,18 +196,18 @@ router.put('/:id', invalidateCacheMiddleware(['members']), async (req, res) => {
       },
       error: {
         name: 'MultipleMembers',
-        message: `Multiple members found with ID: ${id}`
+        message: `Multiple members found with ID: ${idParse.data}`
       }
     });
-    return res.status(400).json({ error: 'Múltiplos membros encontrados com o mesmo ID' });
+    return res.status(400).json({ error: 'multiple_members_same_id' });
   }
 
-  const payload = body;
+  const payload = safeBody;
 
   const { data, error } = await s
     .from('members')
     .update(payload)
-    .eq('id', id)
+    .eq('id', idParse.data)
     .select('*');
     
   if (error) {
@@ -199,7 +227,7 @@ router.put('/:id', invalidateCacheMiddleware(['members']), async (req, res) => {
   }
 
   if (!data || data.length === 0) {
-    return res.status(404).json({ error: 'Nenhum membro foi atualizado' });
+    return res.status(404).json({ error: 'no_member_updated' });
   }
 
   if (data.length > 1) {
@@ -212,15 +240,15 @@ router.put('/:id', invalidateCacheMiddleware(['members']), async (req, res) => {
       },
       error: {
         name: 'MultipleUpdates',
-        message: `Multiple members updated for ID: ${id}`
+        message: `Multiple members updated for ID: ${idParse.data}`
       }
     });
-    return res.status(400).json({ error: 'Múltiplos membros foram atualizados' });
+    return res.status(400).json({ error: 'multiple_members_updated' });
   }
 
   // Log de sucesso
   logger.logMemberAction('update_member', user.id, {
-    memberId: id,
+    memberId: idParse.data,
     memberName: data[0].name,
     userEmail: user.email,
     updatedFields: Object.keys(payload)
@@ -229,7 +257,7 @@ router.put('/:id', invalidateCacheMiddleware(['members']), async (req, res) => {
   res.json({ data: data[0] });
 });
 
-router.delete('/:id', invalidateCacheMiddleware(['members']), async (req, res) => {
+router.delete('/:id', requireRole('super_admin'), invalidateCacheMiddleware(['members']), async (req, res) => {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
   const s = getSupabaseForToken(token);
@@ -238,7 +266,13 @@ router.delete('/:id', invalidateCacheMiddleware(['members']), async (req, res) =
   const user = await getUserFromToken(token);
   if (!user) return res.status(401).json({ error: 'unauthorized' });
 
-  const id = req.params.id;
+  const idSchema = z.string().min(1);
+  const idParse = idSchema.safeParse(req.params.id);
+  if (!idParse.success) {
+    return res.status(400).json({ error: 'invalid_id', details: idParse.error.flatten() });
+  }
+
+  const id = idParse.data;
   
   // Log da tentativa de exclusão
   logger.info('Member deletion attempt', {
@@ -251,35 +285,40 @@ router.delete('/:id', invalidateCacheMiddleware(['members']), async (req, res) =
     }
   });
 
-  const { data, error } = await s.from('members').delete().eq('id', id).select('*').single();
+  const { data, error } = await s
+    .from('members')
+    .delete()
+    .eq('id', id)
+    .select('*');
   
   if (error) {
-    logger.logMemberAction('delete_member', user.id, {
-      memberId: id,
-      userEmail: user.email
-    }, error);
+    logger.error('Error deleting member', {
+      userId: user.id,
+      action: 'delete_member',
+      resource: 'members',
+      context: {
+        memberId: id
+      },
+      error: {
+        name: error.name || 'DeleteError',
+        message: error.message
+      }
+    });
     return res.status(400).json({ error: error.message });
   }
 
+  if (!data || data.length === 0) {
+    return res.status(404).json({ error: 'member_not_found_for_deletion' });
+  }
+
   // Log de sucesso
-  logger.info('Member deleted successfully', {
-    userId: user.id,
-    action: 'delete_member',
-    resource: 'members',
-    context: {
-      adminUserId: user.id,
-      deletedMemberId: id,
-      userEmail: user.email
-    }
-  });
-
   logger.logMemberAction('delete_member', user.id, {
-    deletedMemberId: data.id,
-    deletedMemberName: data.name,
-    userEmail: user.email
+    memberId: id,
+    userEmail: user.email,
+    deletedMember: data[0]
   });
 
-  res.json({ data });
+  res.json({ data: data[0] });
 });
 
 export default router;

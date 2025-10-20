@@ -66,3 +66,7 @@ backend/jest.config.cjs
 # Husky and git hooks
 .husky/
 .git/
+
+# Permitir handlers serverless da API no deploy
+!api/*.mjs
+!api/**/*.mjs

@@ -4,9 +4,65 @@ import { REGIONAL_LABELS, ATIVIDADE_OPTIONS, REGIONAL_COLOR_CLASSES } from '@/pa
 import { useGoals, useUsersWithMembers, useRegionalActivities } from '@/hooks/useApi';
 import { useInstituicaoStats } from '@/hooks/useInstituicaoStats';
 import { useInstituicoes } from '@/hooks/useInstituicoes';
+import { useAuth } from '@/store/authStore';
 
 export default function DashboardMetasPage() {
-  const [filtroRegional, setFiltroRegional] = useState('todos');
+  // Hook de autenticação para obter dados do usuário logado
+  const { user } = useAuth();
+  
+  // Função para mapear a regional do usuário para o formato usado nos filtros
+  const mapUserRegionalToFilter = (userRegional?: string): string => {
+    if (!userRegional) return 'todos';
+    
+    const mapping: Record<string, string> = {
+      'Nacional': 'nacional',
+      'Comercial': 'comercial',
+      'Centro-Oeste': 'centro_oeste',
+      'MG/ES': 'mg_es',
+      'Nordeste 1': 'nordeste_1',
+      'Nordeste 2': 'nordeste_2',
+      'Norte': 'norte',
+      'Rio de Janeiro': 'rj',
+      'São Paulo': 'sp',
+      'Sul': 'sul',
+      // Mapeamentos com prefixo "R."
+      'R. Nacional': 'nacional',
+      'R. Comercial': 'comercial',
+      'R. Centro-Oeste': 'centro_oeste',
+      'R. MG/ES': 'mg_es',
+      'R. Nordeste 1': 'nordeste_1',
+      'R. Nordeste 2': 'nordeste_2',
+      'R. Norte': 'norte',
+      'R. Rio de Janeiro': 'rj',
+      'R. São Paulo': 'sp',
+      'R. Sul': 'sul',
+    };
+    
+    return mapping[userRegional] || 'todos';
+  };
+
+  // Determinar filtro regional inicial baseado no usuário logado
+  const getInitialRegionalFilter = (): string => {
+    console.log('🔍 Debug Dashboard Metas - Usuário logado:', {
+      user: user,
+      role: user?.role,
+      regional: user?.regional,
+      isSuperAdmin: user?.role === 'super_admin'
+    });
+    
+    // Se o usuário é super_admin, pode ver todas as regionais
+    if (user?.role === 'super_admin') {
+      console.log('👑 Super admin - mostrando todos os dados');
+      return 'todos';
+    }
+    
+    // Para outros usuários, filtrar pela sua regional
+    const mappedRegional = mapUserRegionalToFilter(user?.regional);
+    console.log('👤 Usuário comum - regional mapeada:', mappedRegional);
+    return mappedRegional;
+  };
+
+  const [filtroRegional, setFiltroRegional] = useState(() => getInitialRegionalFilter());
   const [filtroAtividade, setFiltroAtividade] = useState<string>('');
   const [filtroEquipe, setFiltroEquipe] = useState<string>('todos');
   const [filtroMes, setFiltroMes] = useState<string>('todos');
@@ -17,6 +73,12 @@ export default function DashboardMetasPage() {
   const { data: statsInstituicoes, loading: loadingStats, error: errorStats } = useInstituicaoStats();
   const { data: atividadesRegionais, loading: loadingAtividades, refetch: refetchAtividades } = useRegionalActivities();
   const { data: instituicoes, loading: loadingInstituicoes } = useInstituicoes();
+
+  // Atualizar filtro regional quando o usuário mudar
+  useEffect(() => {
+    const newRegionalFilter = getInitialRegionalFilter();
+    setFiltroRegional(newRegionalFilter);
+  }, [user]);
 
   // Estado de loading combinado
   const loading = loadingMetas || loadingUsuarios || loadingAtividades || loadingStats || loadingInstituicoes;
@@ -1120,36 +1182,16 @@ export default function DashboardMetasPage() {
       .sort((a, b) => b.percentualRealizado - a.percentualRealizado);
   }, [metas, metasFiltradas, filtroRegional, filtroAtividade, filtroEquipe, filtroMes, filtroAno, atividadesRegionais, usuarios]);
 
-  // Adicionar useEffect para recarregar dados quando necessário
+  // Remover logs excessivos e polling automático para melhor performance
+  // Recarregar dados apenas quando filtros mudarem
   useEffect(() => {
-    // Apenas recarregar se os dados não estão sendo carregados e se os filtros realmente mudaram
     if (!loading && refetch) {
-      console.log('🔄 Recarregando metas devido a mudança de filtros');
       refetch();
     }
-    // Recarregar atividades regionais quando filtros mudarem
     if (!loadingAtividades && refetchAtividades) {
-      console.log('🔄 Recarregando atividades regionais devido a mudança de filtros');
       refetchAtividades();
     }
   }, [filtroAtividade, filtroRegional, filtroEquipe, filtroMes, filtroAno, refetch, refetchAtividades, loading, loadingAtividades]);
-
-  // Atualização automática a cada 10 minutos para dados em tempo real (reduzido de 5 minutos para evitar recarregamento excessivo)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (refetch && !loading) {
-        console.log('🔄 Atualização automática de metas (10 minutos)');
-        refetch();
-      }
-      // Também atualizar atividades regionais
-      if (refetchAtividades && !loadingAtividades) {
-        console.log('🔄 Atualização automática de atividades regionais (10 minutos)');
-        refetchAtividades();
-      }
-    }, 10 * 60 * 1000); // 10 minutos
-
-    return () => clearInterval(interval);
-  }, [refetch, loading, refetchAtividades, loadingAtividades]);
 
   if (loading) {
     return (
