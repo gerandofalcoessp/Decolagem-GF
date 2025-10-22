@@ -1,13 +1,12 @@
 {
   "version": 2,
-  "buildCommand": "npm run vercel-build",
   "builds": [
     {
-      "src": "package.json",
+      "src": "frontend/package.json",
       "use": "@vercel/static-build",
       "config": {
-        "distDir": ".",
-        "outputDirectory": ".",
+        "distDir": "frontend/dist",
+        "outputDirectory": "frontend/dist",
         "nodeVersion": "18.x",
         "maxLambdaSize": "50mb"
       }
