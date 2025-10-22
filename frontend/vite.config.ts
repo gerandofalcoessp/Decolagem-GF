@@ -5,7 +5,6 @@ import path from 'path'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  root: '.', // Definir explicitamente o root
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -71,7 +70,7 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    entries: ['index.html', './src/main.tsx'],
+    entries: ['index.html', 'src/main.tsx'],
     include: ['react', 'react-dom', 'react-router-dom', '@tanstack/react-query', 'lucide-react'],
     // Forçar pré-bundling de dependências comuns
     force: false,
