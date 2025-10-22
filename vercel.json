@@ -7,7 +7,7 @@
       "config": {
         "distDir": "frontend/dist",
         "outputDirectory": "frontend/dist",
-        "nodeVersion": "18.x",
+        "nodeVersion": "22.x",
         "maxLambdaSize": "50mb"
       }
     }
