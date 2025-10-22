@@ -2,6 +2,10 @@
 node_modules/
 */node_modules/
 
+# Source files (keep only built files)
+backend/src/
+frontend/src/
+
 # Development files
 *.log
 *.env.local
@@ -16,6 +20,8 @@ backend/build/
 coverage/
 *.test.js
 *.spec.js
+**/tests/
+**/test/
 
 # IDE files
 .vscode/
@@ -38,7 +44,6 @@ Thumbs.db
 # Scripts and utilities
 scripts/
 *.cjs
-*.mjs
 debug-*.js
 debug-*.html
 test-*.js
@@ -48,6 +53,12 @@ fix-*.js
 investigate-*.js
 testar-*.js
 verificar-*.js
+
+# Keep only essential files for deployment
+!api/
+!index.html
+!assets/
+!*.json
 
 # Database files
 *.sql

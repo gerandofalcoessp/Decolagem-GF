@@ -9,7 +9,7 @@
     "build": "npm run vercel-build",
     "start": "node dist/server.js",
     "start:prod": "node dist/server.js",
-    "vercel-build": "tsc --skipLibCheck --noEmitOnError false || echo 'Build completed with warnings'",
+    "vercel-build": "tsc --skipLibCheck --noEmitOnError false --incremental false --sourceMap false || echo 'Build completed with warnings'",
     "migrate:run": "tsx src/scripts/migrate.ts run",
     "migrate:create": "tsx src/scripts/migrate.ts create",
     "migration:run": "npm run migrate:run",
