@@ -329,9 +329,11 @@ export default function EditarAtividadeRegionalPage() {
         }
       }
 
-      // Invalidar cache do React Query para forçar atualização dos dados
+      // Invalidar cache do React Query para forçar atualização instantânea dos dados
       queryClient.invalidateQueries({ queryKey: ['regional-activities'] });
+      queryClient.refetchQueries({ queryKey: ['regional-activities'] });
       queryClient.invalidateQueries({ queryKey: ['activities'] });
+      queryClient.refetchQueries({ queryKey: ['activities'] });
       
       setNotificationData({
         type: 'success',

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { InstituicaoService, InstituicaoStats } from '@/services/instituicaoService';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 export function useInstituicaoStats() {
   const [data, setData] = useState<InstituicaoStats | null>(null);
@@ -31,16 +32,45 @@ export function useInstituicaoStats() {
     fetchStats();
   }, [fetchStats]);
 
-  // Atualização automática a cada 15 minutos (reduzido de 5 minutos para melhor performance)
+  // Subscription de realtime para tabelas que impactam as estatísticas
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (!loading) {
-        fetchStats();
-      }
-    }, 15 * 60 * 1000); // 15 minutos
+    if (!isSupabaseConfigured() || !supabase) {
+      console.warn('[useInstituicaoStats] Supabase não configurado, pulando subscription realtime');
+      return;
+    }
 
-    return () => clearInterval(interval);
-  }, [fetchStats, loading]);
+    const channel = supabase
+      .channel('instituicao-stats')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'instituicoes' },
+        (payload) => {
+          console.log('[useInstituicaoStats] mudança em instituicoes detectada:', payload.eventType);
+          // Recarregar estatísticas imediatamente
+          fetchStats();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'regional_activities' },
+        (payload) => {
+          console.log('[useInstituicaoStats] mudança em regional_activities detectada:', payload.eventType);
+          // Recarregar estatísticas imediatamente
+          fetchStats();
+        }
+      )
+      .subscribe((status) => {
+        console.log('[useInstituicaoStats] channel status:', status);
+      });
+
+    return () => {
+      try {
+        supabase.removeChannel(channel);
+      } catch (err) {
+        console.warn('[useInstituicaoStats] erro ao remover canal realtime:', err);
+      }
+    };
+  }, [fetchStats]);
 
   return {
     data,

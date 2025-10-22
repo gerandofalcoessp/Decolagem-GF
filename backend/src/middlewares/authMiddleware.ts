@@ -22,7 +22,7 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
   // Anexa o usuário com dados do membro ao request para uso posterior
   (req as any).user = {
     ...user,
-    role: memberData?.role || user.user_metadata?.role || null,
+    role: memberData?.role || user.user_metadata?.role || 'user',
     regional: memberData?.regional || user.user_metadata?.regional || null,
     funcao: memberData?.funcao || user.user_metadata?.funcao || null,
     memberData

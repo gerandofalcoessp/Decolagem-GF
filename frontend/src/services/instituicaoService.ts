@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '@/utils/config';
+import { ProgramaArray } from '@/types';
 
 export interface Instituicao {
   id?: string;
@@ -11,7 +12,8 @@ export interface Instituicao {
   telefone: string;
   email: string;
   regional: 'nacional' | 'centro_oeste' | 'mg_es' | 'nordeste_1' | 'nordeste_2' | 'norte' | 'rj' | 'sp' | 'sul' | 'comercial';
-  programa: 'microcredito' | 'as_maras' | 'decolagem';
+  programa?: 'microcredito' | 'as_maras' | 'decolagem'; // Manter para compatibilidade
+  programas?: ProgramaArray; // Nova propriedade para múltiplos programas
   observacoes?: string;
   nome_lider: string;
   status: 'ativa' | 'inativa' | 'evadida';
@@ -33,7 +35,8 @@ export interface CreateInstituicaoData {
   telefone: string;
   email: string;
   regional: 'nacional' | 'centro_oeste' | 'mg_es' | 'nordeste_1' | 'nordeste_2' | 'norte' | 'rj' | 'sp' | 'sul' | 'comercial';
-  programa: 'microcredito' | 'as_maras' | 'decolagem';
+  programa?: 'microcredito' | 'as_maras' | 'decolagem'; // Manter para compatibilidade
+  programas?: ProgramaArray; // Nova propriedade para múltiplos programas
   observacoes?: string;
   nome_lider: string;
   status?: 'ativa' | 'inativa' | 'evadida';
@@ -45,7 +48,6 @@ export interface UpdateInstituicaoData extends Partial<CreateInstituicaoData> {}
 export interface EvasaoData {
   motivo: string;
   data: string;
-  registrado_em?: string;
 }
 
 export interface InstituicaoStats {

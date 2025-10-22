@@ -48,6 +48,7 @@ export default function OngListPage() {
           email: inst.email,
           regional: inst.regional,
           programa: inst.programa,
+          programas: inst.programas || [], // Incluir o campo programas
           observacoes: inst.observacoes || '',
           nome_lider: inst.nome_lider,
           documentos: inst.documentos || [],
@@ -122,8 +123,7 @@ export default function OngListPage() {
     try {
       await InstituicaoService.marcarEvasao(evasaoModal.ong.id, {
         motivo,
-        data,
-        registradoEm: new Date().toISOString()
+        data
       });
 
       // Atualizar lista local
@@ -173,6 +173,39 @@ export default function OngListPage() {
       decolagem: 'Decolagem'
     };
     return labels[programa] || programa;
+  };
+
+  const getProgramasDisplay = (ong: ONG) => {
+    // Debug: Log para verificar dados recebidos
+    if (ong.nome?.includes('Wise Madness') || ong.nome?.includes('Recomeçar')) {
+      console.log(`🔍 DEBUG ${ong.nome}:`, {
+        programa: ong.programa,
+        programas: ong.programas,
+        programasLength: ong.programas?.length,
+        programasType: typeof ong.programas
+      });
+    }
+    
+    // Priorizar programas (múltiplos) sobre programa (único)
+    if (ong.programas && ong.programas.length > 0) {
+      const result = ong.programas.map(p => getProgramaLabel(p)).join(', ');
+      if (ong.nome?.includes('Wise Madness') || ong.nome?.includes('Recomeçar')) {
+        console.log(`✅ Retornando múltiplos programas para ${ong.nome}:`, result);
+      }
+      return result;
+    }
+    // Fallback para programa único (compatibilidade)
+    if (ong.programa) {
+      const result = getProgramaLabel(ong.programa);
+      if (ong.nome?.includes('Wise Madness') || ong.nome?.includes('Recomeçar')) {
+        console.log(`⚠️ Retornando programa único para ${ong.nome}:`, result);
+      }
+      return result;
+    }
+    if (ong.nome?.includes('Wise Madness') || ong.nome?.includes('Recomeçar')) {
+      console.log(`❌ Nenhum programa encontrado para ${ong.nome}`);
+    }
+    return '-';
   };
 
   const getStatusBadge = (status: ONG['status']) => {
@@ -353,7 +386,7 @@ export default function OngListPage() {
                       {getRegionalLabel(ong.regional)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {getProgramaLabel(ong.programa)}
+                      {getProgramasDisplay(ong)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {ong.cidade || '-'}

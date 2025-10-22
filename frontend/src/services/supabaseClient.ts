@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim(); // Remove caracteres de quebra de linha
 
 // Verificar se as variáveis estão definidas
 if (!SUPABASE_URL) {
@@ -12,7 +12,7 @@ if (!SUPABASE_ANON_KEY) {
   console.warn('[supabase] VITE_SUPABASE_ANON_KEY não definido. Funcionalidades do Supabase ficarão inativas.');
 }
 
-// Cliente Supabase para o frontend
+// Cliente Supabase para o frontend com configuração otimizada para realtime
 export const supabase = SUPABASE_URL && SUPABASE_ANON_KEY
   ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: {
@@ -20,6 +20,16 @@ export const supabase = SUPABASE_URL && SUPABASE_ANON_KEY
         autoRefreshToken: true,
         detectSessionInUrl: true,
       },
+      realtime: {
+        params: {
+          eventsPerSecond: 10
+        }
+      },
+      global: {
+        headers: {
+          'x-client-info': 'decolagem-gf-frontend'
+        }
+      }
     })
   : null;
 

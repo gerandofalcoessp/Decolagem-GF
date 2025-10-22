@@ -33,6 +33,11 @@ export default defineConfig({
         },
       },
   },
+  preview: {
+    port: 3002,
+    host: true,
+    strictPort: true,
+  },
   build: {
     outDir: 'dist',
     sourcemap: false, // Desabilitar sourcemaps em produção para reduzir tamanho

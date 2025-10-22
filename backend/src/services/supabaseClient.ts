@@ -2,7 +2,11 @@ import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// Suporte a nomes alternativos para a chave de service role (Vercel/Supabase)
+const SUPABASE_SERVICE_ROLE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY ??
+  process.env.CHAVE_DE_FUNÇÃO_DO_SERVIÇO_SUPABASE ??
+  process.env.SUPABASE_SERVICE_ROLE;
 
 const hasUrl = !!SUPABASE_URL;
 const hasAnon = !!SUPABASE_ANON_KEY;

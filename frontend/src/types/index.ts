@@ -28,6 +28,7 @@ export type Regional =
 
 // Tipos de programa
 export type Programa = 'as_maras' | 'microcredito' | 'decolagem';
+export type ProgramaArray = Programa[];
 
 // Tipos de status
 export type Status = 'ativo' | 'inativo';
@@ -50,7 +51,8 @@ export type TipoAtividade =
   | 'ligas_maras_formadas'
   | 'familias_embarcadas_decolagem'
   | 'diagnosticos_realizados'
-  | 'leads_do_dia';
+  | 'leads_do_dia'
+  | 'conversao_leads';
 
 // Interface para ONG
 export interface ONG {
@@ -64,7 +66,8 @@ export interface ONG {
   telefone?: string;
   email?: string;
   regional: Regional;
-  programa: Programa;
+  programa: Programa; // Mantido para compatibilidade
+  programas?: ProgramaArray; // Nova propriedade para múltiplos programas
   status: Status;
   motivo_inativacao?: string;
   data_inativacao?: string;
@@ -311,7 +314,9 @@ export interface ONGForm {
   telefone?: string;
   email?: string;
   regional: Regional;
-  programa: Programa;
+  programa?: Programa; // Mantido para compatibilidade (opcional)
+  programas: ProgramaArray; // Nova propriedade obrigatória para múltiplos programas
+  status?: 'ativa' | 'inativa' | 'evadida'; // Campo status para edição
   observacoes?: string;
   // Novos campos
   nome_lider?: string;

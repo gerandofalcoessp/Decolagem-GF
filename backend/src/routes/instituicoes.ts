@@ -43,7 +43,8 @@ interface InstituicaoData {
   telefone?: string;
   email?: string;
   regional: string;
-  programa: string;
+  programa?: string; // Manter para compatibilidade
+  programas?: string[]; // Nova propriedade para múltiplos programas
   observacoes?: string;
   nome_lider?: string;
   status?: 'ativa' | 'inativa' | 'evadida';
@@ -119,108 +120,46 @@ router.get('/stats', async (req, res) => {
       return res.status(401).json({ error: 'unauthorized' });
     }
 
-    // Contagem total de instituições
-    const { count: totalInstituicoes, error: countError } = await s
+    // Otimização: usar uma única query para buscar todas as instituições com os campos necessários
+    const { data: instituicoesData, error: instituicoesError } = await s
       .from('instituicoes')
-      .select('*', { count: 'exact', head: true });
+      .select('programa, regional, status');
 
-    if (countError) {
-      logger.error('Error fetching total count', { 
+    if (instituicoesError) {
+      logger.error('Error fetching instituicoes data', { 
         userId: user.id,
         action: 'get_stats',
         resource: 'instituicoes',
         error: {
-          name: countError.name || 'CountError',
-          message: countError.message,
-          stack: countError.stack
+          name: instituicoesError.name || 'InstituicoesError',
+          message: instituicoesError.message,
+          stack: instituicoesError.stack
         }
       });
-      return res.status(400).json({ error: countError.message });
+      return res.status(400).json({ error: instituicoesError.message });
     }
 
-    // Contagem por programa - APENAS INSTITUIÇÕES ATIVAS
-    const { data: programData, error: programError } = await s
-      .from('instituicoes')
-      .select('programa')
-      .eq('status', 'ativa')
-      .not('programa', 'is', null);
+    // Processar todos os dados em uma única passada
+    let totalInstituicoes = 0;
+    const programCounts: Record<string, number> = {};
+    const programEvasaoCounts: Record<string, number> = {};
+    const regionalCounts: Record<string, number> = {};
 
-    if (programError) {
-      logger.error('Error fetching programa data', { 
-        userId: user.id,
-        action: 'get_stats',
-        resource: 'instituicoes',
-        error: {
-          name: programError.name || 'ProgramError',
-          message: programError.message,
-          stack: programError.stack
+    for (const instituicao of instituicoesData) {
+      totalInstituicoes++;
+      
+      if (instituicao.programa) {
+        if (instituicao.status === 'ativa') {
+          programCounts[instituicao.programa] = (programCounts[instituicao.programa] || 0) + 1;
+        } else if (instituicao.status === 'evadida') {
+          programEvasaoCounts[instituicao.programa] = (programEvasaoCounts[instituicao.programa] || 0) + 1;
         }
-      });
-      return res.status(400).json({ error: programError.message });
+      }
+      
+      if (instituicao.regional && instituicao.status === 'ativa') {
+        regionalCounts[instituicao.regional] = (regionalCounts[instituicao.regional] || 0) + 1;
+      }
     }
-
-    // Contagem por programa - INSTITUIÇÕES EVADIDAS
-    const { data: programEvasaoData, error: programEvasaoError } = await s
-      .from('instituicoes')
-      .select('programa')
-      .eq('status', 'evadida')
-      .not('programa', 'is', null);
-
-    if (programEvasaoError) {
-      logger.error('Error fetching program evasion data', { 
-        userId: user.id,
-        action: 'get_stats',
-        resource: 'instituicoes',
-        error: {
-          name: programEvasaoError.name || 'ProgramEvasaoError',
-          message: programEvasaoError.message,
-          stack: programEvasaoError.stack
-        }
-      });
-      return res.status(400).json({ error: programEvasaoError.message });
-    }
-
-    // Contagem por regional (área) - APENAS INSTITUIÇÕES ATIVAS
-    const { data: regionalData, error: regionalError } = await s
-      .from('instituicoes')
-      .select('regional')
-      .eq('status', 'ativa')
-      .not('regional', 'is', null);
-
-    if (regionalError) {
-      logger.error('Error fetching regional data', { 
-        userId: user.id,
-        action: 'get_stats',
-        resource: 'instituicoes',
-        error: {
-          name: regionalError.name || 'RegionalError',
-          message: regionalError.message,
-          stack: regionalError.stack
-        }
-      });
-      return res.status(400).json({ error: regionalError.message });
-    }
-
-    // Processar contagens por programa (ativas)
-    const programCounts = programData.reduce((acc: Record<string, number>, item) => {
-      const programa = item.programa;
-      acc[programa] = (acc[programa] || 0) + 1;
-      return acc;
-    }, {});
-
-    // Processar contagens por programa (evadidas)
-    const programEvasaoCounts = programEvasaoData.reduce((acc: Record<string, number>, item) => {
-      const programa = item.programa;
-      acc[programa] = (acc[programa] || 0) + 1;
-      return acc;
-    }, {});
-
-    // Processar contagens por regional
-    const regionalCounts = regionalData.reduce((acc: Record<string, number>, item) => {
-      const regional = item.regional;
-      acc[regional] = (acc[regional] || 0) + 1;
-      return acc;
-    }, {});
 
     // Contagens específicas para ONGs Maras e Decolagem (ativas)
     const ongsMaras = programCounts['as_maras'] || 0;
@@ -232,52 +171,33 @@ router.get('/stats', async (req, res) => {
     const ongsDecolagemEvadidas = programEvasaoCounts['decolagem'] || 0;
     const ongsMicrocreditoEvadidas = programEvasaoCounts['microcredito'] || 0;
 
-    // Buscar dados de famílias embarcadas das atividades registradas
-    const { data: atividadesFamiliasData, error: atividadesError } = await s
+    // Otimização: buscar dados de atividades com uma única query usando agregação
+    const { data: atividadesData, error: atividadesError } = await s
       .from('regional_activities')
-      .select('quantidade')
-      .eq('atividade_label', 'Famílias Embarcadas Decolagem')
+      .select('atividade_label, quantidade')
+      .in('atividade_label', ['Famílias Embarcadas Decolagem', 'Diagnósticos Realizados', 'Ligas Maras Formadas'])
       .eq('status', 'ativo');
 
     let familiasEmbarcadas = 0;
-    if (!atividadesError && atividadesFamiliasData) {
-      // Somar todas as quantidades das atividades registradas
-      familiasEmbarcadas = atividadesFamiliasData.reduce((total, atividade) => {
-        const quantidade = parseInt(atividade.quantidade) || 0;
-        return total + quantidade;
-      }, 0);
-    }
-
-    // Buscar dados de diagnósticos realizados das atividades registradas
-    const { data: atividadesDiagnosticosData, error: diagnosticosError } = await s
-      .from('regional_activities')
-      .select('quantidade')
-      .eq('atividade_label', 'Diagnósticos Realizados')
-      .eq('status', 'ativo');
-
     let diagnosticosRealizados = 0;
-    if (!diagnosticosError && atividadesDiagnosticosData) {
-      // Somar todas as quantidades das atividades registradas
-      diagnosticosRealizados = atividadesDiagnosticosData.reduce((total, atividade) => {
-        const quantidade = parseInt(atividade.quantidade) || 0;
-        return total + quantidade;
-      }, 0);
-    }
-
-    // Buscar dados de Ligas Maras Formadas das atividades registradas
-    const { data: atividadesLigasMarasData, error: ligasMarasError } = await s
-      .from('regional_activities')
-      .select('quantidade')
-      .eq('atividade_label', 'Ligas Maras Formadas')
-      .eq('status', 'ativo');
-
     let ligasMarasFormadas = 0;
-    if (!ligasMarasError && atividadesLigasMarasData) {
-      // Somar todas as quantidades das atividades registradas
-      ligasMarasFormadas = atividadesLigasMarasData.reduce((total, atividade) => {
+
+    if (!atividadesError && atividadesData) {
+      for (const atividade of atividadesData) {
         const quantidade = parseInt(atividade.quantidade) || 0;
-        return total + quantidade;
-      }, 0);
+        
+        switch (atividade.atividade_label) {
+          case 'Famílias Embarcadas Decolagem':
+            familiasEmbarcadas += quantidade;
+            break;
+          case 'Diagnósticos Realizados':
+            diagnosticosRealizados += quantidade;
+            break;
+          case 'Ligas Maras Formadas':
+            ligasMarasFormadas += quantidade;
+            break;
+        }
+      }
     }
 
     const stats = {
@@ -412,7 +332,8 @@ router.post('/', requireRole('super_admin'), async (req, res) => {
       telefone: z.string().optional(),
       email: z.string().email().optional(),
       regional: z.string().optional(),
-      programa: z.string().optional(),
+      programa: z.string().optional(), // Manter para compatibilidade
+      programas: z.array(z.string()).optional(), // Nova propriedade para múltiplos programas
       observacoes: z.string().optional(),
       nome_lider: z.string().optional(),
       status: z.enum(['ativa', 'inativa', 'evadida']).optional(),
@@ -433,8 +354,15 @@ router.post('/', requireRole('super_admin'), async (req, res) => {
     const payload = {
       ...instituicaoData,
       status: instituicaoData.status || 'ativa',
-      documentos: instituicaoData.documentos || []
+      documentos: instituicaoData.documentos || [],
+      // Migrar programa único para array se programas não estiver presente
+      programas: instituicaoData.programas || (instituicaoData.programa ? [instituicaoData.programa] : [])
     };
+
+    // Remover o campo programa do payload se programas estiver presente
+    if (payload.programas && payload.programas.length > 0) {
+      delete payload.programa;
+    }
 
     const { data, error } = await s
       .from('instituicoes')
@@ -518,7 +446,8 @@ router.put('/:id', requireRole('super_admin'), async (req, res) => {
       telefone: z.string().optional(),
       email: z.string().email().optional(),
       regional: z.string().optional(),
-      programa: z.string().optional(),
+      programa: z.string().optional(), // Manter para compatibilidade
+      programas: z.array(z.string()).optional(), // Nova propriedade para múltiplos programas
       observacoes: z.string().optional(),
       nome_lider: z.string().optional(),
       status: z.enum(['ativa', 'inativa', 'evadida']).optional(),
@@ -547,9 +476,22 @@ router.put('/:id', requireRole('super_admin'), async (req, res) => {
       return res.status(404).json({ error: 'instituicao_not_found' });
     }
 
+    // Preparar dados para atualização
+    const updatePayload = { ...instituicaoData };
+    
+    // Migrar programa único para array se programas não estiver presente
+    if (updatePayload.programa && !updatePayload.programas) {
+      updatePayload.programas = [updatePayload.programa];
+    }
+    
+    // Remover o campo programa do payload se programas estiver presente
+    if (updatePayload.programas && updatePayload.programas.length > 0) {
+      delete updatePayload.programa;
+    }
+
     const { data, error } = await s
       .from('instituicoes')
-      .update(instituicaoData)
+      .update(updatePayload)
       .eq('id', instituicaoId)
       .select('*')
       .single();

@@ -5,7 +5,7 @@ const router = Router();
 
 router.get('/status', async (_req, res) => {
   const cfg = supabaseConfigStatus();
-  const tables = ['regionals', 'members', 'activities', 'goals', 'files'];
+  const tables = ['regionals', 'members', 'activities', 'goals', 'files', 'calendar_events'];
 
   if (!supabaseAdmin) {
     return res.status(200).json({ status: 'no_admin', cfg, tables });

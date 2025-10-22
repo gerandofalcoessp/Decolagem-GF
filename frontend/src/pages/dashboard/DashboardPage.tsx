@@ -12,7 +12,10 @@ import {
   User,
   Smile,
   AlertTriangle,
-  Rocket
+  Rocket,
+  UserCheck,
+  Crown,
+  Activity
 } from 'lucide-react';
 
 import { useAuth } from '@/store/authStore';
@@ -23,7 +26,7 @@ import ChartCard from '@/components/dashboard/ChartCard';
 
 
 import type { Atividade, Meta, User as UserType, Participante, Microcredito } from '@/types';
-import { supabase, isSupabaseConfigured } from '@/services/supabaseClient';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 // Função utilitária para calcular percentual
 const calcPercent = (total: number, meta: number) => {
@@ -42,53 +45,135 @@ export default function DashboardPage() {
   const { data: regionalActivities, loading: regionalActivitiesLoading, refetch: refetchRegionalActivities } = useRegionalActivities();
   const { data: instituicaoStats, loading: instituicaoStatsLoading } = useInstituicaoStats();
 
-  // Remover polling automático e refetches excessivos para melhor performance
-  // Manter apenas atualização em tempo real via Supabase
+  // Subscription em tempo real removida - usando versão com logs abaixo
+
+  // Subscription em tempo real para invalidar cache quando houver mudanças
   useEffect(() => {
-    if (!isSupabaseConfigured() || !supabase) return;
+    if (!isSupabaseConfigured() || !supabase) {
+      console.log('[DashboardPage] ⚠️ Supabase não configurado, subscriptions desabilitadas');
+      return;
+    }
+
+    console.log('[DashboardPage] 🔗 Configurando subscriptions em tempo real...');
+
     const channel = supabase
       .channel('dashboard_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'goals' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'goals' }, (payload) => {
+        console.log('[DashboardPage] 🔔 Mudança detectada na tabela goals:', {
+          eventType: payload.eventType,
+          timestamp: new Date().toISOString(),
+          record: payload.new || payload.old
+        });
         refetchGoals();
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'regional_activities' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'regional_activities' }, (payload) => {
+        console.log('[DashboardPage] 🔔 Mudança detectada na tabela regional_activities:', {
+          eventType: payload.eventType,
+          timestamp: new Date().toISOString(),
+          record: payload.new || payload.old
+        });
         refetchRegionalActivities();
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[DashboardPage] 📡 Status da subscription dashboard_changes:', status);
+      });
+    
     return () => {
+      console.log('[DashboardPage] 🔌 Removendo subscription dashboard_changes...');
       supabase.removeChannel(channel);
     };
   }, [refetchGoals, refetchRegionalActivities]);
 
   // Garantir que os dados são arrays válidos - MEMOIZADO para evitar recálculos
-  // Fix: API retorna { data: [...] }, então precisamos extrair o array corretamente
+  //Fix: API retorna { data: [...] }, então precisamos extrair o array corretamente
   const activitiesArray = useMemo(() => {
-    return Array.isArray(activities) 
+    const result = Array.isArray(activities) 
       ? activities as Atividade[] 
       : Array.isArray((activities as any)?.data) 
         ? (activities as any).data as Atividade[]
         : [];
+    
+    console.log('[DashboardPage] 📊 Activities processadas:', {
+      total: result.length,
+      timestamp: new Date().toISOString(),
+      rawType: typeof activities,
+      isArray: Array.isArray(activities),
+      hasDataProp: activities && typeof activities === 'object' && 'data' in activities,
+      sample: result.length > 0 ? result[0] : null
+    });
+    
+    return result;
   }, [activities]);
 
   const goalsArray = useMemo(() => {
-    return Array.isArray(goals) ? goals as Meta[] : [];
+    const result = Array.isArray(goals) ? goals as Meta[] : [];
+    
+    console.log('[DashboardPage] 🎯 Goals processadas:', {
+      total: result.length,
+      timestamp: new Date().toISOString(),
+      rawType: typeof goals,
+      isArray: Array.isArray(goals),
+      sample: result.length > 0 ? result[0] : null
+    });
+    
+    return result;
   }, [goals]);
 
   const membersArray = useMemo(() => {
     // users agora retorna dados diretamente da tabela usuarios
-    return Array.isArray(users) ? users as UserType[] : [];
+    const result = Array.isArray(users) ? users as UserType[] : [];
+    
+    console.log('[DashboardPage] 👥 Users processados:', {
+      total: result.length,
+      timestamp: new Date().toISOString(),
+      rawType: typeof users,
+      isArray: Array.isArray(users),
+      sample: result.length > 0 ? result[0] : null
+    });
+    
+    return result;
   }, [users]);
 
   const microcreditoArray = useMemo(() => {
-    return Array.isArray(microcreditoData) ? microcreditoData as Microcredito[] : [];
+    const result = Array.isArray(microcreditoData) ? microcreditoData as Microcredito[] : [];
+    
+    console.log('[DashboardPage] 💰 Microcredito processado:', {
+      total: result.length,
+      timestamp: new Date().toISOString(),
+      rawType: typeof microcreditoData,
+      isArray: Array.isArray(microcreditoData),
+      sample: result.length > 0 ? result[0] : null
+    });
+    
+    return result;
   }, [microcreditoData]);
 
   const asMarasArray = useMemo(() => {
-    return Array.isArray(asMarasData) ? asMarasData as Participante[] : [];
+    const result = Array.isArray(asMarasData) ? asMarasData as Participante[] : [];
+    
+    console.log('[DashboardPage] 🌟 As Maras processado:', {
+      total: result.length,
+      timestamp: new Date().toISOString(),
+      rawType: typeof asMarasData,
+      isArray: Array.isArray(asMarasData),
+      sample: result.length > 0 ? result[0] : null
+    });
+    
+    return result;
   }, [asMarasData]);
 
   const decolagemArray = useMemo(() => {
-    return Array.isArray(decolagemData) ? decolagemData as Participante[] : [];
+    const result = Array.isArray(decolagemData) ? decolagemData as Participante[] : [];
+    
+    console.log('[DashboardPage] 🚀 Decolagem processado:', {
+      total: result.length,
+      timestamp: new Date().toISOString(),
+      rawType: typeof decolagemData,
+      isArray: Array.isArray(decolagemData),
+      sample: result.length > 0 ? result[0] : null
+    });
+    
+    return result;
   }, [decolagemData]);
 
 
@@ -466,6 +551,22 @@ export default function DashboardPage() {
   const totalLeadsMeta = programStats.decolagem.familiasMeta;
   const leadsDoDiaMeta = sumGoalsByLabels(['Leads do dia', 'Leads do Dia', 'leads_do_dia']) || totalLeadsMeta;
 
+  // Cálculo para Processo Seletivo
+  const processoSeletivoRealizado = sumActivitiesByLabels(['Processo seletivo', 'seletivas', 'Processo Seletivo']);
+  const processoSeletivoMeta = sumGoalsByLabelsPreferNational(['Processo seletivo', 'seletivas', 'Processo Seletivo']) || 50;
+
+  // Cálculo para Conversão de Leads
+  const conversaoLeadsRealizado = sumActivitiesByLabels(['Conversão de Leads', 'conversao_leads', 'Conversao de Leads']);
+  const conversaoLeadsMeta = sumGoalsByLabelsPreferNational(['Conversão de Leads', 'conversao_leads', 'Conversao de Leads']) || 100;
+
+  // Cálculo para Imersão Maras
+  const imersaoMarasRealizado = sumActivitiesByLabels(['Imersão Maras', 'imersao', 'Imersao Maras']);
+  const imersaoMarasMeta = sumGoalsByLabelsPreferNational(['Imersão Maras', 'imersao', 'Imersao Maras']) || 50;
+
+  // Cálculo para Encontro Líder Maras
+  const encontroLiderMarasRealizado = sumActivitiesByLabels(['Encontro Líder Maras', 'encontro_lider_maras', 'Encontro Lider Maras']);
+  const encontroLiderMarasMeta = sumGoalsByLabelsPreferNational(['Encontro Líder Maras', 'encontro_lider_maras', 'Encontro Lider Maras']) || 30;
+
   // Cálculo de retenção usando dados do endpoint /api/instituicoes/stats
   const retencaoDecolagemPercentual = instituicaoStats?.porPrograma?.decolagem && instituicaoStats?.evasaoPorPrograma?.decolagem !== undefined
     ? Math.round(((instituicaoStats.porPrograma.decolagem / (instituicaoStats.porPrograma.decolagem + instituicaoStats.evasaoPorPrograma.decolagem)) * 100) || 0)
@@ -503,7 +604,6 @@ export default function DashboardPage() {
 
       {/* Stats Cards - Primeira linha */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-
         <StatsCard
           title="Famílias Embarcadas Decolagem"
           value={familiasEmbarcadasRealizado.toString()}
@@ -513,7 +613,6 @@ export default function DashboardPage() {
           goalValue={familiasEmbarcadasMeta}
           iconColor="decolagem"
         />
-        
         <StatsCard
           title="Diagnósticos Realizados"
           value={diagnosticosRealizadosRealizado.toString()}
@@ -523,7 +622,6 @@ export default function DashboardPage() {
           goalValue={diagnosticosRealizadosMeta}
           iconColor="decolagem"
         />
-
         <StatsCard
           title="ONGs Decolagem (Ativas)"
           value={ongsDecolagemRealizado.toString()}
@@ -533,7 +631,6 @@ export default function DashboardPage() {
           goalValue={ongsDecolagemMeta}
           iconColor="decolagem"
         />
-
         <StatsCard
           title="ONGs Maras (Ativas)"
           value={ongsMarasRealizado.toString()}
@@ -545,7 +642,7 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* Stats Cards - Segunda linha - Programa As Maras */}
+      {/* Stats Cards - Segunda linha */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatsCard
           title="Retenção Decolagem"
@@ -587,8 +684,26 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* Stats Cards - Terceira linha - Programa Decolagem */}
+      {/* Stats Cards - Terceira linha */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatsCard
+          title="Imersão Maras"
+          value={imersaoMarasRealizado.toString()}
+          icon={Crown}
+          trend={calcPercent(imersaoMarasRealizado, imersaoMarasMeta) >= 80 ? 'up' : 'down'}
+          color="secondary"
+          goalValue={imersaoMarasMeta}
+          iconColor="maras"
+        />
+        <StatsCard
+          title="Encontro Líder Maras"
+          value={encontroLiderMarasRealizado.toString()}
+          icon={Activity}
+          trend={calcPercent(encontroLiderMarasRealizado, encontroLiderMarasMeta) >= 80 ? 'up' : 'down'}
+          color="secondary"
+          goalValue={encontroLiderMarasMeta}
+          iconColor="maras"
+        />
         <StatsCard
           title="Total de Pessoas Atendidas"
           value={pessoasAtendidas.toString()}
@@ -605,12 +720,34 @@ export default function DashboardPage() {
           color="secondary"
           iconColor="green"
         />
+      </div>
+
+      {/* Stats Cards - Quarta linha */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatsCard
           title="Total de Leads"
           value={totalLeads.toString()}
           icon={User}
           trend={'neutral'}
           color="secondary"
+          iconColor="green"
+        />
+        <StatsCard
+          title="Conversão de Leads"
+          value={conversaoLeadsRealizado.toString()}
+          icon={Target}
+          trend={calcPercent(conversaoLeadsRealizado, conversaoLeadsMeta) >= 80 ? 'up' : 'down'}
+          color="secondary"
+          goalValue={conversaoLeadsMeta}
+          iconColor="green"
+        />
+        <StatsCard
+          title="Processo Seletivo"
+          value={processoSeletivoRealizado.toString()}
+          icon={UserCheck}
+          trend={calcPercent(processoSeletivoRealizado, processoSeletivoMeta) >= 80 ? 'up' : 'down'}
+          color="secondary"
+          goalValue={processoSeletivoMeta}
           iconColor="green"
         />
         <StatsCard
@@ -625,7 +762,7 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* Stats Cards - Quarta linha - Evasão */}
+      {/* Stats Cards - Quinta linha (3 cards) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <StatsCard
           title="Evasão Decolagem"

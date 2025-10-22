@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 // import { Input } from '@/components/ui/Input';
 // import { Select } from '@/components/ui/Select';
-import { ONGForm, Programa, Regional } from '@/types';
+import { ONGForm, Programa, ProgramaArray, Regional } from '@/types';
 import { Building2, Save } from 'lucide-react';
 import { useNotificationStore } from '@/store/notificationStore';
 import { InstituicaoService, CreateInstituicaoData, UpdateInstituicaoData } from '@/services/instituicaoService';
@@ -42,7 +42,8 @@ export default function OngCadastroPage() {
     telefone: '',
     email: '',
     regional: initialRegional,
-    programa: 'decolagem',
+    programas: [], // Nova propriedade para múltiplos programas
+    status: 'ativa', // Status padrão
     observacoes: '',
     nome_lider: '',
     documentos: []
@@ -58,20 +59,21 @@ export default function OngCadastroPage() {
         try {
           const instituicao = await InstituicaoService.getInstituicaoById(id);
           setForm({
-            nome: instituicao.nome,
-            cnpj: instituicao.cnpj,
-            endereco: instituicao.endereco,
-            cidade: instituicao.cidade,
-            estado: instituicao.estado,
-            cep: instituicao.cep,
-            telefone: instituicao.telefone,
-            email: instituicao.email,
-            regional: instituicao.regional,
-            programa: instituicao.programa,
-            observacoes: instituicao.observacoes || '',
-            nome_lider: instituicao.nome_lider,
-            documentos: instituicao.documentos || []
-          });
+          nome: instituicao.nome,
+          cnpj: instituicao.cnpj,
+          endereco: instituicao.endereco,
+          cidade: instituicao.cidade,
+          estado: instituicao.estado,
+          cep: instituicao.cep,
+          telefone: instituicao.telefone,
+          email: instituicao.email,
+          regional: instituicao.regional,
+          programas: instituicao.programas || (instituicao.programa ? [instituicao.programa] : []), // Migrar programa único para array
+          status: instituicao.status, // Incluir status na edição
+          observacoes: instituicao.observacoes || '',
+          nome_lider: instituicao.nome_lider,
+          documentos: instituicao.documentos || []
+        });
         } catch (error) {
           console.error('Erro ao carregar instituição:', error);
           showError('Erro ao carregar dados da instituição');
@@ -155,6 +157,11 @@ export default function OngCadastroPage() {
       newErrors.nome = 'Nome é obrigatório';
     }
     
+    // Validar programas obrigatório
+    if (!form.programas || form.programas.length === 0) {
+      newErrors.programas = 'Selecione pelo menos um programa';
+    }
+    
     // Validar outros campos
     const fields: Array<[('cnpj'|'cep'|'telefone'|'email'), string]> = [
       ['cnpj', form.cnpj || ''],
@@ -168,15 +175,15 @@ export default function OngCadastroPage() {
     return Object.values(newErrors).every(msg => !msg);
   };
 
-  const handleChange = (field: keyof ONGForm, value: string) => {
+  const handleChange = (field: keyof ONGForm, value: string | ProgramaArray) => {
     let newValue = value;
-    if (field === 'cnpj') newValue = formatCNPJ(value);
-    if (field === 'cep') newValue = formatCEP(value);
-    if (field === 'telefone') newValue = formatTelefone(value);
+    if (field === 'cnpj' && typeof value === 'string') newValue = formatCNPJ(value);
+    if (field === 'cep' && typeof value === 'string') newValue = formatCEP(value);
+    if (field === 'telefone' && typeof value === 'string') newValue = formatTelefone(value);
     setForm(prev => ({ ...prev, [field]: newValue }));
     
     // Validar campos específicos em tempo real
-    if (['cnpj','cep','telefone','email'].includes(field as string)) {
+    if (['cnpj','cep','telefone','email'].includes(field as string) && typeof newValue === 'string') {
       const msg = validateField(field as any, newValue);
       setErrors(prev => ({ ...prev, [field]: msg }));
     }
@@ -184,6 +191,11 @@ export default function OngCadastroPage() {
     // Limpar erro do nome quando o usuário começar a digitar
     if (field === 'nome' && errors.nome) {
       setErrors(prev => ({ ...prev, nome: '' }));
+    }
+    
+    // Limpar erro dos programas quando o usuário selecionar algum
+    if (field === 'programas' && Array.isArray(newValue) && newValue.length > 0 && errors.programas) {
+      setErrors(prev => ({ ...prev, programas: '' }));
     }
   };
 
@@ -212,7 +224,8 @@ export default function OngCadastroPage() {
           telefone: form.telefone,
           email: form.email,
           regional: form.regional,
-          programa: form.programa,
+          programas: form.programas, // Usar programas array
+          status: form.status, // Incluir status na atualização
           observacoes: form.observacoes,
           nome_lider: form.nome_lider,
           documentos: documentosNomes
@@ -232,7 +245,7 @@ export default function OngCadastroPage() {
           telefone: form.telefone,
           email: form.email,
           regional: form.regional,
-          programa: form.programa,
+          programas: form.programas, // Usar programas array
           observacoes: form.observacoes,
           nome_lider: form.nome_lider,
           documentos: documentosNomes,
@@ -407,20 +420,41 @@ export default function OngCadastroPage() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Programa</label>
-            <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" value={form.programa} onChange={e => handleChange('programa', e.target.value as Programa)}>
-              <option value="as_maras">As Maras</option>
-              <option value="microcredito">Microcrédito</option>
-              <option value="decolagem">Decolagem</option>
-            </select>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Programas</label>
+            <div className="space-y-2">
+              {(['as_maras', 'microcredito', 'decolagem'] as Programa[]).map((programa) => (
+                <label key={programa} className="flex items-center">
+                  <input
+                    type="checkbox"
+                    className="mr-2 h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                    checked={form.programas?.includes(programa) || false}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        handleChange('programas', [...(form.programas || []), programa]);
+                      } else {
+                        handleChange('programas', (form.programas || []).filter(p => p !== programa));
+                      }
+                    }}
+                  />
+                  <span className="text-sm text-gray-700">
+                    {programa === 'as_maras' ? 'As Maras' : 
+                     programa === 'microcredito' ? 'Microcrédito' : 
+                     'Decolagem'}
+                  </span>
+                </label>
+              ))}
+            </div>
+            {(form.programas?.length || 0) === 0 && (
+              <p className="text-xs text-red-600 mt-1">Selecione pelo menos um programa</p>
+            )}
           </div>
           {isEditing && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
               <select 
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" 
-                value={ongToEdit?.status || 'ativa'} 
-                onChange={e => setForm(prev => ({ ...prev, status: e.target.value as 'ativa' | 'inativa' | 'evadida' }))}
+                value={form.status || 'ativa'} 
+                onChange={e => handleChange('status', e.target.value as 'ativa' | 'inativa' | 'evadida')}
               >
                 <option value="ativa">Ativa</option>
                 <option value="inativa">Inativa</option>

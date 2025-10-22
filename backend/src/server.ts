@@ -40,6 +40,7 @@ const allowedDevOrigins = [
   'http://localhost:3002',
   'http://localhost:3003',
   'http://localhost:3005',
+  'http://localhost:3012',
   'http://localhost:5173',
   'http://localhost:8080',
   'http://localhost:8081',
@@ -80,10 +81,10 @@ const corsOptions = {
   origin: (origin: any, callback: any) => {
     if (!isProd) {
       const ok = !origin || allowedDevOrigins.includes(origin);
-      return callback(ok ? null : new Error('Not allowed by CORS'), ok);
+      return callback(null, ok);
     }
     const ok = allowPreviewFrontend(origin);
-    return callback(ok ? null : new Error('Not allowed by CORS'), ok);
+    return callback(null, ok);
   },
   credentials: true
 };

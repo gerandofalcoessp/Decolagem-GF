@@ -226,14 +226,62 @@ router.post('/', requireRole(['super_admin', 'equipe_interna', 'user']), upload.
     userId = user.id;
 
     // Buscar member_id do usuário
-    const { data: member, error: memberError } = await s
+    const { data: memberOriginal, error: memberError } = await s
       .from('members')
       .select('id')
       .eq('auth_user_id', user.id)
       .single();
-
+    
+    let member: any = memberOriginal;
     if (memberError || !member) {
-      return res.status(404).json({ error: 'member_not_found' });
+      // Fallback: tentar buscar/criar o member via supabaseAdmin
+      if (!supabaseAdmin) {
+        return res.status(404).json({ error: 'member_not_found' });
+      }
+    
+      // Verificar se já existe via admin (bypass RLS)
+      const { data: adminMember } = await supabaseAdmin
+        .from('members')
+        .select('id')
+        .eq('auth_user_id', user.id)
+        .single();
+    
+      if (adminMember) {
+        member = adminMember;
+      } else {
+        // Coletar dados do usuário para criar o member
+        let nome = (user.user_metadata as any)?.nome || null;
+        let email = user.email || null;
+        let regional = (user.user_metadata as any)?.regional || null;
+    
+        if (!nome || !regional) {
+          // Tentar obter da tabela usuarios
+          const { data: usuario } = await supabaseAdmin
+            .from('usuarios')
+            .select('nome, email, regional')
+            .eq('id', user.id)
+            .single();
+          nome = nome || usuario?.nome || (email ? email.split('@')[0] : 'Usuário');
+          email = email || usuario?.email || user.email;
+          regional = regional || usuario?.regional || null;
+        }
+    
+        const { data: created, error: createErr } = await supabaseAdmin
+          .from('members')
+          .insert({
+            auth_user_id: user.id,
+            name: nome,
+            email,
+            regional,
+          })
+          .select('id')
+          .single();
+    
+        if (createErr || !created) {
+          return res.status(500).json({ error: 'member_creation_failed' });
+        }
+        member = created;
+      }
     }
     memberId = member.id;
 
@@ -245,7 +293,7 @@ router.post('/', requireRole(['super_admin', 'equipe_interna', 'user']), upload.
       activity_date: z.string().min(1),
       regional: z.string().min(1),
       status: z.string().optional(),
-      responsavel_id: z.string().uuid().optional().nullable(),
+      responsavel_id: z.union([z.string().uuid(), z.string().length(0)]).optional().nullable(),
       programa: z.string().optional(),
       estados: z.union([z.array(z.string()), z.string()]).optional(),
       instituicaoId: z.union([z.string().uuid(), z.string().length(0)]).optional().nullable(),
@@ -298,7 +346,7 @@ router.post('/', requireRole(['super_admin', 'equipe_interna', 'user']), upload.
           const randomSuffix = Math.random().toString(36).substring(2, 8);
           const ext = file.originalname.split('.').pop();
           const filename = `${timestamp}_${randomSuffix}.${ext}`;
-          const storagePath = `regional-activities/${member.id}/${filename}`;
+          const storagePath = `regional-activities/${memberId}/${filename}`;
 
           // Upload para o Supabase Storage
           const { data: uploadData, error: uploadError } = await s.storage
@@ -341,7 +389,7 @@ router.post('/', requireRole(['super_admin', 'equipe_interna', 'user']), upload.
       activity_date,
       regional,
       // Campos adicionais e normalizados
-      member_id: member.id,
+      member_id: memberId,
       evidences: evidences,
       programa: programa || null,
       estados: JSON.stringify(estadosArray || []),
@@ -372,7 +420,7 @@ router.post('/', requireRole(['super_admin', 'equipe_interna', 'user']), upload.
         userId: user.id,
         resource: 'regional_activities',
         context: {
-          memberId: member.id,
+          memberId: memberId,
           payloadSummary: { ...payload, evidences: evidences.length }
         }
       });
@@ -385,7 +433,7 @@ router.post('/', requireRole(['super_admin', 'equipe_interna', 'user']), upload.
       resource: 'regional_activities',
       context: {
         activityId: data.id,
-        memberId: member.id,
+        memberId: memberId,
         programa: payload.programa,
         regional: payload.regional,
         evidencesCount: evidences.length
@@ -507,6 +555,114 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// GET - Buscar atividade regional por ID com arquivos (para edição)
+router.get('/:id/with-files', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
+    const supabase = getSupabaseForToken(token);
+    
+    if (!supabase) {
+      return res.status(500).json({ error: 'supabase_client_unavailable' });
+    }
+
+    const user = await getUserFromToken(token);
+    if (!user) {
+      return res.status(401).json({ error: 'unauthorized', details: 'token_missing' });
+    }
+
+    const id = req.params.id;
+
+    // Buscar a atividade específica
+    const { data: activity, error } = await supabaseAdmin
+      .from('regional_activities')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error || !activity) {
+      console.error('Erro ao buscar atividade:', error);
+      return res.status(404).json({ error: 'activity_not_found' });
+    }
+
+    // Buscar dados do responsável se existir
+    let responsavel = null;
+    if (activity.responsavel_id) {
+      const { data: responsavelData } = await supabaseAdmin
+        .from('usuarios')
+        .select('id, nome')
+        .eq('id', activity.responsavel_id)
+        .single();
+      
+      if (responsavelData) {
+        responsavel = { id: responsavelData.id, nome: responsavelData.nome };
+      }
+    }
+
+    // Buscar dados da instituição se existir
+    let instituicao = null;
+    if (activity.instituicao_id) {
+      const { data: instituicaoData } = await supabaseAdmin
+        .from('instituicoes')
+        .select('id, nome')
+        .eq('id', activity.instituicao_id)
+        .single();
+      
+      if (instituicaoData) {
+        instituicao = { id: instituicaoData.id, nome: instituicaoData.nome };
+      }
+    }
+
+    // Buscar arquivos/evidências da atividade
+    const { data: files, error: filesError } = await supabaseAdmin
+      .from('regional_activity_files')
+      .select('*')
+      .eq('activity_id', id);
+
+    if (filesError) {
+      console.warn('Erro ao buscar arquivos da atividade:', filesError);
+    }
+
+    // Mapear os dados para o formato esperado pelo frontend
+    const mappedActivity = {
+      id: activity.id,
+      titulo: activity.title,
+      descricao: activity.description,
+      data_inicio: activity.activity_date,
+      tipo: activity.type,
+      regional: activity.regional,
+      programa: activity.programa,
+      estados: (() => {
+        // Parse do campo JSONB estados que pode vir como string
+        if (!activity.estados) return [];
+        if (Array.isArray(activity.estados)) return activity.estados;
+        if (typeof activity.estados === 'string') {
+          try {
+            return JSON.parse(activity.estados);
+          } catch {
+            return [];
+          }
+        }
+        return [];
+      })(),
+      responsavel_id: activity.responsavel_id,
+      responsavel: responsavel,
+      instituicao_id: activity.instituicao_id,
+      instituicao: instituicao,
+      quantidade: activity.quantidade,
+      status: activity.status || 'ativo',
+      evidencias: activity.evidences || [],
+      files: files || [],
+      created_at: activity.created_at
+    };
+
+    res.json(mappedActivity);
+  } catch (err) {
+    console.error('Erro interno:', err);
+    res.status(500).json({ error: 'internal_server_error' });
+  }
+});
+
 // PUT - Atualizar atividade regional com arquivos
 router.put('/:id/with-files', requireRole(['super_admin', 'equipe_interna', 'user']), upload.array('evidencias', 10), invalidateCacheMiddleware(['regional-activities']), async (req, res) => {
   try {
@@ -525,8 +681,8 @@ router.put('/:id/with-files', requireRole(['super_admin', 'equipe_interna', 'use
     // Validar payload básico com Zod (aceitando strings para arrays JSON)
     const updateWithFilesSchema = z.object({
       responsavel_id: z.string().uuid().optional().nullable(),
-      instituicaoId: z.string().uuid().optional().nullable(),
-      instituicao_id: z.string().uuid().optional().nullable(),
+      instituicaoId: z.union([z.string().uuid(), z.string().length(0)]).optional().nullable(),
+      instituicao_id: z.union([z.string().uuid(), z.string().length(0)]).optional().nullable(),
       quantidade: z.coerce.number().int().nonnegative().optional(),
       estados: z.union([z.array(z.string()), z.string()]).optional(),
       evidencias: z.union([z.array(z.any()), z.string()]).optional(),
@@ -635,9 +791,21 @@ router.put('/:id/with-files', requireRole(['super_admin', 'equipe_interna', 'use
     
     // Mapear instituicao_id (pode vir como instituicaoId)
     if (body.instituicao_id !== undefined) {
-      payload.instituicao_id = body.instituicao_id;
+      const val = body.instituicao_id as string | null;
+      if (!val || val === '') {
+        payload.instituicao_id = null;
+      } else {
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        payload.instituicao_id = uuidRegex.test(val) ? val : null;
+      }
     } else if (body.instituicaoId !== undefined) {
-      payload.instituicao_id = body.instituicaoId;
+      const val = body.instituicaoId as string | null;
+      if (!val || val === '') {
+        payload.instituicao_id = null;
+      } else {
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        payload.instituicao_id = uuidRegex.test(val) ? val : null;
+      }
     }
     
     // Mapear estados (garantir que seja array)
@@ -738,9 +906,21 @@ router.put('/:id', requireRole(['super_admin', 'equipe_interna', 'user']), inval
     
     // Mapear instituicao_id (pode vir como instituicaoId)
     if (body.instituicao_id !== undefined) {
-      payload.instituicao_id = body.instituicao_id;
+      const val = body.instituicao_id as string | null;
+      if (!val || val === '') {
+        payload.instituicao_id = null;
+      } else {
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        payload.instituicao_id = uuidRegex.test(val) ? val : null;
+      }
     } else if (body.instituicaoId !== undefined) {
-      payload.instituicao_id = body.instituicaoId;
+      const val = body.instituicaoId as string | null;
+      if (!val || val === '') {
+        payload.instituicao_id = null;
+      } else {
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        payload.instituicao_id = uuidRegex.test(val) ? val : null;
+      }
     }
     
     // Mapear estados (garantir que seja array)

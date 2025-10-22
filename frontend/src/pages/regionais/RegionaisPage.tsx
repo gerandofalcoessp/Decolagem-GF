@@ -310,8 +310,9 @@ export default function RegionaisPage() {
       const result = await response.json();
       console.log('Atividade regional salva com sucesso:', result);
       
-      // Invalidar cache das atividades regionais para atualizar a lista
+      // Invalidar cache das atividades regionais para atualizar a lista instantaneamente
       queryClient.invalidateQueries({ queryKey: ['regional-activities'] });
+      queryClient.refetchQueries({ queryKey: ['regional-activities'] });
       
       // Fechar o modal após salvar
       setShowRegistrarModal(false);

@@ -25,53 +25,28 @@ router.get('/', async (req, res) => {
     // Super admin vê todas as metas
     query = query;
   } else {
-    // Usuários normais veem suas próprias metas + metas criadas por super admins + metas da sua regional/área
-    // Primeiro, buscar todos os members que são super admins
-    const { data: superAdminMembers, error: superAdminError } = await s
-      .from('members')
-      .select('id, auth_user_id')
-      .not('auth_user_id', 'is', null);
-    
-    if (superAdminError) {
-      return res.status(500).json({ error: 'failed_to_fetch_super_admins' });
-    }
-    
-    // Verificar quais members são super admins consultando auth.users
-    const superAdminMemberIds = [];
-    for (const member of superAdminMembers) {
-      try {
-        const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(member.auth_user_id);
-        if (!userError && userData.user?.user_metadata?.role === 'super_admin') {
-          superAdminMemberIds.push(member.id);
-        }
-      } catch (error) {
-        // Ignorar erros individuais de usuários
-        console.warn(`Erro ao verificar usuário ${member.auth_user_id}:`, error);
-      }
-    }
-    
+    // Otimização: buscar metas diretamente com filtros mais eficientes
     // Construir filtros para metas
     const filters = [];
     
     // 1. Metas próprias do usuário
     filters.push(`member_id.eq.${me.id}`);
     
-    // 2. Metas criadas por super admins que são relevantes para o usuário
-    if (superAdminMemberIds.length > 0) {
-      // Se o usuário tem regional ou área, filtrar metas de super admins por essas informações
-      if (me.regional || me.area) {
-        // Metas de super admins que contenham "Rio" na descrição (simplificado)
-        if (me.regional && me.regional.includes('Rio')) {
-          filters.push(`and(member_id.in.(${superAdminMemberIds.join(',')}),descricao.ilike.*Rio*)`);
-        }
-        
-        // Metas de super admins que contenham a área na descrição (se diferente da regional)
-        if (me.area && me.area !== me.regional) {
-          filters.push(`and(member_id.in.(${superAdminMemberIds.join(',')}),descricao.ilike.*${me.area}*)`);
-        }
-      } else {
-        // Se não tem regional/área, mostrar todas as metas de super admins
-        filters.push(`member_id.in.(${superAdminMemberIds.join(',')})`);
+    // 2. Para metas de super admins, usar uma abordagem mais simples
+    // Buscar metas que contenham informações relevantes na descrição
+    if (me.regional) {
+      // Extrair palavras-chave da regional para busca
+      const regionalKeywords = me.regional.split(/[\s\-\.]+/).filter(word => word.length > 2);
+      for (const keyword of regionalKeywords) {
+        filters.push(`descricao.ilike.*${keyword}*`);
+      }
+    }
+    
+    if (me.area && me.area !== me.regional) {
+      // Extrair palavras-chave da área para busca
+      const areaKeywords = me.area.split(/[\s\-\.]+/).filter(word => word.length > 2);
+      for (const keyword of areaKeywords) {
+        filters.push(`descricao.ilike.*${keyword}*`);
       }
     }
     
