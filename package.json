@@ -43,7 +43,7 @@
     "clean": "npm run clean:backend && npm run clean:frontend",
     "clean:backend": "cd backend && npm run clean",
     "clean:frontend": "cd frontend && npm run clean",
-    "vercel-build": "npm --prefix backend install --legacy-peer-deps && npm --prefix backend run vercel-build && npm --prefix frontend install --legacy-peer-deps && npm --prefix frontend run build && if exist index.html del index.html && if exist assets rmdir /s /q assets && xcopy frontend\\dist\\* . /s /e /y && if exist api\\_backend_dist rmdir /s /q api\\_backend_dist && mkdir api\\_backend_dist && xcopy backend\\dist\\* api\\_backend_dist\\ /s /e /y && copy backend\\dist\\server.js api\\server.js && copy backend\\dist\\server.js api\\server.mjs"
+    "vercel-build": "npm --prefix backend install --legacy-peer-deps && npm --prefix backend run vercel-build && npm --prefix frontend install --legacy-peer-deps && npm --prefix frontend run build && rm -f index.html && rm -rf assets && cp -r frontend/dist/* . && rm -rf api/_backend_dist && mkdir -p api/_backend_dist && cp -r backend/dist/* api/_backend_dist/ && cp backend/dist/server.js api/server.js && cp backend/dist/server.js api/server.mjs"
   },
   "keywords": [
     "crm",
