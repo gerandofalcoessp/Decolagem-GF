@@ -1,0 +1,27 @@
+import { Router } from 'express';
+import { supabaseAdmin, supabaseConfigStatus } from '../services/supabaseClient.js';
+const router = Router();
+router.get('/status', async (_req, res) => {
+    const cfg = supabaseConfigStatus();
+    const tables = ['regionals', 'members', 'activities', 'goals', 'files', 'calendar_events'];
+    if (!supabaseAdmin) {
+        return res.status(200).json({ status: 'no_admin', cfg, tables });
+    }
+    const checks = {};
+    for (const t of tables) {
+        try {
+            const { data, error } = await supabaseAdmin.from(t).select('id').limit(1);
+            if (error) {
+                checks[t] = { ok: false, error: error.message };
+            }
+            else {
+                checks[t] = { ok: true };
+            }
+        }
+        catch (e) {
+            checks[t] = { ok: false, error: e?.message ?? 'unknown_error' };
+        }
+    }
+    res.json({ status: 'ok', cfg, checks });
+});
+export default router;
