@@ -50,7 +50,9 @@ export default defineConfig({
       },
     },
     rollupOptions: {
-      input: path.resolve(__dirname, 'index.html'), // Especificar explicitamente o input
+      input: {
+        main: path.resolve(__dirname, 'index.html')
+      },
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom'],
