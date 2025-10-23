@@ -4,7 +4,8 @@ node_modules/
 
 # Source files (keep only built files)
 backend/src/
-frontend/src/
+# frontend/src/             # no longer ignored
+!frontend/src/**
 
 # Development files
 *.log
