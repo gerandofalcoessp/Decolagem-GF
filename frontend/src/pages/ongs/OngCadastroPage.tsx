@@ -152,17 +152,7 @@ export default function OngCadastroPage() {
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
     
-    // Validar campo nome obrigatório
-    if (!form.nome || form.nome.trim() === '') {
-      newErrors.nome = 'Nome é obrigatório';
-    }
-    
-    // Validar programas obrigatório
-    if (!form.programas || form.programas.length === 0) {
-      newErrors.programas = 'Selecione pelo menos um programa';
-    }
-    
-    // Validar outros campos
+    // Todos os campos são opcionais; apenas validar formato quando houver valor
     const fields: Array<[('cnpj'|'cep'|'telefone'|'email'), string]> = [
       ['cnpj', form.cnpj || ''],
       ['cep', form.cep || ''],
@@ -225,13 +215,22 @@ export default function OngCadastroPage() {
           email: form.email,
           regional: form.regional,
           programas: form.programas, // Usar programas array
-          status: form.status, // Incluir status na atualização
+          status: (form.status as any)?.toLowerCase() as 'ativa' | 'inativa' | 'evadida', // Normalizar para os valores esperados pelo backend
           observacoes: form.observacoes,
           nome_lider: form.nome_lider,
           documentos: documentosNomes
         };
+
+        // Remover campos opcionais com string vazia para evitar falha de validação no backend (e.g., email vazio)
+        const sanitizedUpdateData = Object.fromEntries(
+          Object.entries(updateData).filter(([_, v]) => {
+            if (v === undefined || v === null) return false;
+            if (typeof v === 'string') return v.trim() !== '';
+            return true;
+          })
+        ) as UpdateInstituicaoData;
         
-        await InstituicaoService.updateInstituicao(id, updateData);
+        await InstituicaoService.updateInstituicao(id, sanitizedUpdateData);
         showSuccess('Instituição atualizada com sucesso!');
       } else {
         // Criar nova instituição
@@ -443,9 +442,11 @@ export default function OngCadastroPage() {
                   </span>
                 </label>
               ))}
+              {/* Removido: mensagem de obrigatoriedade dos programas */}
             </div>
             {(form.programas?.length || 0) === 0 && (
-              <p className="text-xs text-red-600 mt-1">Selecione pelo menos um programa</p>
+            -               <p className="text-xs text-red-600 mt-1">Selecione pelo menos um programa</p>
+            +               null
             )}
           </div>
           {isEditing && (
