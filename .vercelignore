@@ -1,71 +1,7 @@
-# Dependencies
-node_modules/
-*/node_modules/
-
-# Source files (keep only built files)
-# backend/src/  # REMOVIDO: necessário para compilar no Vercel
-# frontend/src/  # REMOVIDO: necessário para compilar no Vercel
-!backend/src/
-!frontend/src/
-
-# Development files
-*.log
-*.env.local
-*.env.development
-*.env.test
-
-# Build artifacts that aren't needed
-backend/build/
-frontend/build/
-
-# Testing
-coverage/
-*.test.js
-*.spec.js
-**/tests/
-**/test/
-
-# IDE files
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# Temporary files
-*.tmp
-*.temp
-
-# Documentation
-*.md
-!README.md
-
-# Scripts and utilities
+# Ignore backend and root dev files during Vercel deployment
+backend/
 scripts/
-debug-*.js
-debug-*.html
-test-*.js
-
-# Database files
-*.sql
-*.db
-*.sqlite
-
-# Docker
-Dockerfile
-docker-compose.yml
-
-# Git
-.git/
-.husky/
-
-# Keep essential files for deployment
-!api/
-!dist/
-!backend/dist/
-!frontend/dist/
-!*.json
-!*.mjs
+**/*.test.*
+**/__tests__/**
+README-SETUP.md
+README.md
