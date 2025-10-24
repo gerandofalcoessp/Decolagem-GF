@@ -35,6 +35,7 @@ export const ATIVIDADE_OPTIONS: { value: TipoAtividade; label: string }[] = [
   { value: 'diagnosticos_realizados', label: 'Diagnósticos Realizados' },
   { value: 'leads_do_dia', label: 'Leads do Dia' },
   { value: 'conversao_leads', label: 'Conversão de Leads' },
+  { value: 'leads_maras', label: 'Leads Maras' },
   // Opção de customização
   { value: 'outros', label: 'OUTRA' },
 ];
@@ -58,6 +59,7 @@ export const TYPE_COLOR_CLASSES: Record<TipoAtividade, string> = {
   diagnosticos_realizados: 'bg-orange-600',
   leads_do_dia: 'bg-cyan-600',
   conversao_leads: 'bg-lime-600',
+  leads_maras: 'bg-rose-600',
 };
 
 export const REGIONAL_COLOR_CLASSES: Record<string, string> = {

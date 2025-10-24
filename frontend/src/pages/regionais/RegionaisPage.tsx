@@ -25,7 +25,7 @@ interface Regional {
   id: string;
   name: string;
   states: string[];
-  leader: {
+  leader?: {
     name: string;
     role: string;
   };
@@ -34,6 +34,10 @@ interface Regional {
     role: string;
   };
   consultants: Array<{
+    name: string;
+    role: string;
+  }>;
+  allMembers?: Array<{
     name: string;
     role: string;
   }>;
@@ -401,6 +405,11 @@ export default function RegionaisPage() {
         name: c.nome,
         role: c.funcao
       })),
+      // Para o card Nacional, incluir todos os coordenadores como membros adicionais
+      allMembers: data.regional === 'Nacional' ? data.coordenadores.map(c => ({
+        name: c.nome,
+        role: c.funcao
+      })) : undefined,
       totalMembers: data.totalMembros,
       color: regionalColors[data.regional] || 'bg-slate-50 border-slate-200'
     };
@@ -514,29 +523,48 @@ export default function RegionaisPage() {
                 </div>
               )}
 
-              {regional.coordinator && (
-                <div className="flex items-center">
-                  <Shield className="h-4 w-4 text-blue-500 mr-2" />
-                  <span className="text-sm">
-                    <span className="font-medium">Coordenador:</span> {regional.coordinator.name}
-                  </span>
-                </div>
-              )}
-
-              {regional.consultants && regional.consultants.length > 0 && (
+              {/* Para o card Nacional, mostrar todos os membros */}
+              {regional.name === 'Nacional' && regional.allMembers && regional.allMembers.length > 0 ? (
                 <div className="flex items-start">
-                  <UserCheck className="h-4 w-4 text-green-500 mr-2 mt-0.5" />
+                  <Shield className="h-4 w-4 text-blue-500 mr-2 mt-0.5" />
                   <div className="text-sm">
-                    <span className="font-medium">Consultores:</span>
+                    <span className="font-medium">Membros:</span>
                     <div className="mt-1">
-                      {regional.consultants.map((consultant, index) => (
+                      {regional.allMembers.map((member, index) => (
                         <span key={index} className="block text-gray-600">
-                          • {consultant.name}
+                          • {member.name}
                         </span>
                       ))}
                     </div>
                   </div>
                 </div>
+              ) : (
+                <>
+                  {regional.coordinator && (
+                    <div className="flex items-center">
+                      <Shield className="h-4 w-4 text-blue-500 mr-2" />
+                      <span className="text-sm">
+                        <span className="font-medium">Coordenador:</span> {regional.coordinator.name}
+                      </span>
+                    </div>
+                  )}
+
+                  {regional.consultants && regional.consultants.length > 0 && (
+                    <div className="flex items-start">
+                      <UserCheck className="h-4 w-4 text-green-500 mr-2 mt-0.5" />
+                      <div className="text-sm">
+                        <span className="font-medium">Consultores:</span>
+                        <div className="mt-1">
+                          {regional.consultants.map((consultant, index) => (
+                            <span key={index} className="block text-gray-600">
+                              • {consultant.name}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 

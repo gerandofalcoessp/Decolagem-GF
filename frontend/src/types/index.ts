@@ -52,7 +52,8 @@ export type TipoAtividade =
   | 'familias_embarcadas_decolagem'
   | 'diagnosticos_realizados'
   | 'leads_do_dia'
-  | 'conversao_leads';
+  | 'conversao_leads'
+  | 'leads_maras';
 
 // Interface para ONG
 export interface ONG {

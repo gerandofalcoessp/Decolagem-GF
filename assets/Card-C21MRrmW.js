@@ -1,0 +1,1 @@
+import{j as r}from"./ui-C_BmRRy8.js";import{o as s}from"./index-_MdAt-zn.js";function e({children:e,className:o}){return r.jsx("div",{className:s("bg-white rounded-lg shadow-sm border border-gray-200",o),children:e})}export{e as C};

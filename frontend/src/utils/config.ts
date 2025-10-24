@@ -2,23 +2,13 @@
 const envUrl = (import.meta.env.VITE_API_URL ?? '').trim();
 const isProd = import.meta.env.PROD;
 
-function deriveBackendBaseFromOrigin(origin: string): string {
-  try {
-    const url = new URL(origin);
-    // Regra: trocar "frontend" por "backend" no hostname
-    const backendHost = url.hostname.replace('frontend', 'backend');
-    return `${url.protocol}//${backendHost}`;
-  } catch {
-    return origin;
-  }
-}
-
+// Em produção, o frontend deve chamar a API no mesmo domínio (Vercel Functions /api)
+// Removemos a derivação automática que trocava "frontend" por "backend"
+// para evitar CORS/404 quando o backend está deployado como função dentro do mesmo projeto.
 let base = envUrl;
 if (!base) {
   if (isProd) {
-    // Em produção, se não houver VITE_API_URL, derivar o domínio do backend a partir do domínio do frontend
-    const derived = deriveBackendBaseFromOrigin(window.location.origin);
-    base = derived || window.location.origin;
+    base = window.location.origin; // mesmo domínio do Vercel
   } else {
     // Em desenvolvimento, usar URL direta do backend para evitar problemas de proxy
     base = 'http://localhost:4000';

@@ -541,12 +541,38 @@ export default function DashboardPage() {
     return isNaN(numQ) ? 0 : numQ;
   }, [activitiesArray, doesActivityMatch]);
 
-  // Implementação correta para Total de Leads - somar todos os leads da API regional-activities
+  // Implementação para Leads Maras - buscar dados da tabela regional_activities
+  const getLeadsMarasRealizado = useCallback(() => {
+    if (!regionalActivities || !Array.isArray(regionalActivities)) {
+      return 0;
+    }
+
+    // Filtrar atividades que são do tipo "leads_maras"
+    const leadsMarasActivities = regionalActivities.filter(activity => {
+      const tipo = (activity.tipo || '').toLowerCase();
+      return tipo === 'leads_maras' || tipo === 'leads maras';
+    });
+
+    if (leadsMarasActivities.length === 0) {
+      return 0;
+    }
+
+    // Somar todas as quantidades de leads maras
+    const totalLeadsMaras = leadsMarasActivities.reduce((sum, activity) => {
+      const quantidade = parseFloat(activity.quantidade) || 0;
+      return sum + quantidade;
+    }, 0);
+
+    return totalLeadsMaras;
+  }, [regionalActivities]);
+
+  // Implementação correta para Total de Leads - somar apenas Leads do dia (não incluir Leads Maras)
   const getTotalLeadsRealizado = useCallback(() => {
-    return sumActivitiesByLabels(['Leads do dia', 'Leads do Dia', 'leads_do_dia', 'leads', 'Leads']);
+    return sumActivitiesByLabels(['Leads do dia', 'Leads do Dia', 'leads_do_dia']);
   }, [sumActivitiesByLabels]);
 
   const leadsDoDiaRealizado = getLeadsDoDiaRealizado();
+  const leadsMarasRealizado = getLeadsMarasRealizado();
   const totalLeads = getTotalLeadsRealizado();
   const totalLeadsMeta = programStats.decolagem.familiasMeta;
   const leadsDoDiaMeta = sumGoalsByLabels(['Leads do dia', 'Leads do Dia', 'leads_do_dia']) || totalLeadsMeta;
@@ -602,64 +628,52 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Stats Cards - Primeira linha */}
+      {/* Stats Cards - Linha 1: Leads do dia, Leads Maras, Total de Leads e Conversão de Leads */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatsCard
-          title="Famílias Embarcadas Decolagem"
-          value={familiasEmbarcadasRealizado.toString()}
-          icon={Users}
-          trend={calcPercent(familiasEmbarcadasRealizado, familiasEmbarcadasMeta) >= 80 ? 'up' : 'down'}
+          title="Leads do dia"
+          value={`${leadsDoDiaRealizado}`}
+          icon={TrendingUp}
+          trend={leadsDoDiaRealizado > 0 ? 'up' : 'down'}
           color="secondary"
-          goalValue={familiasEmbarcadasMeta}
-          iconColor="decolagem"
+          iconColor="maras"
         />
         <StatsCard
-          title="Diagnósticos Realizados"
-          value={diagnosticosRealizadosRealizado.toString()}
-          icon={Rocket}
-          trend={calcPercent(diagnosticosRealizadosRealizado, diagnosticosRealizadosMeta) >= 80 ? 'up' : 'down'}
+          title="Total de Leads"
+          value={totalLeads.toString()}
+          icon={User}
+          trend={'neutral'}
           color="secondary"
-          goalValue={diagnosticosRealizadosMeta}
-          iconColor="decolagem"
+          iconColor="maras"
         />
         <StatsCard
-          title="ONGs Decolagem (Ativas)"
-          value={ongsDecolagemRealizado.toString()}
-          icon={Home}
-          trend={calcPercent(ongsDecolagemRealizado, ongsDecolagemMeta) >= 80 ? 'up' : 'down'}
+          title="Leads Maras"
+          value={`${leadsMarasRealizado}`}
+          icon={TrendingUp}
+          trend={leadsMarasRealizado > 0 ? 'up' : 'down'}
           color="secondary"
-          goalValue={ongsDecolagemMeta}
-          iconColor="decolagem"
+          iconColor="maras"
         />
         <StatsCard
-          title="ONGs Maras (Ativas)"
-          value={ongsMarasRealizado.toString()}
-          icon={Building2}
-          trend={calcPercent(ongsMarasRealizado, ongsMarasMeta) >= 80 ? 'up' : 'down'}
+          title="Conversão de Leads"
+          value={conversaoLeadsRealizado.toString()}
+          icon={Target}
+          trend={calcPercent(conversaoLeadsRealizado, conversaoLeadsMeta) >= 80 ? 'up' : 'down'}
           color="secondary"
-          goalValue={ongsMarasMeta}
+          goalValue={conversaoLeadsMeta}
           iconColor="maras"
         />
       </div>
 
-      {/* Stats Cards - Segunda linha */}
+      {/* Stats Cards - Linha 2: Processo Seletivo, Ligas Maras Formadas, Total Maras e ONGs Maras (Ativas) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatsCard
-          title="Retenção Decolagem"
-          value={`${retencaoDecolagemPercentual}%`}
-          icon={Percent}
-          trend={retencaoDecolagemPercentual >= retencaoDecolagemMetaPercentual ? 'up' : 'down'}
+          title="Processo Seletivo"
+          value={processoSeletivoRealizado.toString()}
+          icon={UserCheck}
+          trend={calcPercent(processoSeletivoRealizado, processoSeletivoMeta) >= 80 ? 'up' : 'down'}
           color="secondary"
-          goalValue={retencaoDecolagemMetaPercentual}
-          iconColor="decolagem"
-        />
-        <StatsCard
-          title="Retenção Maras"
-          value={`${retencaoMarasPercentual}%`}
-          icon={Percent}
-          trend={retencaoMarasPercentual >= retencaoMarasMetaPercentual ? 'up' : 'down'}
-          color="secondary"
-          goalValue={retencaoMarasMetaPercentual}
+          goalValue={processoSeletivoMeta}
           iconColor="maras"
         />
         <StatsCard
@@ -682,9 +696,18 @@ export default function DashboardPage() {
           hideMetaPercentage={true}
           iconColor="maras"
         />
+        <StatsCard
+          title="ONGs Maras (Ativas)"
+          value={ongsMarasRealizado.toString()}
+          icon={Building2}
+          trend={calcPercent(ongsMarasRealizado, ongsMarasMeta) >= 80 ? 'up' : 'down'}
+          color="secondary"
+          goalValue={ongsMarasMeta}
+          iconColor="maras"
+        />
       </div>
 
-      {/* Stats Cards - Terceira linha */}
+      {/* Stats Cards - Linha 3: Imersão Maras, Encontro Líder Maras, Evasão Maras e Retenção Maras */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatsCard
           title="Imersão Maras"
@@ -705,50 +728,90 @@ export default function DashboardPage() {
           iconColor="maras"
         />
         <StatsCard
+          title="Evasão Maras"
+          value={(instituicaoStats?.evasaoPorPrograma?.as_maras || 0).toString()}
+          icon={AlertTriangle}
+          trend="down"
+          color="error"
+          iconColor="maras"
+        />
+        <StatsCard
+          title="Retenção Maras"
+          value={`${retencaoMarasPercentual}%`}
+          icon={Percent}
+          trend={retencaoMarasPercentual >= retencaoMarasMetaPercentual ? 'up' : 'down'}
+          color="secondary"
+          goalValue={retencaoMarasMetaPercentual}
+          iconColor="maras"
+        />
+      </div>
+
+      {/* Stats Cards - Linha 4: ONGs Decolagem (Ativas), Diagnósticos Realizados, Famílias Embarcadas e Total de Pessoas Atendidas */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatsCard
+          title="ONGs Decolagem (Ativas)"
+          value={ongsDecolagemRealizado.toString()}
+          icon={Home}
+          trend={calcPercent(ongsDecolagemRealizado, ongsDecolagemMeta) >= 80 ? 'up' : 'down'}
+          color="secondary"
+          goalValue={ongsDecolagemMeta}
+          iconColor="decolagem"
+        />
+        <StatsCard
+          title="Diagnósticos Realizados"
+          value={diagnosticosRealizadosRealizado.toString()}
+          icon={Rocket}
+          trend={calcPercent(diagnosticosRealizadosRealizado, diagnosticosRealizadosMeta) >= 80 ? 'up' : 'down'}
+          color="secondary"
+          goalValue={diagnosticosRealizadosMeta}
+          iconColor="decolagem"
+        />
+        <StatsCard
+          title="Famílias Embarcadas"
+          value={familiasEmbarcadasRealizado.toString()}
+          icon={Users}
+          trend={calcPercent(familiasEmbarcadasRealizado, familiasEmbarcadasMeta) >= 80 ? 'up' : 'down'}
+          color="secondary"
+          goalValue={familiasEmbarcadasMeta}
+          iconColor="decolagem"
+        />
+        <StatsCard
           title="Total de Pessoas Atendidas"
           value={pessoasAtendidas.toString()}
           icon={Users}
           trend={'neutral'}
           color="secondary"
-          iconColor="green"
-        />
-        <StatsCard
-          title="Leads do dia"
-          value={`${leadsDoDiaRealizado}`}
-          icon={TrendingUp}
-          trend={leadsDoDiaRealizado > 0 ? 'up' : 'down'}
-          color="secondary"
-          iconColor="green"
+          iconColor="decolagem"
         />
       </div>
 
-      {/* Stats Cards - Quarta linha */}
+      {/* Stats Cards - Linha 5: Evasão Decolagem, Retenção Decolagem, Inadimplência e NPS */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatsCard
-          title="Total de Leads"
-          value={totalLeads.toString()}
-          icon={User}
-          trend={'neutral'}
-          color="secondary"
-          iconColor="green"
+          title="Evasão Decolagem"
+          value={(instituicaoStats?.evasaoPorPrograma?.decolagem || 0).toString()}
+          icon={AlertTriangle}
+          trend="down"
+          color="error"
+          iconColor="decolagem"
         />
         <StatsCard
-          title="Conversão de Leads"
-          value={conversaoLeadsRealizado.toString()}
-          icon={Target}
-          trend={calcPercent(conversaoLeadsRealizado, conversaoLeadsMeta) >= 80 ? 'up' : 'down'}
+          title="Retenção Decolagem"
+          value={`${retencaoDecolagemPercentual}%`}
+          icon={Percent}
+          trend={retencaoDecolagemPercentual >= retencaoDecolagemMetaPercentual ? 'up' : 'down'}
           color="secondary"
-          goalValue={conversaoLeadsMeta}
-          iconColor="green"
+          goalValue={retencaoDecolagemMetaPercentual}
+          iconColor="decolagem"
         />
         <StatsCard
-          title="Processo Seletivo"
-          value={processoSeletivoRealizado.toString()}
-          icon={UserCheck}
-          trend={calcPercent(processoSeletivoRealizado, processoSeletivoMeta) >= 80 ? 'up' : 'down'}
-          color="secondary"
-          goalValue={processoSeletivoMeta}
-          iconColor="green"
+          title="Inadimplência"
+          value={`${programStats.microcredito.inadimplenciaPercentual}%`}
+          icon={AlertTriangle}
+          trend="down"
+          change={programStats.microcredito.inadimplenciaPercentual}
+          color="error"
+          iconColor="light-red"
         />
         <StatsCard
           title="NPS"
@@ -759,35 +822,6 @@ export default function DashboardPage() {
           color="secondary"
           goalValue={sumGoalsByLabels(['NPS', 'nps']) || 70}
           iconColor="green"
-        />
-      </div>
-
-      {/* Stats Cards - Quinta linha (3 cards) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <StatsCard
-          title="Evasão Decolagem"
-          value={(instituicaoStats?.evasaoPorPrograma?.decolagem || 0).toString()}
-          icon={AlertTriangle}
-          trend="down"
-          color="error"
-          iconColor="light-red"
-        />
-        <StatsCard
-          title="Evasão Maras"
-          value={(instituicaoStats?.evasaoPorPrograma?.as_maras || 0).toString()}
-          icon={AlertTriangle}
-          trend="down"
-          color="error"
-          iconColor="light-red"
-        />
-        <StatsCard
-          title="Inadimplência"
-          value={`${programStats.microcredito.inadimplenciaPercentual}%`}
-          icon={AlertTriangle}
-          trend="down"
-          change={programStats.microcredito.inadimplenciaPercentual}
-          color="error"
-          iconColor="light-red"
         />
       </div>
 
