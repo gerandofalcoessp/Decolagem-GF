@@ -3,8 +3,8 @@ node_modules/
 */node_modules/
 
 # Source files (keep only built files)
-backend/src/
-frontend/src/
+# backend/src/  # REMOVIDO: necessário para compilar no Vercel
+# frontend/src/  # REMOVIDO: necessário para compilar no Vercel
 
 # Development files
 *.log
