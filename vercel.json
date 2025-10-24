@@ -9,6 +9,13 @@
       "runtime": "nodejs20.x"
     }
   },
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": { "distDir": "frontend/dist" }
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/(.*)",
