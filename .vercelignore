@@ -4,8 +4,7 @@ node_modules/
 
 # Source files (keep only built files)
 backend/src/
-# frontend/src/             # no longer ignored
-!frontend/src/**
+frontend/src/
 
 # Development files
 *.log
@@ -13,9 +12,9 @@ backend/src/
 *.env.development
 *.env.test
 
-# Build artifacts
-# backend/dist/
+# Build artifacts that aren't needed
 backend/build/
+frontend/build/
 
 # Testing
 coverage/
@@ -44,25 +43,9 @@ Thumbs.db
 
 # Scripts and utilities
 scripts/
-*.cjs
 debug-*.js
 debug-*.html
 test-*.js
-
-# Avoid conflicts with server files
-api/server.js
-test-*.html
-check-*.js
-fix-*.js
-investigate-*.js
-testar-*.js
-verificar-*.js
-
-# Keep only essential files for deployment
-!api/
-!index.html
-!assets/
-!*.json
 
 # Database files
 *.sql
@@ -73,15 +56,14 @@ verificar-*.js
 Dockerfile
 docker-compose.yml
 
-# Backend source (allow compile on Vercel)
-# backend/src/             # no longer ignored
-# backend/tsconfig.json    # no longer ignored
-backend/jest.config.cjs
-
-# Husky and git hooks
-.husky/
+# Git
 .git/
+.husky/
 
-# Permitir handlers serverless da API no deploy
-!api/*.mjs
-!api/**/*.mjs
+# Keep essential files for deployment
+!api/
+!dist/
+!backend/dist/
+!frontend/dist/
+!*.json
+!*.mjs

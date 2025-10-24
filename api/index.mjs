@@ -1,9 +1,11 @@
 // Vercel Serverless Function wrapper for the Express app
+import 'dotenv/config';
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 
+// Debug endpoint
 export default async function handler(req, res) {
   try {
     const moduleDir = path.dirname(fileURLToPath(import.meta.url));

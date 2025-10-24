@@ -90,7 +90,7 @@ router.get('/stats', async (req, res) => {
         // Otimização: usar uma única query para buscar todas as instituições com os campos necessários
         const { data: instituicoesData, error: instituicoesError } = await s
             .from('instituicoes')
-            .select('programa, regional, status');
+            .select('programa, programas, regional, status');
         if (instituicoesError) {
             logger.error('Error fetching instituicoes data', {
                 userId: user.id,
@@ -111,12 +111,17 @@ router.get('/stats', async (req, res) => {
         const regionalCounts = {};
         for (const instituicao of instituicoesData) {
             totalInstituicoes++;
-            if (instituicao.programa) {
+            // Usar o campo 'programas' array se disponível, senão usar 'programa' único para compatibilidade
+            const programasArray = instituicao.programas && Array.isArray(instituicao.programas) && instituicao.programas.length > 0
+                ? instituicao.programas
+                : (instituicao.programa ? [instituicao.programa] : []);
+            // Contabilizar cada programa separadamente (permite contabilização múltipla)
+            for (const programa of programasArray) {
                 if (instituicao.status === 'ativa') {
-                    programCounts[instituicao.programa] = (programCounts[instituicao.programa] || 0) + 1;
+                    programCounts[programa] = (programCounts[programa] || 0) + 1;
                 }
                 else if (instituicao.status === 'evadida') {
-                    programEvasaoCounts[instituicao.programa] = (programEvasaoCounts[instituicao.programa] || 0) + 1;
+                    programEvasaoCounts[programa] = (programEvasaoCounts[programa] || 0) + 1;
                 }
             }
             if (instituicao.regional && instituicao.status === 'ativa') {
@@ -124,11 +129,12 @@ router.get('/stats', async (req, res) => {
             }
         }
         // Contagens específicas para ONGs Maras e Decolagem (ativas)
-        const ongsMaras = programCounts['as_maras'] || 0;
+        // Verificar tanto 'maras' quanto 'as_maras' para compatibilidade
+        const ongsMaras = (programCounts['maras'] || 0) + (programCounts['as_maras'] || 0);
         const ongsDecolagem = programCounts['decolagem'] || 0;
         const ongsMicrocredito = programCounts['microcredito'] || 0;
         // Contagens específicas para ONGs Maras e Decolagem (evadidas)
-        const ongsMarasEvadidas = programEvasaoCounts['as_maras'] || 0;
+        const ongsMarasEvadidas = (programEvasaoCounts['maras'] || 0) + (programEvasaoCounts['as_maras'] || 0);
         const ongsDecolagemEvadidas = programEvasaoCounts['decolagem'] || 0;
         const ongsMicrocreditoEvadidas = programEvasaoCounts['microcredito'] || 0;
         // Otimização: buscar dados de atividades com uma única query usando agregação

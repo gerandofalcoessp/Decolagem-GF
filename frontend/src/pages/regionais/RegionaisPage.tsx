@@ -517,10 +517,13 @@ export default function RegionaisPage() {
               
               {/* Debug específico para Centro-Oeste */}
               {(regional.name === 'Centro-Oeste' || regional.name === 'R. Centro-Oeste') && (
-                <div style={{ display: 'none' }}>
-                  {console.log('🔍 DEBUG CARD CENTRO-OESTE - regional.leader:', regional.leader)}
-                  {console.log('🔍 DEBUG CARD CENTRO-OESTE - regional completo:', regional)}
-                </div>
+                <>
+                  {(() => {
+                    console.log('🔍 DEBUG CARD CENTRO-OESTE - regional.leader:', regional.leader);
+                    console.log('🔍 DEBUG CARD CENTRO-OESTE - regional completo:', regional);
+                    return null;
+                  })()}
+                </>
               )}
 
               {/* Para o card Nacional, mostrar todos os membros */}

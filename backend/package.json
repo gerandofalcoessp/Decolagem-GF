@@ -6,10 +6,11 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "start:dev": "tsx watch src/server.ts",
-    "build": "npm run vercel-build",
+    "build": "tsc --project . --skipLibCheck --noEmitOnError false --incremental false --sourceMap false && npm run copy-to-api",
+    "copy-to-api": "if exist \"../api/_backend_dist\" rmdir /s /q \"../api/_backend_dist\" && mkdir \"../api/_backend_dist\" && xcopy /E /I /Y \"dist\\*\" \"../api\\_backend_dist\\\" && copy /Y \"dist\\server.js\" \"../api\\server.js\" 2>nul || echo 'Server.js not found, skipping copy'",
     "start": "node dist/server.js",
     "start:prod": "node dist/server.js",
-    "vercel-build": "tsc --skipLibCheck --noEmitOnError false --incremental false --sourceMap false || echo 'Build completed with warnings'",
+    "vercel-build": "if exist dist rmdir /s /q dist && tsc --project . --skipLibCheck --noEmitOnError false --incremental false --sourceMap false || echo 'Build completed with warnings'",
     "migrate:run": "tsx src/scripts/migrate.ts run",
     "migrate:create": "tsx src/scripts/migrate.ts create",
     "migration:run": "npm run migrate:run",

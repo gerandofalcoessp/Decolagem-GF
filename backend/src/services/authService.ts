@@ -16,6 +16,7 @@ export interface SignUpData {
     tipo?: string;
     regional?: string;
     funcao?: string;
+    area?: string;
   };
 }
 

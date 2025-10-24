@@ -15,6 +15,7 @@ interface LogEntry {
   method?: string;
   url?: string;
   statusCode?: number;
+  email?: string;
   error?: {
     name: string;
     message: string;

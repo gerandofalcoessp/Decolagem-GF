@@ -4,6 +4,23 @@ import { canUserSeeRegionalEvents } from '../services/regionalService.js';
 import { z } from 'zod';
 import { requireRole } from '../middlewares/authMiddleware.js';
 const router = Router();
+// Schema para criação e atualização de eventos
+const createSchema = z.object({
+    titulo: z.string().min(1, 'titulo é obrigatório'),
+    data_inicio: z.string().refine((v) => !Number.isNaN(Date.parse(v)), 'data_inicio deve ser uma data ISO válida'),
+    descricao: z.string().min(1).optional().nullable(),
+    data_fim: z.string().refine((v) => !Number.isNaN(Date.parse(v)), 'data_fim deve ser uma data ISO válida').optional().nullable(),
+    local: z.string().min(1).optional().nullable(),
+    regional: z.string().min(1).optional().nullable(),
+    programa: z.string().min(1).optional().nullable(),
+    responsavel_id: z.string().uuid().optional().nullable(),
+    participantes_esperados: z.number().int().nonnegative().optional().nullable(),
+    participantes_confirmados: z.number().int().nonnegative().optional().nullable(),
+    quantidade: z.number().int().nonnegative().optional().nullable(),
+    evidencias: z.any().optional().nullable(),
+    status: z.string().min(1).optional().nullable(),
+    observacoes: z.string().min(1).optional().nullable(),
+}).passthrough();
 // GET - Listar eventos de calendário
 router.get('/', async (req, res) => {
     const authHeader = req.headers.authorization;
@@ -76,22 +93,6 @@ router.post('/', requireRole(['super_admin', 'equipe_interna', 'user']), async (
     if (!user)
         return res.status(401).json({ error: 'unauthorized' });
     const body = req.body || {};
-    const createSchema = z.object({
-        titulo: z.string().min(1, 'titulo é obrigatório'),
-        data_inicio: z.string().refine((v) => !Number.isNaN(Date.parse(v)), 'data_inicio deve ser uma data ISO válida'),
-        descricao: z.string().min(1).optional().nullable(),
-        data_fim: z.string().refine((v) => !Number.isNaN(Date.parse(v)), 'data_fim deve ser uma data ISO válida').optional().nullable(),
-        local: z.string().min(1).optional().nullable(),
-        regional: z.string().min(1).optional().nullable(),
-        programa: z.string().min(1).optional().nullable(),
-        responsavel_id: z.string().uuid().optional().nullable(),
-        participantes_esperados: z.number().int().nonnegative().optional().nullable(),
-        participantes_confirmados: z.number().int().nonnegative().optional().nullable(),
-        quantidade: z.number().int().nonnegative().optional().nullable(),
-        evidencias: z.any().optional().nullable(),
-        status: z.string().min(1).optional().nullable(),
-        observacoes: z.string().min(1).optional().nullable(),
-    }).passthrough();
     const parsed = createSchema.safeParse(body);
     if (!parsed.success) {
         return res.status(400).json({ error: 'invalid_payload', details: parsed.error.flatten() });

@@ -10,7 +10,7 @@ import {
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, getDay } from 'date-fns';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import type { Atividade, Regional, StatusAtividade, TipoAtividade } from '@/types';
+import type { Atividade, Regional, Status, TipoAtividade } from '@/types';
 import NovoEventoModal from '@/components/modals/NovoEventoModal';
 import ConfirmModal from '@/components/modals/ConfirmModal';
 import { useCalendarEvents } from '@/hooks/useApi';
@@ -335,19 +335,19 @@ export default function RegionalCalendarioPage() {
                     )}
 
                     {/* Participantes - só exibir se houver participantes */}
-                    {((evt.participantes_esperados && evt.participantes_esperados > 0) || (evt.participantes_confirmados && evt.participantes_confirmados > 0)) && (
+                    {(((evt.participantes_esperados ?? 0) > 0) || ((evt.participantes_confirmados ?? 0) > 0)) && (
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <div className="w-4 h-4 rounded bg-cyan-100 flex items-center justify-center">
                           <div className="w-2 h-2 rounded bg-cyan-500"></div>
                         </div>
                         <span className="font-medium">Participantes:</span>
                         <div className="flex gap-2">
-                          {evt.participantes_confirmados > 0 && (
+                          {(evt.participantes_confirmados ?? 0) > 0 && (
                             <span className="px-2 py-1 bg-green-50 text-green-700 rounded text-xs font-medium">
                               {evt.participantes_confirmados} confirmados
                             </span>
                           )}
-                          {evt.participantes_esperados > 0 && (
+                          {(evt.participantes_esperados ?? 0) > 0 && (
                             <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs font-medium">
                               {evt.participantes_esperados} esperados
                             </span>
