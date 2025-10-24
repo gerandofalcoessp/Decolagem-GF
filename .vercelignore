@@ -48,6 +48,9 @@ scripts/
 debug-*.js
 debug-*.html
 test-*.js
+
+# Avoid conflicts with server files
+api/server.js
 test-*.html
 check-*.js
 fix-*.js
