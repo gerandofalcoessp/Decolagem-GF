@@ -6,7 +6,7 @@
   "framework": null,
   "functions": {
     "api/**/*.{js,mjs}": {
-      "runtime": "vercel/node@20.x"
+      "runtime": "nodejs20.x"
     }
   },
 
