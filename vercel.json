@@ -1,14 +1,14 @@
 {
   "version": 2,
-  "buildCommand": "npm run vercel-build --prefix frontend",
+  "buildCommand": "npm ci --include=dev --prefix frontend && npm run vercel-build --prefix frontend",
   "outputDirectory": "frontend/dist",
-  "installCommand": "npm install",
+  "installCommand": "npm install && npm install --prefix frontend",
   "framework": null,
 
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/api/index.mjs"
+      "destination": "/api/index.mjs?path=$1"
     },
     {
       "source": "/(.*)",

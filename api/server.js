@@ -65,6 +65,14 @@ const allowPreviewFrontend = (origin) => {
         // Permite domínio estável via env
         if (CORS_ORIGIN && o === CORS_ORIGIN.toLowerCase())
             return true;
+        // Permite FRONTEND_URL explícito
+        if (FRONTEND_URL && o === FRONTEND_URL.toLowerCase())
+            return true;
+        // Permite qualquer domínio *.vercel.app (alias/preview)
+        try {
+            const hostname = new URL(o).hostname.toLowerCase();
+            if (hostname.endsWith('.vercel.app')) return true;
+        } catch {}
         // Permite qualquer alias de preview do mesmo projeto Vercel
         const projectSlug = getVercelProjectSlug();
         if (projectSlug && o.startsWith(`https://${projectSlug}`) && o.endsWith('.vercel.app')) {
@@ -84,7 +92,9 @@ const corsOptions = {
         const ok = allowPreviewFrontend(origin);
         return callback(null, ok);
     },
-    credentials: true
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Authorization', 'Content-Type', 'Accept', 'Origin', 'X-Requested-With']
 };
 // Middlewares básicos
 app.use(helmet());
