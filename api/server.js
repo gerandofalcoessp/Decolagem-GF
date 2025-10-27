@@ -94,7 +94,7 @@ const corsOptions = {
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Authorization', 'Content-Type', 'Accept', 'Origin', 'X-Requested-With']
+    allowedHeaders: ['Authorization', 'Content-Type', 'Accept', 'Origin', 'X-Requested-With', 'x-client-info', 'x-client-version']
 };
 // Middlewares básicos
 app.use(helmet());
@@ -116,6 +116,81 @@ app.get('/health', (_req, res) => {
 // Also expose health under /api for Vercel
 app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', env: process.env.NODE_ENV ?? 'dev' });
+});
+// Rotas públicas de leitura (fallback para GET sem Authorization)
+app.get('/api/regional-activities', async (req, res, next) => {
+    if (req.headers.authorization) return next();
+    if (!supabaseAdmin) return res.status(500).json({ error: 'supabase_admin_unavailable' });
+    try {
+        const { data, error } = await supabaseAdmin
+            .from('regional_activities')
+            .select('*')
+            .order('created_at', { ascending: false });
+        if (error) return res.status(500).json({ error: error.message });
+        return res.json(data || []);
+    } catch (e) {
+        return res.status(500).json({ error: e?.message || 'internal_server_error' });
+    }
+});
+
+app.get('/api/asmaras', async (req, res, next) => {
+    if (req.headers.authorization) return next();
+    if (!supabaseAdmin) return res.status(500).json({ error: 'supabase_admin_unavailable' });
+    try {
+        const { data, error } = await supabaseAdmin
+            .from('participantes_asmaras')
+            .select('*')
+            .order('created_at', { ascending: false });
+        if (error) return res.status(500).json({ error: error.message });
+        return res.json(data || []);
+    } catch (e) {
+        return res.status(500).json({ error: e?.message || 'internal_server_error' });
+    }
+});
+
+app.get('/api/microcredito', async (req, res, next) => {
+    if (req.headers.authorization) return next();
+    if (!supabaseAdmin) return res.status(500).json({ error: 'supabase_admin_unavailable' });
+    try {
+        const { data, error } = await supabaseAdmin
+            .from('emprestimos')
+            .select('*')
+            .order('created_at', { ascending: false });
+        if (error) return res.status(500).json({ error: error.message });
+        return res.json(data || []);
+    } catch (e) {
+        return res.status(500).json({ error: e?.message || 'internal_server_error' });
+    }
+});
+
+app.get('/api/goals', async (req, res, next) => {
+    if (req.headers.authorization) return next();
+    if (!supabaseAdmin) return res.status(500).json({ error: 'supabase_admin_unavailable' });
+    try {
+        const { data, error } = await supabaseAdmin
+            .from('goals')
+            .select('*')
+            .order('created_at', { ascending: false });
+        if (error) return res.status(500).json({ error: error.message });
+        return res.json({ data: data || [] });
+    } catch (e) {
+        return res.status(500).json({ error: e?.message || 'internal_server_error' });
+    }
+});
+
+app.get('/api/decolagem', async (req, res, next) => {
+    if (req.headers.authorization) return next();
+    if (!supabaseAdmin) return res.status(500).json({ error: 'supabase_admin_unavailable' });
+    try {
+        const { data, error } = await supabaseAdmin
+            .from('familias_decolagem')
+            .select('*')
+            .order('created_at', { ascending: false });
+        if (error) return res.status(500).json({ error: error.message });
+        return res.json(data || []);
+    } catch (e) {
+        return res.status(500).json({ error: e?.message || 'internal_server_error' });
+    }
 });
 // Rota raiz pública (somente quando NÃO servindo o frontend)
 if (process.env.SERVE_FRONTEND !== 'true') {

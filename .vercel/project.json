@@ -1,1 +1,16 @@
-{"projectId":"prj_wlFGxMQPSdSykKBGYcqlxRlZSOa0","orgId":"team_OYX8MxPGcGDBQbpETqhrbw02","projectName":"decolagem-gf-backend"}
+{
+  "projectId": "prj_6toLbfyDds0x1ZWosemo9avtEu55",
+  "orgId": "team_OYX8MxPGcGDBQbpETqhrbw02",
+  "projectName": "decolagem-gf-frontend",
+  "settings": {
+    "createdAt": 1760584512468,
+    "framework": "vite",
+    "devCommand": null,
+    "installCommand": null,
+    "buildCommand": null,
+    "outputDirectory": null,
+    "rootDirectory": null,
+    "directoryListing": false,
+    "nodeVersion": "20.x"
+  }
+}

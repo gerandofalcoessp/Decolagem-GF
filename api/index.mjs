@@ -84,6 +84,22 @@ export default async function handler(req, res) {
     const originalQS = qsIndex >= 0 ? (req.url || '').slice(qsIndex) : '';
 
     const normalizedPath = (originalPath || '').split('?')[0];
+
+    // Generic CORS preflight handling for any /api/* route
+    if ((req.method || '').toUpperCase() === 'OPTIONS') {
+      try {
+        res.statusCode = 204;
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-client-info, x-client-version, Accept, Origin, X-Requested-With');
+        res.end('');
+        return;
+      } catch (_) {
+        res.end('');
+        return;
+      }
+    }
+
     if (normalizedPath === '/api/health' || normalizedPath === '/health' || rawPath === 'health') {
       try {
         res.statusCode = 200;
@@ -158,6 +174,84 @@ export default async function handler(req, res) {
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.end(JSON.stringify({ status: 'error', error: message }));
         return;
+      }
+    }
+
+    // Handlers públicos: intercepta GET sem Authorization e retorna dados do Supabase
+    if ((req.method || '').toUpperCase() === 'GET') {
+      const hasAuthHeader = !!(req.headers && (req.headers.authorization || req.headers.Authorization));
+      const publicPaths = new Set([
+        '/api/regional-activities',
+        '/api/asmaras',
+        '/api/microcredito',
+        '/api/goals',
+        '/api/decolagem'
+      ]);
+      if (!hasAuthHeader && publicPaths.has(normalizedPath)) {
+        try {
+          const { createClient } = await import('@supabase/supabase-js');
+          const supabaseUrlDirect = process.env.SUPABASE_URL || '';
+          const supabaseUrlFallback = process.env.VITE_SUPABASE_URL || '';
+          const supabaseUrl = supabaseUrlDirect || supabaseUrlFallback;
+          const supabaseServiceRoleKeyDirect = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+          const supabaseServiceRoleKeyFallback = process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || '';
+          const supabaseServiceRoleKey = supabaseServiceRoleKeyDirect || supabaseServiceRoleKeyFallback;
+
+          if (!supabaseUrl || !supabaseServiceRoleKey) {
+            res.statusCode = 500;
+            res.setHeader('Content-Type', 'application/json');
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.end(JSON.stringify({ error: 'supabase_unavailable' }));
+            return;
+          }
+
+          const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
+
+          let table = '';
+          let wrapAsData = false;
+          switch (normalizedPath) {
+            case '/api/regional-activities':
+              table = 'regional_activities';
+              break;
+            case '/api/asmaras':
+              table = 'participantes_asmaras';
+              break;
+            case '/api/microcredito':
+              table = 'emprestimos';
+              break;
+            case '/api/goals':
+              table = 'goals';
+              wrapAsData = true; // frontend espera { data }
+              break;
+            case '/api/decolagem':
+              table = 'familias_decolagem';
+              break;
+          }
+
+          const q = supabaseAdmin.from(table).select('*');
+          // Ordenar por created_at se existir
+          try { q.order('created_at', { ascending: false }); } catch {}
+          const { data, error } = await q;
+          if (error) {
+            res.statusCode = 500;
+            res.setHeader('Content-Type', 'application/json');
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.end(JSON.stringify({ error: error.message }));
+            return;
+          }
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.end(JSON.stringify(wrapAsData ? { data: data || [] } : (data || [])));
+          return;
+        } catch (e) {
+          const message = (e && e.message) ? e.message : 'unknown_error';
+          res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.end(JSON.stringify({ error: message }));
+          return;
+        }
       }
     }
 
